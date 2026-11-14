@@ -65,7 +65,6 @@ static const char *TAG = "link";
 #define SESSIONS 4
 typedef struct {
     uint32_t sid, last_seq, last_hover, used_ms;
-    uint32_t want_until_ms;  // this PC's phone mirrors until then (WANT); 0: it doesn't
     int host;  // whose key: settings.hosts[host]
     uint8_t reply[600];
     int reply_len;
@@ -88,15 +87,19 @@ static session_t sessions[SESSIONS];
 
 static uint32_t clock_ms(void) { return esp_timer_get_time() / 1000; }
 
+// Per allowed PC (settings.hosts), not per session: a PC that opens a new session (its
+// HELLO after lost answers on weak Wi-Fi) still has its phone mirroring.
+static uint32_t want_until_ms[HOSTS];  // that PC's phone mirrors until then (WANT); 0: it doesn't
+
 bool link_wanted(void) {
     uint32_t now = clock_ms();
-    for (int i = 0; i < SESSIONS; i++)
-        if (sessions[i].want_until_ms && (int32_t)(sessions[i].want_until_ms - now) > 0) return true;
+    for (int i = 0; i < HOSTS; i++)
+        if (want_until_ms[i] && (int32_t)(want_until_ms[i] - now) > 0) return true;
     return false;
 }
 
 static void want(session_t *ss, bool on, uint32_t now_ms) {
-    ss->want_until_ms = on ? (now_ms + WANT_MS) | 1 : 0;  // | 1: never 0 while on
+    want_until_ms[ss->host] = on ? (now_ms + WANT_MS) | 1 : 0;  // | 1: never 0 while on
     hid_update_wanted();
 }
 
@@ -109,8 +112,10 @@ static bool mac_ok(const uint8_t *key, const uint8_t *b, int n) {
 }
 
 void link_host_removed(int i) {
+    for (int k = i; k < HOSTS - 1; k++) want_until_ms[k] = want_until_ms[k + 1];  // hosts after i move down
+    want_until_ms[HOSTS - 1] = 0;
     for (int k = 0; k < SESSIONS; k++) {
-        if (sessions[k].host == i) sessions[k].sid = sessions[k].want_until_ms = 0;  // its PC isn't allowed any more
+        if (sessions[k].host == i) sessions[k].sid = 0;  // its PC isn't allowed any more
         else if (sessions[k].host > i) sessions[k].host--;
     }
 }
@@ -248,7 +253,6 @@ static void link_task(void *arg) {
                 if (sessions[i].used_ms < v->used_ms) v = &sessions[i];
             crypto_random(&v->sid, 4);
             v->last_seq = v->last_hover = 0;
-            v->want_until_ms = 0;  // a new session hasn't said its phone mirrors (main.c rechecks every second)
             v->reply_len = 0;
             memset(v->recent, 0, sizeof v->recent);
             v->used_ms = now_ms;
