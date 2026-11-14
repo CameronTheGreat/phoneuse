@@ -123,7 +123,7 @@ class Touch:
         the way, which turns an edge swipe into a drag of the content."""
         fx, fy = _clamp(fx), _clamp(fy)
         if self.pos is None or abs(self.pos[0] - fx) > 0.002 or abs(self.pos[1] - fy) > 0.002:
-            self.hid.cmd(f"a {fx:.5f} {fy:.5f} 0")
+            self.hid.cmd(f"a {fx:.5f} {fy:.5f} 0 sure")  # answered: see hid_daemon "a"
             # A new Touch doesn't know where the pointer is: it may be parked at the
             # left edge after a screenshot, a long jump. Taps right after such
             # jumps were lost twice in 15 tries at 0.1 s; give unknown starts longer.
@@ -155,7 +155,7 @@ class Touch:
         if not self.down:
             return
         fx, fy = self.target or self.pos
-        self.hid.cmd(f"a {fx:.5f} {fy:.5f} 0")
+        self.hid.cmd(f"a {fx:.5f} {fy:.5f} 0 sure")  # the lift must arrive: see hid_daemon "a"
         self.down = False
         self.pos = (fx, fy)
 
@@ -408,7 +408,7 @@ def tap(hid, fx, fy, hold=0.06, settle=True):
     (the second tap of a double tap)."""
     fx, fy = _clamp(fx), _clamp(fy)
     if settle:
-        hid.cmd(f"a {fx:.5f} {fy:.5f} 0")
+        hid.cmd(f"a {fx:.5f} {fy:.5f} 0 sure")  # answered: see hid_daemon "a"
         time.sleep(0.2)  # the pointer may jump far; pressing mid-jump starts a drag
     try:
         hid.cmd(f"tap {fx:.5f} {fy:.5f} {hold:.3f}")

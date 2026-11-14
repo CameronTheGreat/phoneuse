@@ -148,7 +148,7 @@ class Pointer:
         if self.grip is None:
             pos = self._grip_point()
             if pos != self.sent:
-                self.hid().cmd(f"a {pos[0]:.5f} {pos[1]:.5f} 0")
+                self.hid().cmd(f"a {pos[0]:.5f} {pos[1]:.5f} 0 sure")  # a press follows: it must arrive
                 self.sent = pos
             self.grip = (pos, now)
             return
@@ -181,7 +181,7 @@ class Pointer:
         # (lock held) lift where the touch is, so the release carries no position change
         self.pressed = self.scrolling = False
         fx, fy = self.touch
-        self.hid().cmd(f"a {fx:.5f} {fy:.5f} 0")
+        self.hid().cmd(f"a {fx:.5f} {fy:.5f} 0 sure")  # a lost lift breaks the next press (hid_daemon "a")
         self.sent = (round(fx, 4), round(fy, 4))
 
     def press(self, fx, fy):

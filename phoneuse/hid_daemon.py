@@ -918,9 +918,15 @@ def run_command(line):
             time.sleep(hold)
             hid.send(3, absolute(args[0], args[1], 0))
         return "ok"
-    if cmd == "a":  # absolute pointer: a FX FY [BUTTONS], FX/FY are 0..1 screen fractions
+    if cmd == "a":  # absolute pointer: a FX FY [BUTTONS [sure]], FX/FY are 0..1 screen fractions
         buttons = int(args[2]) if len(args) > 2 else 0
-        if not buttons and not hid.buttons:
+        # sure: a gesture's lift or its hover before a press. It must arrive, so it goes
+        # answered (resent until the bridge confirms it), never as a skippable hover: over
+        # weak Wi-Fi a lost lift left iOS's last absolute report at the press point, and the
+        # next press at that point was ignored as a repeat, so the touch started wherever
+        # the pointer already was (edge swipes became drags of the content).
+        sure = len(args) > 3 and args[3] == "sure"
+        if not buttons and not hid.buttons and not sure:
             # A hover while earlier reports still wait to go out (in the socket, the
             # controller, or the bridge): skip it, so the pointer jumps to the newest
             # position instead of trailing a queue. The sender sends its newest

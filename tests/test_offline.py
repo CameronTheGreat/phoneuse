@@ -214,7 +214,7 @@ def test_gesture_still_press_is_one_timed_tap():
             sent.append(line)
             return "ok"
     touch.gesture(Hid(), touch.parse_gesture("down 0.5 0.4 hold 0.8 up"))
-    assert sent == ["a 0.50000 0.40000 0", "tap 0.50000 0.40000 0.800"]
+    assert sent == ["a 0.50000 0.40000 0 sure", "tap 0.50000 0.40000 0.800"]
 
 
 def test_recipe_values():
