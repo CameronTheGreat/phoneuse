@@ -95,6 +95,9 @@ class HID:
         # The bridge path needs the same guard as the local one (hidproto.AbsoluteNudge):
         # an agent's tap at the spot of the last absolute report, after the owner's mouse
         # had moved the pointer, was ignored and the tap landed nowhere (2026-11-10).
+        # Drag motion still unanswered goes first (resent if lost): a lift or a press that
+        # overtook it on Wi-Fi would land before the drag's end.
+        bridge_link[0].drain()
         for extra in self.nudge.before(report_id, payload):
             bridge_link[0].report(3, extra, False)
         r = bridge_link[0].report(report_id, payload, skippable)
@@ -856,7 +859,10 @@ def run_command(line):
     cmd, rest = parts[0].lower(), (parts[1] if len(parts) > 1 else "")
     args = rest.split()
     if cmd == "status":
-        via = f" bridge={bridge_link[0].addr[0]}" if bridge_link[0] else ""
+        link = bridge_link[0]
+        # motion reports sent to the bridge since it was set, how many went again, how many were lost
+        via = (f" bridge={link.addr[0]} bridge_moves={link.counts['async']} bridge_resent={link.counts['resent']}"
+               f" bridge_lost={link.counts['lost']}") if link else ""
         return (f"ok connected={hid.connected} released={released.is_set()} peer={hid.peer} "
                 f"paired={paired_devices()} mirror={mirror_name[0]!r}{via}")
     if cmd == "bridge":  # bridge IP KEYHEX | bridge off: send input through the ESP32 bridge

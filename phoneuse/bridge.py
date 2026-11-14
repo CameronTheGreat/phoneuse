@@ -478,7 +478,9 @@ class Link:
 
     TIMEOUT = 0.06   # first wait for an answer; doubles on each retry
     CREDIT = 5       # unanswered async reports allowed at once (measured: 6 -> 107/s)
-    EXPIRE = 0.25    # an async report unanswered this long counts as lost
+    RESEND = 0.12    # an async report unanswered this long goes again, with the same seq (firmware 0.4.1+)
+    TRIES = 5        # sends of one async report before it counts as lost
+    EXPIRE = 0.25    # firmware before 0.4.1 can't take a resend: unanswered this long, it counts as lost
 
     def __init__(self, cfg=None):
         self.cfg = cfg or saved()
@@ -497,7 +499,8 @@ class Link:
         self.phone = True              # the last answer said a phone is connected
         self.rtt = []
         self.waiters = {}              # seq or ("hello", nonce) -> [event, answer body]
-        self.inflight = {}             # async seq -> send time
+        self.inflight = {}             # async seq -> [first send, last send, packet, sends]
+        self.counts = {"async": 0, "resent": 0, "lost": 0}  # async reports since the link opened
         self.closed = False
         # the receiver holds the Link weakly: a Link dropped without close() (a one-off
         # status()) closes its socket and ends its thread within 0.5 s
@@ -562,7 +565,7 @@ class Link:
             self.waiting, self.phone = body[1], body[0] != 2
         sent = self.inflight.pop(seq, None)
         if sent:
-            self.rtt = (self.rtt + [time.time() - sent])[-200:]
+            self.rtt = (self.rtt + [time.time() - sent[1]])[-200:]
         w = self.waiters.get(seq)
         if w and not w[0].is_set():
             w[1] = body
@@ -627,21 +630,62 @@ class Link:
         """Send a hover or motion report without waiting. False: not now."""
         if not self.session:
             self.hello()
-        now = time.time()
+        resend = self.can_resend()
         with self.lock:
-            for seq, t in list(self.inflight.items()):
-                if now - t > self.EXPIRE:
-                    del self.inflight[seq]
-                    self.lost = getattr(self, "lost", 0) + 1
+            self._resend_due(resend)
             if len(self.inflight) >= self.CREDIT or self.waiting >= self.CREDIT:
                 return False
             self.seq += 1
-            self.inflight[self.seq] = now
-            self.sock.sendto(self._pack(0x02, self.seq, bytes([0, report_id]) + bytes(payload)), self.addr)
+            pkt = self._pack(0x02, self.seq, bytes([0, report_id]) + bytes(payload))
+            self.inflight[self.seq] = [time.time(), time.time(), pkt, 1]
+            self.counts["async"] += 1
+            self.sock.sendto(pkt, self.addr)
         if getattr(self, "lost", 0) >= 8:  # many lost in a row: maybe a new session is needed
             self.lost = 0
             threading.Thread(target=self.hello, daemon=True).start()
         return True
+
+    def _resend_due(self, resend):
+        """(lock held) Send again, with the same seq, each async report unanswered for
+        RESEND: the bridge does a report it hasn't done yet once, and only answers a repeat
+        (0.4.1+). One unanswered after TRIES sends, or EXPIRE on older firmware, is lost."""
+        now = time.time()
+        for seq, f in list(self.inflight.items()):
+            if resend and f[3] < self.TRIES:
+                if now - f[1] > self.RESEND:
+                    f[1], f[3] = now, f[3] + 1
+                    self.counts["resent"] += 1
+                    self.sock.sendto(f[2], self.addr)
+            elif now - f[0] > (self.RESEND * self.TRIES if resend else self.EXPIRE):
+                del self.inflight[seq]
+                self.counts["lost"] += 1
+                self.lost = getattr(self, "lost", 0) + 1
+
+    def drain(self, timeout=1.0):
+        """Wait until every async report is answered (resending as needed), so a report
+        sent next can't overtake drag motion: a lift must come after the drag. True when
+        none is left unanswered."""
+        resend, end = self.can_resend(), time.time() + timeout
+        while True:
+            with self.lock:
+                self._resend_due(resend)
+                if not self.inflight:
+                    return True
+            if time.time() > end:
+                return False
+            time.sleep(0.004)
+
+    def can_resend(self):
+        """Whether the bridge's firmware takes resent async reports (0.4.1 and later)."""
+        if getattr(self, "_can_resend", None) is None:
+            self._can_resend = False  # until the status below says otherwise
+            try:
+                fw = self.status().get("fw", "0")
+                self._can_resend = tuple(int(p) for p in fw.split(".")[:3]) >= (0, 4, 1)
+            except (RuntimeError, ValueError, OSError):
+                self._can_resend = None
+                return False
+        return self._can_resend
 
     def send_latest(self, report_id, payload):
         """A hover: sent without waiting and without an answer. The bridge keeps

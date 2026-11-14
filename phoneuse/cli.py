@@ -615,6 +615,23 @@ def gesture(h, text):
     touch.gesture(h, parse_gesture(text))
 
 
+def link_counts(h):
+    """(moves, resent, lost): drag reports the HID daemon sent to the bridge, or None."""
+    try:
+        m = re.search(r"bridge_moves=(\d+) bridge_resent=(\d+) bridge_lost=(\d+)", h.cmd("status"))
+    except (RuntimeError, OSError):
+        return None
+    return tuple(int(v) for v in m.groups()) if m else None
+
+
+def link_note(before, after):
+    """A line for the agent when the bridge lost drag reports during the gesture."""
+    if not before or not after or after[2] == before[2]:
+        return None
+    return (f"note: the bridge link lost {after[2] - before[2]} of {after[0] - before[0]} drag reports, so the "
+            "touch ended short of where it was sent; look before relying on it")
+
+
 def recipe_steps(name, args=()):
     """A recipe's parsed steps with its values filled in, or None for the Home key."""
     from . import recipes
@@ -2084,10 +2101,14 @@ def main():
         else:
             from . import film
             f = film.Film()
+            before = link_counts(h)
             try:
                 touch.gesture(h, steps, film=f)
             finally:
                 NOTES.append(save_film(f, film_path))
+                note = link_note(before, link_counts(h))
+                if note:
+                    NOTES.append(note)
     elif cmd == "scroll":
         scroll(h, args[0] if args else "down", float(args[1]) if len(args) > 1 else 1.0)
     elif cmd == "scroll-by":
