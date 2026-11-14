@@ -108,6 +108,11 @@ another phone mirrors, even in the background. An app that has never reported (a
 before. Screen recording also sets `captured`; recording on one phone while another mirrors would tie that app
 to the wrong phone until it reports again.
 
+The app also ends its own Live Activity whenever its phone's screen isn't captured, without asking the PC, so
+the activity goes even when the PC can't be reached. While the app is open it reacts the moment mirroring stops
+or starts (`UIScreen.capturedDidChangeNotification`): it ends or starts the activity and sends a state request
+at once, so the PC learns the new `captured` before the next poll. In the background only the PC can end it.
+
 `bridge.connected` says whether the bridge reaches the iPhone, and `bridge.phone` names that iPhone (or is
 `null`). `pc_bluetooth.on` says whether the PC also uses its own Bluetooth as the iPhone's keyboard and mouse
 (Use This PC's Bluetooth); it is switched only on the PC, since turning it on asks for the PC's administrator

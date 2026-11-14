@@ -11,6 +11,7 @@ struct PhoneUseApp: App {
             ContentView()
                 .environmentObject(model)
                 .onOpenURL { model.pair(from: $0) }
+                .task { model.watchCapture() }
                 #if DEBUG
                 .task { model.startDemoActivityIfAsked() }
                 .task {  // screenshots: -demo YES opens the demo; -demoRequest YES adds an agent asking to start

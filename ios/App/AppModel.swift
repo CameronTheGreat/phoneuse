@@ -308,6 +308,11 @@ final class AppModel: ObservableObject {
 
     func syncActivity() async {
         if demo { return }  // no Live Activity for the simulated computer
+        // No mirroring here, no activity: iOS's own capture state, so this holds when the PC can't be reached too.
+        guard Self.screenCaptured else {
+            await endActivities("this iPhone isn't mirroring")
+            return await refresh()
+        }
         await refresh()
         guard reachable, let s = state else { return }
         let live = Self.live()
@@ -330,20 +335,48 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// While the app is open, corrects an activity whose state differs from the PC's, in case iOS dropped a push.
     /// Whether iOS mirrors (or records) this phone's screen now.
     static var screenCaptured: Bool {
         UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
             .contains { $0.traitCollection.sceneCaptureState == .active }
     }
 
-    private func reconcileActivities(_ s: PCState) async {
-        if s.serving == false {  // another iPhone mirrors: its agent isn't this phone's to show
-            for a in Self.live() {
-                AppLog.write("activity \(a.id): another iPhone mirrors; ending it")
-                await a.end(nil, dismissalPolicy: .immediate)
+    /// Ends every Phone Use Live Activity, saying why in the log.
+    func endActivities(_ why: String) async {
+        for a in Self.live() {
+            AppLog.write("activity \(a.id): \(why); ending it")
+            await a.end(nil, dismissalPolicy: .immediate)
+        }
+    }
+
+    private var watchingCapture = false
+
+    /// The moment iOS starts or stops mirroring this screen while the app runs: tells the PC at once (the state
+    /// request carries captured) instead of at the next poll, ends the activity when mirroring stopped, and
+    /// starts one again when it resumed.
+    func watchCapture() {
+        guard !watchingCapture else { return }
+        watchingCapture = true
+        NotificationCenter.default.addObserver(forName: UIScreen.capturedDidChangeNotification, object: nil,
+                                               queue: .main) { _ in
+            Task { @MainActor in
+                let model = AppModel.shared
+                if Self.screenCaptured {
+                    await model.syncActivity()  // refreshes first
+                } else {
+                    await model.endActivities("this iPhone stopped mirroring")
+                    await model.refresh()
+                }
             }
-            return
+        }
+    }
+
+    /// While the app is open, corrects an activity whose state differs from the PC's, in case iOS dropped a push.
+    private func reconcileActivities(_ s: PCState) async {
+        // This phone doesn't mirror: no activity, whatever the PC says (and when it can't be reached, see syncActivity)
+        guard Self.screenCaptured else { return await endActivities("this iPhone isn't mirroring") }
+        if s.serving == false {  // another iPhone mirrors: its agent isn't this phone's to show
+            return await endActivities("another iPhone mirrors")
         }
         let want = Self.contentState(s)
         for a in Self.live() {
