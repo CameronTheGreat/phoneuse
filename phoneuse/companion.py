@@ -196,6 +196,7 @@ class Companion:
         self._off_since = 0.0  # when mirroring stopped, while it is off
         self.warned_at = {}  # bridge warning title -> when its alert last sounded
         self._mirror_since = 0.0
+        self.sent_to = frozenset()  # the apps the last activity push was for (serves)
 
     # ---- auth ----
     @web.middleware
@@ -251,6 +252,8 @@ class Companion:
 
     async def state(self, req):
         m = self.mirror
+        if req.query.get("captured") in ("0", "1"):  # the app: whether iOS mirrors its own screen
+            await self.run(self.note_captured, req["device"], req.query["captured"] == "1")
         st = await self.run(self.daemon, "status")
         b = bridge.saved()
         bridge_state = None
@@ -278,6 +281,8 @@ class Companion:
             "pc": {"id": d["pc_id"], "name": pc_name(), "receiver": NAME, "version": _version()},
             "mirroring": m.live(),
             "phone": phones.current(),
+            # false: another phone mirrors, so this app gets no pushes and its actions are refused
+            "serving": self.serves(req["device"]),
             "bluetooth": {"connected": "connected=True" in st, "via": "bridge" if "bridge=" in st else "pc"},
             "agent": {"state": m.agent(), "action": m.agent_action, "since": int(m.agent_started) or None,
                       "steps": m.agent_steps,
@@ -301,14 +306,20 @@ class Companion:
 
     # ---- actions ----
     async def takeover(self, req):
+        if no := self.refuse_other(req):  # only the mirroring phone's app acts on it
+            return no
         self.mirror.take_over(True)
         return web.json_response({"agent": self.mirror.agent()})
 
     async def resume(self, req):
+        if no := self.refuse_other(req):  # only the mirroring phone's app acts on it
+            return no
         self.mirror.take_over(False)
         return web.json_response({"agent": self.mirror.agent()})
 
     async def unlock_answer(self, req):
+        if no := self.refuse_other(req):  # only the mirroring phone's app acts on it
+            return no
         p, b = self.unlocks.pending, req["json"]
         if not p or b.get("id") != p["id"]:
             return web.json_response({"error": "That unlock request is over."}, status=409)
@@ -317,6 +328,8 @@ class Companion:
         return web.json_response({"ok": True})
 
     async def session_answer(self, req):
+        if no := self.refuse_other(req):  # only the mirroring phone's app acts on it
+            return no
         b = req["json"]
         if not self.mirror.sessions.answer_id(b.get("id"), b.get("approve")):
             return web.json_response({"error": "That request is over."}, status=409)
@@ -358,6 +371,8 @@ class Companion:
         return web.json_response({"awake": self.mirror.awake})
 
     async def keyboard(self, req):
+        if no := self.refuse_other(req):  # only the mirroring phone's app acts on it
+            return no
         r = await self.run(self.daemon, "eject")
         return web.json_response({"ok": r.startswith("ok")} if r.startswith("ok") else {"error": r}, status=200)
 
@@ -367,6 +382,8 @@ class Companion:
         POST {"on": bool}: turn it on or off by asking Siri out loud through the PC's
         speakers (up to ~15 s; the phone must be unlocked and in earshot). Runs here,
         as the owner's own action: an agent session or approval isn't involved."""
+        if no := self.refuse_other(req):  # only the mirroring phone's app acts on it
+            return no
         from . import cli
         h = self.mirror.get_hid()
 
@@ -475,8 +492,55 @@ class Companion:
             return "relay"
         return None
 
+    # ---- which app: only the one on the phone that screen mirrors ----
+    def mirroring_phone(self):
+        """The phone that screen mirrors to this PC now (its AirPlay name), or None."""
+        return phones.current() if self.mirror.live() else None
+
+    def serves(self, dev_id):
+        """Whether the app `dev_id` gets this PC's state and pushes. While a phone mirrors, only
+        the app on that phone does: each app says whether iOS mirrors its own screen
+        (note_captured), which ties it to the phone mirroring at that moment, so another phone's
+        app stays out even in the background. An app that never said (older builds) is served."""
+        phone = self.mirroring_phone()
+        if not phone:
+            return True
+        dev = load()["devices"].get(dev_id) or {}
+        if dev.get("phone"):
+            return phones.same(dev["phone"], phone)
+        return not phones.same(dev.get("not_phone"), phone)
+
+    def note_captured(self, dev_id, captured):
+        """The app says whether iOS mirrors its screen now (UIScreen.isCaptured): while a phone
+        mirrors, that tells which phone the app runs on, or that it isn't that phone."""
+        phone = self.mirroring_phone()
+        if not phone:
+            return
+        d = load()
+        dev = d["devices"].get(dev_id)
+        if dev is None:
+            return
+        if captured and not phones.same(dev.get("phone"), phone):
+            dev["phone"] = phone
+            dev.pop("not_phone", None)
+            log(f"app {dev_id} runs on {phone}")
+        elif not captured and (phones.same(dev.get("phone"), phone) or not phones.same(dev.get("not_phone"), phone)):
+            dev.pop("phone", None)  # its screen isn't the one mirroring: whatever it was tied to, it isn't this
+            dev["not_phone"] = phone
+            log(f"app {dev_id} isn't on {phone}: it gets nothing while {phone} mirrors")
+        else:
+            return
+        save(d)
+
+    def refuse_other(self, req):
+        """A response refusing an action from an app on a phone that doesn't mirror, or None."""
+        if self.serves(req["device"]):
+            return None
+        return web.json_response({"error": f"{self.mirroring_phone()} is mirroring, not this iPhone."}, status=409)
+
     def _devices(self):
-        return [dev for dev in load()["devices"].values() if dev.get("bundle_id") and self.push_mode(dev)]
+        return [dev for i, dev in load()["devices"].items()
+                if dev.get("bundle_id") and self.push_mode(dev) and self.serves(i)]
 
     def has_devices(self):
         """Whether a paired phone can get pushes (an agent's countdown waits for one to take it)."""
@@ -555,14 +619,16 @@ class Companion:
         stops. An activity the app or iOS ended is started again by push."""
         while True:
             await asyncio.sleep(0.5)
-            if not self._devices():
+            if not self._devices_by_id(every=True):
                 continue
             want = self._activity_state()
+            served = frozenset(self._devices_by_id())  # another phone started mirroring: some apps drop out
             # one push per change the owner should see: a new state, request, action or
             # warning. The ring and the robot animate on the phone by themselves, and the
             # step count and phase ride along with the next push.
-            if _key(want) == _key(self.sent) and not self._needs_start(want):
+            if _key(want) == _key(self.sent) and served == self.sent_to and not self._needs_start(want):
                 continue
+            self.sent_to = served
             await self.run(self._send_activity, want)
 
     def _activity_state(self):
@@ -658,8 +724,10 @@ class Companion:
                    and now - self.start_tried.get(i, 0) > START_RETRY
                    for i, dev in self._devices_by_id().items() if dev.get("push_to_start"))
 
-    def _devices_by_id(self):
-        return {i: dev for i, dev in load()["devices"].items() if dev.get("bundle_id") and self.push_mode(dev)}
+    def _devices_by_id(self, every=False):
+        """Apps that can get pushes: those served now (serves), or every one (to end an activity)."""
+        return {i: dev for i, dev in load()["devices"].items()
+                if dev.get("bundle_id") and self.push_mode(dev) and (every or self.serves(i))}
 
     def _send_activity(self, want):
         m, before = self.mirror, self.sent
@@ -688,7 +756,9 @@ class Companion:
               and time.time() - self.warned_at.get(want[2], 0) > WARN_ALERT_EVERY):
             self.warned_at[want[2]] = time.time()
             alert = {"title": want[2], "body": want[6], "sound": "default"}  # the bridge needs the owner
-        for i, dev in self._devices_by_id().items():
+        everyone_want = want
+        for i, dev in self._devices_by_id(every=True).items():
+            want = everyone_want if self.serves(i) else None  # another phone's app: its activity ends
             topic = dev["bundle_id"] + ".push-type.liveactivity"
             # iOS ignores an update whose timestamp isn't newer than the last one it applied
             self.last_ts = max(int(time.time()), self.last_ts + 1)
@@ -736,6 +806,7 @@ class Companion:
             log(f"live activity {aps.get('event')} ({want[0] if want else 'off'}):", r)
             if want and want[0] == "asking":
                 self._told(want[4], r, sent_at)
+        want = everyone_want
 
     def mirror_since(self):
         if self.mirror.live():

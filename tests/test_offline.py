@@ -263,3 +263,32 @@ if __name__ == "__main__":
                 fails += 1
                 print("FAIL", name, e)
     sys.exit(1 if fails else 0)
+
+
+def test_companion_serves_only_the_mirroring_phones_app(monkeypatch):
+    from phoneuse import companion, phones
+    store = {"devices": {"mine": {"key": "00"}, "hers": {"key": "01"}, "old": {"key": "02"}}}
+    monkeypatch.setattr(companion, "load", lambda: store)
+    monkeypatch.setattr(companion, "save", lambda d: None)
+    mirroring = ["LXEPhone17Pro"]
+    monkeypatch.setattr(phones, "current", lambda: mirroring[0])
+
+    class Mirror:
+        def live(self):
+            return mirroring[0] is not None
+
+    c = companion.Companion.__new__(companion.Companion)
+    c.mirror = Mirror()
+    c.note_captured("mine", True)       # my app, while my phone mirrors
+    mirroring[0] = "Meng\u2019s iPhone"
+    c.note_captured("hers", True)       # her app, while hers mirrors
+    assert not c.serves("mine")         # my app is tied to my phone: left out, even without reporting again
+    assert c.serves("hers")
+    assert c.serves("old")              # never reported: served as before
+    c.note_captured("old", False)       # it says its screen isn't the mirroring one
+    assert not c.serves("old")
+    mirroring[0] = "LXEPhone17Pro"
+    assert c.serves("mine") and not c.serves("hers")
+    assert c.serves("old")              # it only said it isn't Meng's iPhone
+    mirroring[0] = None
+    assert c.serves("mine") and c.serves("hers")  # nothing mirrors: every app sees the PC

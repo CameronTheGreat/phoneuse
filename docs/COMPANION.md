@@ -51,7 +51,7 @@ Every response is JSON. Errors are `{"error": "<short sentence for the owner>"}`
 
 | Method and path | Body | What the PC does |
 |---|---|---|
-| `GET /v1/state` | | Returns the state below |
+| `GET /v1/state?captured=0\|1` | | Returns the state below. `captured`: whether iOS mirrors this phone's screen (see "Which app") |
 | `POST /v1/agent/takeover` | `{}` | Stops the agent: its next action fails with "the user took over" |
 | `POST /v1/agent/resume` | `{}` | Lets the agent continue |
 | `POST /v1/unlock/answer` | `{"id", "approve": bool}` | Answers a pending unlock request |
@@ -78,6 +78,7 @@ Every response is JSON. Errors are `{"error": "<short sentence for the owner>"}`
   "pc": {"id": "…", "name": "lxe-desktop", "version": "9ccd370"},
   "mirroring": true,
   "phone": "LXEPhone17Pro",
+  "serving": true,
   "bluetooth": {"connected": true, "via": "bridge"},
   "agent": {"state": "idle | driving | paused", "action": "Opening Gmail", "since": 1794153854, "steps": 3,
             "phase": "acting | reading | thinking (while driving), else null"},
@@ -93,6 +94,19 @@ Every response is JSON. Errors are `{"error": "<short sentence for the owner>"}`
 ```
 
 `session.pending`, `unlock.pending` and `bridge` are `null` when there is no pending request or no bridge.
+
+### Which app
+
+While a phone mirrors, the PC serves only the app on that phone: its state says `"serving": true`, it gets the
+Live Activity and the request notifications, and only it may answer requests, take over or resume. An app on
+another phone gets `"serving": false`, its Live Activity ends, and its actions are refused with 409.
+
+The PC learns which phone an app runs on from `captured`, which the app sends with every state request (iOS's
+`sceneCaptureState`): `captured=1` while phone X mirrors ties the app to X, and `captured=0` marks it as not on X.
+The tie lasts, so the app needs to have reported once while its phone mirrored, and is then left out whenever
+another phone mirrors, even in the background. An app that has never reported (an older build) is served as
+before. Screen recording also sets `captured`; recording on one phone while another mirrors would tie that app
+to the wrong phone until it reports again.
 
 `bridge.connected` says whether the bridge reaches the iPhone, and `bridge.phone` names that iPhone (or is
 `null`). `pc_bluetooth.on` says whether the PC also uses its own Bluetooth as the iPhone's keyboard and mouse
