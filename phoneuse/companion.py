@@ -154,10 +154,11 @@ def signal_level(kind, value):
 
 def bridge_health(s, use):
     """What the owner should know about the bridge, from its status (`s`, {} when it
-    doesn't answer): {"online", "phone_connected", "wifi", "phone", "warning"}. warning is
+    doesn't answer): {"online", "phone_connected", "standby", "wifi", "phone", "warning"}. warning is
     None or {"title", "detail"}."""
     if not use:
-        return {"online": None, "phone_connected": None, "wifi": None, "phone": None, "warning": None}
+        return {"online": None, "phone_connected": None, "standby": None, "wifi": None, "phone": None,
+                "warning": None}
     online = bool(s)
     wifi = signal_level("wifi", s.get("rssi") or None) if online else None
     fresh = online and 0 <= s.get("bt_rssi_age_ms", -1) < 10000
@@ -165,6 +166,8 @@ def bridge_health(s, use):
     warning = None
     if not online:
         warning = {"title": "Bridge is offline", "detail": "Check that it has power and is on Wi-Fi."}
+    elif s.get("standby"):
+        pass  # no phone mirrors, so the bridge stays away from it on purpose (firmware 0.4+)
     elif not s.get("connected"):
         warning = {"title": "Bridge can't reach your iPhone", "detail": "Move it closer, or check Bluetooth."}
     elif phone == "weak":
@@ -172,7 +175,7 @@ def bridge_health(s, use):
     elif wifi == "weak":
         warning = {"title": "Bridge's Wi-Fi is weak", "detail": "Move it closer to your router."}
     return {"online": online, "phone_connected": bool(s.get("connected")) if online else None,
-            "wifi": wifi, "phone": phone, "warning": warning}
+            "standby": bool(s.get("standby")) if online else None, "wifi": wifi, "phone": phone, "warning": warning}
 
 
 class Companion:
