@@ -20,7 +20,7 @@
 //        flags bit 1: newest wins, no answer (hovers): only the newest one goes
 //        to the phone, once Bluetooth has sent the previous report
 //   0x03 STATUS               -> 0x83 JSON
-//   0x04 CONNECT              -> 0x84 (page the last iPhone; also a WANT 1, for PCs older than 0.4)
+//   0x04 CONNECT              -> 0x84 (page the last iPhone, if some PC says it mirrors: WANT)
 //   0x0E WANT on(1)           -> 0x8E connected(1): on 1, this PC's phone is screen mirroring:
 //        connect to it and stay connected for WANT_MS (the PC repeats it every few seconds).
 //        On 0, or once no PC has said 1 for WANT_MS, the bridge stands by: it drops the
@@ -297,8 +297,7 @@ static void link_task(void *arg) {
             char j[460];
             m = reply(out, 0x83, sid, seq, j, status_json(j, sizeof j), key);
         } else if (type == 0x04) {
-            want(ss, true, now_ms);
-            hid_connect_last();
+            hid_connect_last();  // only while some PC says its phone mirrors (WANT)
             m = reply(out, 0x84, sid, seq, "", 0, key);
         } else if (type == 0x0E && bn >= 1) {
             want(ss, body[0] != 0, now_ms);
