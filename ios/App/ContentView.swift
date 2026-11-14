@@ -573,12 +573,15 @@ struct BridgeTab: View {
                 .accessibilityIdentifier("bridgeWarning")
             }
             let connected = b.connected ?? (s.bluetooth.connected && s.bluetooth.via == "bridge")
+            let standby = b.online && !connected && b.standby == true  // waits for Screen Mirroring
             LabeledContent {
-                Text(!b.online ? "Offline" : connected ? "Connected" : "Not connected")
-                    .foregroundStyle(!b.online ? Color.red : connected ? Color.green : Color.orange)
+                Text(!b.online ? "Offline" : connected ? "Connected" : standby ? "Waiting for mirroring" : "Not connected")
+                    .foregroundStyle(!b.online ? Color.red : connected ? Color.green
+                                     : standby ? Color.secondary : Color.orange)
             } label: {
                 RowTitle("Bridge \(String((b.id ?? "").suffix(4)))",
-                         b.online && !connected ? "Settings › Bluetooth › Phone Use Bridge" : b.ip)
+                         standby ? "Start Screen Mirroring to connect"
+                             : b.online && !connected ? "Settings › Bluetooth › Phone Use Bridge" : b.ip)
             }
             .accessibilityIdentifier("bridgeStatus")
             if let phone = b.signal?.phone { signalRow("Bridge to iPhone", "cellularbars", phone) }

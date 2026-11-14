@@ -58,6 +58,8 @@ struct BridgeStatus: Decodable {
     var error: String?
     var connected: Bool?
     var phone: String?
+    /// No phone mirrors, so the bridge stays off the iPhone until one does (firmware 0.4+).
+    var standby: Bool?
 }
 
 struct Session: Decodable {

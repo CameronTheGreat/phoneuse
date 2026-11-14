@@ -268,6 +268,8 @@ class Companion:
                             "rtt_ms": s.get("rtt_ms"),
                             # whether the bridge reaches the iPhone, and that iPhone's name
                             "connected": bool(s.get("connected")), "phone": s.get("phone") or None,
+                            # no phone mirrors, so the bridge stays off the iPhone on purpose (firmware 0.4+)
+                            "standby": bool(s.get("standby")),
                             # signal levels: good / fair / weak, or null when unknown
                             "signal": {"wifi": h["wifi"], "phone": h["phone"]}, "warning": h["warning"]}
         p = self.unlocks.pending

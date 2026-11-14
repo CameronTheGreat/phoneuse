@@ -361,7 +361,8 @@ class Window(Adw.ApplicationWindow):
         self._show_bridge(s.get("bridge"), running)
         st = (s.get("bridge") or {}).get("status") or {}
         self.tabs["bridge"].set_needs_attention(running and (not (s.get("bridge") or {}).get("saved")
-                                                             or bool(st.get("error")) or not st.get("connected")))
+                                                             or bool(st.get("error"))
+                                                             or not (st.get("connected") or st.get("standby"))))
         fw = s.get("firewall")
         self.net_group.set_visible(bool(fw) and not s["confirmed"])
         self.fw_row.set_subtitle(f"If {CFG['name']} is missing from Screen Mirroring on the iPhone, {fw} is "
@@ -475,6 +476,10 @@ class Window(Adw.ApplicationWindow):
         elif st.get("connected"):  # the iPhone's name, after a phone icon, in plain text
             state.set_label(st.get("phone") or "iPhone")
             r.add_suffix(Gtk.Image(icon_name="phone-symbolic"))
+        elif st.get("standby"):  # no phone mirrors: the bridge stays off the iPhone until one does
+            state.set_label("Waiting for mirroring")
+            state.add_css_class("dim-label")
+            r.set_subtitle("Start Screen Mirroring to connect")
         else:
             state.set_label("iPhone not connected")
             state.add_css_class("warning")

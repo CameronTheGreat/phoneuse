@@ -66,8 +66,10 @@ struct PCState: Decodable, Equatable {
         /// Whether the bridge reaches the iPhone over Bluetooth, and that iPhone's name. Older PCs don't send them.
         var connected: Bool?
         var phone: String?
+        /// No phone mirrors, so the bridge stays off the iPhone until one does (bridge firmware 0.4+).
+        var standby: Bool?
         enum CodingKeys: String, CodingKey {
-            case saved, id, ip, ssid, use, online, signal, warning, connected, phone, rttMs = "rtt_ms"
+            case saved, id, ip, ssid, use, online, signal, warning, connected, phone, standby, rttMs = "rtt_ms"
         }
     }
     struct Signal: Decodable, Equatable { var wifi: String?; var phone: String? }

@@ -32,7 +32,8 @@ struct MainView: View {
 
     private var bridgeNeedsAttention: Bool {
         guard core.running, let b = core.state?.bridge else { return false }
-        return b.saved == nil || b.status?.error != nil || b.status?.connected != true
+        return b.saved == nil || b.status?.error != nil
+            || (b.status?.connected != true && b.status?.standby != true)  // standby: waits for mirroring
     }
 }
 
@@ -338,7 +339,9 @@ struct BridgeTab: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Bridge \(String(saved.id.suffix(4)))")
                             let notConnected = b?.status?.error == nil && b?.status?.connected != true
-                            Text(notConnected ? "On the iPhone: Settings › Bluetooth › Phone Use Bridge" : saved.ip ?? "")
+                            let standby = notConnected && b?.status?.standby == true  // waits for Screen Mirroring
+                            Text(standby ? "Start Screen Mirroring to connect"
+                                 : notConnected ? "On the iPhone: Settings › Bluetooth › Phone Use Bridge" : saved.ip ?? "")
                                 .font(.callout).foregroundStyle(.secondary)
                         }
                         Spacer()
@@ -424,6 +427,8 @@ struct BridgeTab: View {
             Text("Offline").foregroundStyle(.red)
         } else if st?.connected == true {
             Text(st?.phone ?? "iPhone").foregroundStyle(.green)
+        } else if st?.standby == true {
+            Text("Waiting for mirroring").foregroundStyle(.secondary)
         } else {
             Text("iPhone not connected").foregroundStyle(.orange)
         }
