@@ -21,7 +21,11 @@
 //        to the phone, once Bluetooth has sent the previous report
 //   0x03 STATUS               -> 0x83 JSON
 //   0x04 CONNECT              -> 0x84 (page the last iPhone, if some PC says it mirrors: WANT)
-//   0x0E WANT on(1)           -> 0x8E connected(1): on 1, this PC's phone is screen mirroring:
+//   0x0F DROP                 -> 0x8F: disconnect the phone, and don't page it until mirroring
+//        stops and starts again (0.4.2)
+//   0x0E WANT on(1) name      -> 0x8E connected(1): on 1, this PC's phone is screen mirroring
+//        (name: the phone's AirPlay name, 0.4.2; the bridge pages and keeps only the paired
+//        phone by that name, and none when the name is missing or no paired phone has it):
 //        connect to it and stay connected for WANT_MS (the PC repeats it every few seconds).
 //        On 0, or once no PC has said 1 for WANT_MS, the bridge stands by: it drops the
 //        phone, stops paging and turns invisible, so the phone keeps its own keyboard.
@@ -332,6 +336,13 @@ static void link_task(void *arg) {
             hid_connect_last();  // only while some PC says its phone mirrors (WANT)
             m = reply(out, 0x84, sid, seq, "", 0, key);
         } else if (type == 0x0E && bn >= 1) {
+            if (body[0] && bn > 1) {  // the mirroring phone's name follows (0.4.2)
+                char nm[40];
+                int k = bn - 1 < (int)sizeof nm - 1 ? bn - 1 : (int)sizeof nm - 1;
+                memcpy(nm, body + 1, k);
+                nm[k] = 0;
+                hid_want_name(nm);
+            }
             want(ss, body[0] != 0, now_ms);
             uint8_t c = bridge.phone_connected;
             m = reply(out, 0x8E, sid, seq, &c, 1, key);
@@ -372,6 +383,9 @@ static void link_task(void *arg) {
 #pragma GCC diagnostic pop
             if (body[0] == 2) e = esp_wifi_set_max_tx_power((int8_t)body[1]);
             m = reply(out, 0x88, sid, seq, &e, 4, key);
+        } else if (type == 0x0F) {  // DROP
+            hid_drop();
+            m = reply(out, 0x8F, sid, seq, "", 0, key);
         } else if (type == 0x0C && bn >= 6) {  // TAP x(u16) y(u16) hold_ms(u16), little-endian
             int8_t e = (int8_t)hid_tap(body[0] | body[1] << 8, body[2] | body[3] << 8, body[4] | body[5] << 8);
             bridge_activity(ACT_TAP);

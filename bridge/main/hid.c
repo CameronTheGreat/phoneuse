@@ -13,6 +13,7 @@
 #include "esp_hidd_api.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "nvs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
@@ -125,6 +126,77 @@ static void name_from(const uint8_t *addr) { esp_bt_gap_read_remote_name((uint8_
 static esp_bd_addr_t paged;
 static int64_t paged_at;
 
+// The phone that screen mirrors, by name (WANT): the only phone the bridge pages or keeps.
+// AirPlay and Bluetooth both carry the name from the phone's Settings > General > About.
+static char want_name[40];
+// A phone the PC dropped (DROP), or one that isn't the mirroring phone: not paged, and
+// dropped if it connects, until mirroring stops or another phone mirrors.
+static esp_bd_addr_t held;
+static bool held_set;
+
+// Names of the phones the bridge has a key for, learned when they pair or connect (NVS).
+#define NAMES 8
+typedef struct { esp_bd_addr_t addr; char name[40]; } phone_name_t;
+static phone_name_t names[NAMES];
+
+static void names_load(void) {
+    nvs_handle_t h;
+    size_t n = sizeof names;
+    if (nvs_open("phones", NVS_READONLY, &h) != ESP_OK) return;
+    if (nvs_get_blob(h, "names", names, &n) != ESP_OK) memset(names, 0, sizeof names);
+    nvs_close(h);
+}
+
+static void name_learn(const uint8_t *addr, const char *name) {
+    if (!name || !name[0]) return;
+    int slot = -1, empty = -1;
+    for (int i = 0; i < NAMES; i++) {
+        if (!memcmp(names[i].addr, addr, sizeof(esp_bd_addr_t)) && names[i].name[0]) slot = i;
+        else if (!names[i].name[0] && empty < 0) empty = i;
+    }
+    if (slot >= 0 && !strncmp(names[slot].name, name, sizeof names[slot].name - 1)) return;
+    if (slot < 0) slot = empty >= 0 ? empty : 0;
+    memcpy(names[slot].addr, addr, sizeof(esp_bd_addr_t));
+    snprintf(names[slot].name, sizeof names[slot].name, "%s", name);
+    nvs_handle_t h;
+    if (nvs_open("phones", NVS_READWRITE, &h) != ESP_OK) return;
+    nvs_set_blob(h, "names", names, sizeof names);
+    nvs_commit(h);
+    nvs_close(h);
+}
+
+static const char *name_of(const uint8_t *addr) {
+    for (int i = 0; i < NAMES; i++)
+        if (names[i].name[0] && !memcmp(names[i].addr, addr, sizeof(esp_bd_addr_t))) return names[i].name;
+    return NULL;
+}
+
+// One name in a comparable form: ASCII lower case, ’ as ', no spaces at the ends.
+static void fold(const char *in, char *out, int cap) {
+    int n = 0;
+    while (*in == ' ') in++;
+    for (; *in && n < cap - 1; in++) {
+        if ((uint8_t)in[0] == 0xE2 && (uint8_t)in[1] == 0x80 && (uint8_t)in[2] == 0x99) {
+            out[n++] = '\'';
+            in += 2;
+        } else {
+            out[n++] = (*in >= 'A' && *in <= 'Z') ? *in + 32 : *in;
+        }
+    }
+    while (n > 0 && out[n - 1] == ' ') n--;
+    out[n] = 0;
+}
+
+static bool same_name(const char *a, const char *b) {
+    char x[48], y[48];
+    if (!a || !b || !a[0] || !b[0]) return false;
+    fold(a, x, sizeof x);
+    fold(b, y, sizeof y);
+    return !strcmp(x, y);
+}
+
+static bool is_held(const uint8_t *addr) { return held_set && !memcmp(held, addr, sizeof held); }
+
 static bool bonded(const uint8_t *addr) {
     int n = esp_bt_gap_get_bond_device_num();
     esp_bd_addr_t list[8];
@@ -146,6 +218,11 @@ static void hidd_cb(esp_hidd_cb_event_t ev, esp_hidd_cb_param_t *p) {
         break;
     case ESP_HIDD_OPEN_EVT:
         if (p->open.conn_status == ESP_HIDD_CONN_STATE_CONNECTED) {
+            if (is_held(p->open.bd_addr)) {  // dropped by the PC, or not the mirroring phone
+                ESP_LOGI(TAG, "a held phone connected: dropping it");
+                esp_bt_hid_device_disconnect();
+                break;
+            }
             memcpy(peer, p->open.bd_addr, sizeof peer);
             bridge.phone_connected = true;
             atomic_store(&in_lower, 0);
@@ -196,6 +273,7 @@ static void gap_cb(esp_bt_gap_cb_event_t ev, esp_bt_gap_cb_param_t *p) {
         break;
     case ESP_BT_GAP_AUTH_CMPL_EVT:
         ESP_LOGI(TAG, "paired with %s: %d", p->auth_cmpl.device_name, p->auth_cmpl.stat);
+        if (p->auth_cmpl.stat == ESP_BT_STATUS_SUCCESS) name_learn(p->auth_cmpl.bda, (char *)p->auth_cmpl.device_name);
         break;
     case ESP_BT_GAP_READ_RSSI_DELTA_EVT:  // the phone's signal: 0 inside the controller's golden range, below it negative
         if (p->read_rssi_delta.stat == ESP_BT_STATUS_SUCCESS) {
@@ -205,7 +283,16 @@ static void gap_cb(esp_bt_gap_cb_event_t ev, esp_bt_gap_cb_param_t *p) {
         break;
     case ESP_BT_GAP_READ_REMOTE_NAME_EVT:
         if (p->read_rmt_name.stat == ESP_BT_STATUS_SUCCESS) {
-            snprintf(bridge.phone, sizeof bridge.phone, "%s", (char *)p->read_rmt_name.rmt_name);
+            const char *nm = (char *)p->read_rmt_name.rmt_name;
+            name_learn(p->read_rmt_name.bda, nm);
+            bool ours = bridge.phone_connected && !memcmp(p->read_rmt_name.bda, peer, sizeof peer);
+            if (ours) snprintf(bridge.phone, sizeof bridge.phone, "%s", nm);
+            if (ours && !same_name(nm, want_name)) {  // not the phone that mirrors: no input goes to it
+                ESP_LOGW(TAG, "%s isn't the mirroring phone (%s): dropping it", nm, want_name);
+                memcpy(held, peer, sizeof held);
+                held_set = true;
+                esp_bt_hid_device_disconnect();
+            }
             screen_update();
         }
         break;
@@ -215,6 +302,7 @@ static void gap_cb(esp_bt_gap_cb_event_t ev, esp_bt_gap_cb_param_t *p) {
 }
 
 void hid_init(void) {
+    names_load();
     esp_bt_gap_register_callback(gap_cb);
     esp_bt_gap_set_device_name(BRIDGE_NAME);
     esp_bt_cod_t cod = {.major = ESP_BT_COD_MAJOR_DEV_PERIPHERAL, .minor = ESP_BT_COD_MINOR_PERIPHERAL_COMBO};
@@ -296,16 +384,44 @@ void hid_latest(uint8_t id, const uint8_t *data, int len) {
     xTaskNotifyGive(out_task);
 }
 
+// Page the phone that screen mirrors, if the bridge has a key for a phone by its name.
+// Never any other phone: with no such phone paired, it stays visible to be paired instead.
 void hid_connect_last(void) {
-    if (settings.quiet || !wanted) return;
+    if (settings.quiet || !wanted || !want_name[0]) return;
     int n = esp_bt_gap_get_bond_device_num();
     if (n <= 0) return;
-    esp_bd_addr_t list[4];
-    if (n > 4) n = 4;
+    esp_bd_addr_t list[8];
+    if (n > 8) n = 8;
     esp_bt_gap_get_bond_device_list(&n, list);
-    memcpy(paged, list[n - 1], sizeof paged);
-    paged_at = esp_timer_get_time();
-    esp_bt_hid_device_connect(list[n - 1]);
+    for (int i = n - 1; i >= 0; i--) {
+        if (is_held(list[i]) || !same_name(name_of(list[i]), want_name)) continue;
+        memcpy(paged, list[i], sizeof paged);
+        paged_at = esp_timer_get_time();
+        esp_bt_hid_device_connect(list[i]);
+        return;
+    }
+}
+
+void hid_want_name(const char *name) {
+    if (!strcmp(name, want_name)) return;
+    snprintf(want_name, sizeof want_name, "%s", name);
+    held_set = false;  // another phone mirrors: the old hold is over
+    ESP_LOGI(TAG, "the mirroring phone: %s", want_name);
+    if (bridge.phone_connected && bridge.phone[0] && !same_name(bridge.phone, want_name)) {
+        memcpy(held, peer, sizeof held);
+        held_set = true;
+        esp_bt_hid_device_disconnect();
+    } else if (!bridge.phone_connected) {
+        hid_connect_last();
+    }
+}
+
+void hid_drop(void) {
+    if (!bridge.phone_connected) return;
+    memcpy(held, peer, sizeof held);
+    held_set = true;
+    ESP_LOGI(TAG, "the PC dropped the phone: not paging it until mirroring starts again");
+    esp_bt_hid_device_disconnect();
 }
 
 // Ask the controller for the phone's signal; the answer arrives as ESP_BT_GAP_READ_RSSI_DELTA_EVT.
@@ -329,6 +445,7 @@ void hid_update_wanted(void) {
         set_visible(bridge.phone_connected);
         if (!bridge.phone_connected) hid_connect_last();
     } else {
+        held_set = false;  // mirroring stopped: a dropped phone may connect again next time
         if (bridge.phone_connected) esp_bt_hid_device_disconnect();  // its close event hides the bridge
         set_visible(bridge.phone_connected);
     }

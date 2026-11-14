@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BRIDGE_FW "0.4.1"  // 0.2: TAP (0x0C); 0.2.1: the phone's Bluetooth signal in status; 0.2.2: activity icon; 0.2.3: FORGET (0x0D); 0.2.4: setup advertising waits for its data; 0.2.5: network scan while online; 0.2.6: named Phone Use Bridge; 0.3.0: several PCs, ADOPT (0x11), more in FIND; 0.3.1: a phone that forgot the bridge stays unpaired; 0.4.0: WANT (0x0E): connects only while a phone mirrors; 0.4.1: overtaken REPORTs still done, once
+#define BRIDGE_FW "0.4.2"  // 0.2: TAP (0x0C); 0.2.1: the phone's Bluetooth signal in status; 0.2.2: activity icon; 0.2.3: FORGET (0x0D); 0.2.4: setup advertising waits for its data; 0.2.5: network scan while online; 0.2.6: named Phone Use Bridge; 0.3.0: several PCs, ADOPT (0x11), more in FIND; 0.3.1: a phone that forgot the bridge stays unpaired; 0.4.0: WANT (0x0E): connects only while a phone mirrors; 0.4.1: overtaken REPORTs still done, once; 0.4.2: only the mirroring phone (WANT name), DROP (0x0F)
 #define BRIDGE_NAME "Phone Use Bridge"  // the name the iPhone sees in Bluetooth settings
 
 typedef enum {
@@ -81,6 +81,8 @@ void hid_visible_again(void);  // after quiet ends
 // Connect to the phone, or stand by (disconnect, stop paging, invisible), as link_wanted()
 // says now. Called when a PC says whether its phone mirrors, and once a second.
 void hid_update_wanted(void);
+void hid_want_name(const char *name);  // the phone that screen mirrors: the only one paged or kept
+void hid_drop(void);                   // drop the phone; don't page it until mirroring starts again
 void hid_forget(void);         // disconnect, remove every pairing, go invisible (settings.quiet)
 void hid_read_signal(void);  // measure the phone's Bluetooth signal (bridge.bt_rssi_delta)
 // A tap at the absolute position (x, y: 0..32767): press, hold hold_ms, release, all on
