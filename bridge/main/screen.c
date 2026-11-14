@@ -147,6 +147,10 @@ static void draw(void) {
             uint32_t idle = t - bridge.last_cmd_ms;
             row(2, 8, 62, &font16, bridge.last_cmd_ms && idle < 5000 ? b : "Waiting for phoneuse", DIM);
             row(3, 8, 84, &font16, "", DIM);
+        } else if (bridge.standby) {  // paired, but no phone mirrors: the bridge stays out of sight
+            name_drawn = row(1, 8, 28, &font22, "Standby", FG);
+            row(2, 8, 62, &font16, "Connects while the", DIM);
+            row(3, 8, 84, &font16, "iPhone mirrors", FG);
         } else {
             name_drawn = row(1, 8, 28, &font22, "No phone", FG);
             row(2, 8, 62, &font16, "Pair on the iPhone:", DIM);
@@ -176,7 +180,7 @@ static void screen_task(void *arg) {
         // a change, every 200 ms while the icon may need hiding, or once a second for the counters
         bool icon_up = now_ms() - bridge.activity_ms < ACT_SHOW_MS + 200;
         ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(icon_up ? 200 : 1000));
-        int layout = bridge.asking ? 100 : bridge.state * 2 + bridge.phone_connected;  // rows differ between these
+        int layout = bridge.asking ? 100 : bridge.state * 4 + bridge.standby * 2 + bridge.phone_connected;  // rows differ between these
         if (layout != shown) {
             display_clear(BG);
             forget_rows();

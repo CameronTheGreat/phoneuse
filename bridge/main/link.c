@@ -20,7 +20,11 @@
 //        flags bit 1: newest wins, no answer (hovers): only the newest one goes
 //        to the phone, once Bluetooth has sent the previous report
 //   0x03 STATUS               -> 0x83 JSON
-//   0x04 CONNECT              -> 0x84 (page the last iPhone)
+//   0x04 CONNECT              -> 0x84 (page the last iPhone; also a WANT 1, for PCs older than 0.4)
+//   0x0E WANT on(1)           -> 0x8E connected(1): on 1, this PC's phone is screen mirroring:
+//        connect to it and stay connected for WANT_MS (the PC repeats it every few seconds).
+//        On 0, or once no PC has said 1 for WANT_MS, the bridge stands by: it drops the
+//        phone, stops paging and turns invisible, so the phone keeps its own keyboard.
 //   0x05 SETUP                -> 0x85 (open BLE setup again)
 //   0x06 SCAN                 -> 0x86 JSON list of networks it sees (takes ~2 s)
 //   0x07 JOIN nonce(12) sealed -> 0x87, then it changes network; sealed =
@@ -61,6 +65,7 @@ static const char *TAG = "link";
 #define SESSIONS 4
 typedef struct {
     uint32_t sid, last_seq, last_hover, used_ms;
+    uint32_t want_until_ms;  // this PC's phone mirrors until then (WANT); 0: it doesn't
     int host;  // whose key: settings.hosts[host]
     uint8_t reply[600];
     int reply_len;
@@ -79,6 +84,22 @@ static void remember(session_t *ss, uint32_t seq, const uint8_t *b, int n) {
 }
 static session_t sessions[SESSIONS];
 
+#define WANT_MS 30000  // a WANT 1 lasts this long: a PC that goes away lets the bridge stand by
+
+static uint32_t clock_ms(void) { return esp_timer_get_time() / 1000; }
+
+bool link_wanted(void) {
+    uint32_t now = clock_ms();
+    for (int i = 0; i < SESSIONS; i++)
+        if (sessions[i].want_until_ms && (int32_t)(sessions[i].want_until_ms - now) > 0) return true;
+    return false;
+}
+
+static void want(session_t *ss, bool on, uint32_t now_ms) {
+    ss->want_until_ms = on ? (now_ms + WANT_MS) | 1 : 0;  // | 1: never 0 while on
+    hid_update_wanted();
+}
+
 static bool mac_ok(const uint8_t *key, const uint8_t *b, int n) {
     uint8_t m[32];
     crypto_hmac(key, b, n - MAC, m);
@@ -89,7 +110,7 @@ static bool mac_ok(const uint8_t *key, const uint8_t *b, int n) {
 
 void link_host_removed(int i) {
     for (int k = 0; k < SESSIONS; k++) {
-        if (sessions[k].host == i) sessions[k].sid = 0;  // its PC isn't allowed any more
+        if (sessions[k].host == i) sessions[k].sid = sessions[k].want_until_ms = 0;  // its PC isn't allowed any more
         else if (sessions[k].host > i) sessions[k].host--;
     }
 }
@@ -151,11 +172,11 @@ static int status_json(char *j, int cap) {
     return snprintf(j, cap,
                     "{\"id\":\"%s\",\"fw\":\"%s\",\"phone\":\"%s\",\"connected\":%s,\"rssi\":%d,\"reports\":%lu,"
                     "\"skipped\":%lu,\"waiting\":%d,\"battery_mv\":%d,\"uptime\":%llu,\"ssid\":\"%s\","
-                    "\"online\":%s,\"err\":\"%s\",\"bt_rssi_delta\":%d,\"bt_rssi_age_ms\":%ld,\"hosts\":%d}",
+                    "\"online\":%s,\"standby\":%s,\"err\":\"%s\",\"bt_rssi_delta\":%d,\"bt_rssi_age_ms\":%ld,\"hosts\":%d}",
                     bridge.id, BRIDGE_FW, bridge.phone, bridge.phone_connected ? "true" : "false", bridge.wifi_rssi,
                     (unsigned long)bridge.reports, (unsigned long)bridge.skipped, bridge.pending, bridge.battery_mv,
                     (unsigned long long)(esp_timer_get_time() / 1000000), settings.ssid,
-                    bridge.state == ST_ONLINE ? "true" : "false", bridge.err, bridge.bt_rssi_delta,
+                    bridge.state == ST_ONLINE ? "true" : "false", bridge.standby ? "true" : "false", bridge.err, bridge.bt_rssi_delta,
                     bridge.bt_rssi_at_ms ? (long)((uint32_t)(esp_timer_get_time() / 1000) - bridge.bt_rssi_at_ms) : -1L,
                     settings.nhosts);
 }
@@ -227,6 +248,7 @@ static void link_task(void *arg) {
                 if (sessions[i].used_ms < v->used_ms) v = &sessions[i];
             crypto_random(&v->sid, 4);
             v->last_seq = v->last_hover = 0;
+            v->want_until_ms = 0;  // a new session hasn't said its phone mirrors (main.c rechecks every second)
             v->reply_len = 0;
             memset(v->recent, 0, sizeof v->recent);
             v->used_ms = now_ms;
@@ -272,11 +294,16 @@ static void link_task(void *arg) {
             r[1] = bridge.pending;
             m = reply(out, 0x82, sid, seq, r, 2, key);
         } else if (type == 0x03) {
-            char j[400];
+            char j[460];
             m = reply(out, 0x83, sid, seq, j, status_json(j, sizeof j), key);
         } else if (type == 0x04) {
+            want(ss, true, now_ms);
             hid_connect_last();
             m = reply(out, 0x84, sid, seq, "", 0, key);
+        } else if (type == 0x0E && bn >= 1) {
+            want(ss, body[0] != 0, now_ms);
+            uint8_t c = bridge.phone_connected;
+            m = reply(out, 0x8E, sid, seq, &c, 1, key);
         } else if (type == 0x06) {
             static char j[512];
             int jn = wifi_scan_json(j, sizeof j);

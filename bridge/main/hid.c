@@ -102,9 +102,17 @@ typedef struct { uint16_t x, y, hold_ms; } tap_t;  // a whole tap (hid_tap)
 static QueueHandle_t tapq;
 static void tap_loop(void *arg);
 
-// Discoverable for a new pairing while no phone is connected, unless the bridge was forgotten.
+// Whether a PC says its phone is screen mirroring (link_wanted). Only then does the
+// bridge connect to its phone; otherwise it stands by, out of the phone's sight.
+static bool wanted;
+
+static bool any_bond(void) { return esp_bt_gap_get_bond_device_num() > 0; }
+
+// Connected: connectable for a reconnect, hidden from new pairings. Standing by with a
+// phone paired: invisible, so the phone can't reconnect by itself and keeps its own
+// keyboard. Otherwise discoverable for a new pairing, unless the bridge was forgotten.
 static void set_visible(bool connected) {
-    if (settings.quiet)
+    if (settings.quiet || (!connected && !wanted && any_bond()))
         esp_bt_gap_set_scan_mode(ESP_BT_NON_CONNECTABLE, ESP_BT_NON_DISCOVERABLE);
     else
         esp_bt_gap_set_scan_mode(ESP_BT_CONNECTABLE, connected ? ESP_BT_NON_DISCOVERABLE : ESP_BT_GENERAL_DISCOVERABLE);
@@ -147,8 +155,8 @@ static void hidd_cb(esp_hidd_cb_event_t ev, esp_hidd_cb_param_t *p) {
             name_from(peer);
             flow_spec_t f = {0, 2, 800, 0, 0, 8000, 0xFFFFFFFF};
             ESP_LOGI(TAG, "QoS setup: %d", BTM_SetQoS(peer, &f, NULL));
-            // Connected: stay connectable for a reconnect, hidden from new pairings.
             set_visible(true);
+            if (!wanted) esp_bt_hid_device_disconnect();  // connected while standing by: no phone mirrors
             screen_update();
         }
         break;
@@ -289,7 +297,7 @@ void hid_latest(uint8_t id, const uint8_t *data, int len) {
 }
 
 void hid_connect_last(void) {
-    if (settings.quiet) return;
+    if (settings.quiet || !wanted) return;
     int n = esp_bt_gap_get_bond_device_num();
     if (n <= 0) return;
     esp_bd_addr_t list[4];
@@ -310,6 +318,22 @@ void hid_discoverable(int seconds) {
 }
 
 void hid_visible_again(void) { set_visible(bridge.phone_connected); }
+
+void hid_update_wanted(void) {
+    bool w = link_wanted();
+    bridge.standby = !w && any_bond();
+    if (w == wanted) return;
+    wanted = w;
+    ESP_LOGI(TAG, "%s", w ? "a phone mirrors: connecting" : "no phone mirrors: standing by");
+    if (w) {
+        set_visible(bridge.phone_connected);
+        if (!bridge.phone_connected) hid_connect_last();
+    } else {
+        if (bridge.phone_connected) esp_bt_hid_device_disconnect();  // its close event hides the bridge
+        set_visible(bridge.phone_connected);
+    }
+    screen_update();
+}
 
 void hid_forget(void) {
     if (bridge.phone_connected) esp_bt_hid_device_disconnect();

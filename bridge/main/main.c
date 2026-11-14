@@ -63,8 +63,9 @@ static void housekeeping(void *arg) {
         if (held == 30) setup_ble_open(true);
         if (bridge.asking && gpio_get_level(BUTTON_BOOT) == 0) bridge.answer = 1;
         if (++tick % 10) continue;
-        // Keep the phone connected: page it every 5 s while it's away (locked,
-        // out of range, Bluetooth toggled). iOS accepts a bonded keyboard's page.
+        hid_update_wanted();  // a PC's word that its phone mirrors lasts WANT_MS (link.c)
+        // While a phone mirrors, keep it connected: page it every 5 s while it's away
+        // (locked, out of range, Bluetooth toggled). iOS accepts a bonded keyboard's page.
         if (!bridge.phone_connected && tick % 50 == 0) hid_connect_last();
         if (bridge.phone_connected && tick % 20 == 0) hid_read_signal();  // every 2 s
         wifi_ap_record_t ap;
