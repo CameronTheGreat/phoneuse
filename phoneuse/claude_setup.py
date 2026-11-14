@@ -16,6 +16,7 @@ Nothing else in ~/.claude or ~/.claude.json changes.
 """
 import json
 import os
+import shlex
 import shutil
 
 HOME = os.path.expanduser("~")
@@ -54,7 +55,7 @@ def _skill_source():
 
 def _cli_script():
     target = (f"flatpak run --command=phoneuse {FLATPAK_ID}" if FLATPAK_ID
-              else os.path.join(os.path.dirname(PKG), "bin", "phoneuse"))
+              else shlex.quote(os.path.join(os.path.dirname(PKG), "bin", "phoneuse")))  # "Phone Use.app"
     return f"#!/bin/sh\n{MARK}: lets agents (and you) run phoneuse commands.\nexec {target} \"$@\"\n"
 
 
