@@ -78,6 +78,9 @@ struct PCState: Decodable, Equatable {
     var pc: PC
     var mirroring: Bool
     var phone: String?
+    /// false: another iPhone mirrors to the PC, so this app gets no pushes and its actions are refused. Older PCs
+    /// don't send it.
+    var serving: Bool?
     var bluetooth: Bluetooth
     var agent: Agent
     var awake: Bool

@@ -121,7 +121,9 @@ final class AppModel: ObservableObject {
         if demo { reachable = true; return }
         guard let client else { return }
         do {
-            let s = try await client.get("/v1/state", as: PCState.self)
+            // captured: whether iOS mirrors this phone's screen. While a phone mirrors, the PC serves only the
+            // app on that phone, and remembers which phone each app runs on (phoneuse/companion.py, serves).
+            let s = try await client.get("/v1/state?captured=\(Self.screenCaptured ? 1 : 0)", as: PCState.self)
             if s != state {
                 state = s
                 // In their own tasks: a slow ActivityKit or notification call must not hold up the action that
@@ -329,7 +331,20 @@ final class AppModel: ObservableObject {
     }
 
     /// While the app is open, corrects an activity whose state differs from the PC's, in case iOS dropped a push.
+    /// Whether iOS mirrors (or records) this phone's screen now.
+    static var screenCaptured: Bool {
+        UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            .contains { $0.traitCollection.sceneCaptureState == .active }
+    }
+
     private func reconcileActivities(_ s: PCState) async {
+        if s.serving == false {  // another iPhone mirrors: its agent isn't this phone's to show
+            for a in Self.live() {
+                AppLog.write("activity \(a.id): another iPhone mirrors; ending it")
+                await a.end(nil, dismissalPolicy: .immediate)
+            }
+            return
+        }
         let want = Self.contentState(s)
         for a in Self.live() {
             let have = a.content.state

@@ -269,6 +269,11 @@ struct PhoneHero: View {
                         detail: "Check that Phone Use is running on the PC and that this iPhone is on the same network.",
                         retry: true)
         }
+        if s.serving == false {  // the PC serves only the app on the iPhone that mirrors to it
+            return Step(icon: "iphone.slash", title: "\(s.phone ?? "Another iPhone") is mirroring",
+                        detail: "\(s.pc.name) works with the iPhone that mirrors to it. Start Screen Mirroring here "
+                            + "to use this one.")
+        }
         if !s.mirroring {
             let name = s.pc.receiverName
             return Step(icon: "iphone", title: "Start Screen Mirroring",
