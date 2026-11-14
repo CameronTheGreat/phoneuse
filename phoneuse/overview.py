@@ -46,12 +46,18 @@ def hero(s, name):
     if saved and st.get("error"):
         return _step("bridge_offline", "The bridge is offline", "Check that it has power and is on the same "
                      "Wi-Fi as this PC.", "retry", icon="offline")
+    phone = b.get("mirroring_phone")
+    if saved and b.get("other_phone"):  # the bridge holds a phone that isn't mirroring: nothing goes to it
+        return _step("other_phone", f"The bridge is on {b['other_phone']}",
+                     f"{phone} is mirroring. To use it, open Settings › Bluetooth on {phone} and tap Phone Use Bridge.",
+                     icon="bluetooth", bold=phone)
     if saved and not st.get("connected"):
-        return _step("connect_bridge", "Connect the bridge to the iPhone", "On the iPhone, open Settings › "
-                     "Bluetooth and tap Phone Use Bridge. If it won't connect, forget it there and tap it again.", icon="bluetooth")
+        return _step("connect_bridge", "Connect the bridge to the iPhone", f"On {phone or 'the iPhone'}, open Settings › "
+                     "Bluetooth and tap Phone Use Bridge. If it won't connect, forget it there and tap it again.",
+                     icon="bluetooth", bold=phone)
     if pic.get("paused"):
         return _step("taken_over", "You're in control", "You took over from the agent.", "open_phone", good=True)
     if pic.get("stale"):
         return _step("stale", "The picture is old", "The iPhone's screen is off, or mirroring stalled.",
                      "open_phone")
-    return _step("mirroring", st.get("phone") or "iPhone", "Mirroring to this PC", "open_phone", good=True)
+    return _step("mirroring", phone or st.get("phone") or "iPhone", "Mirroring to this PC", "open_phone", good=True)

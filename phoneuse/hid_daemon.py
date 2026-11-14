@@ -65,6 +65,14 @@ def log(*a):
 # instead of this PC's Bluetooth: the iPhone pairs with the bridge.
 bridge_link = [None]
 bridge_phone = [False]
+bridge_other = [None]  # the bridge's phone, when it isn't the phone that mirrors: no input goes to it
+
+
+def no_bridge_phone():
+    if bridge_other[0]:
+        return RuntimeError(f"the bridge is connected to {bridge_other[0]}, not the mirroring {mirror_name[0]}: "
+                            f"nothing was sent. Pair {mirror_name[0]} with Phone Use Bridge")
+    return RuntimeError("no iPhone connected to the bridge (pair it with Phone Use Bridge)")
 
 
 def through_bridge():
@@ -95,6 +103,8 @@ class HID:
         # The bridge path needs the same guard as the local one (hidproto.AbsoluteNudge):
         # an agent's tap at the spot of the last absolute report, after the owner's mouse
         # had moved the pointer, was ignored and the tap landed nowhere (2026-11-10).
+        if bridge_other[0]:  # the bridge holds a phone that isn't mirroring: nothing goes to it
+            raise no_bridge_phone()
         # Drag motion still unanswered goes first (resent if lost): a lift or a press that
         # overtook it on Wi-Fi would land before the drag's end.
         bridge_link[0].drain()
@@ -103,7 +113,7 @@ class HID:
         r = bridge_link[0].report(report_id, payload, skippable)
         bridge_phone[0] = r != "no phone"
         if r == "no phone":
-            raise RuntimeError("no iPhone connected to the bridge (pair it with Phone Use Bridge)")
+            raise no_bridge_phone()
         return r == "sent"
 
     def send_skippable(self, report_id, payload):
@@ -112,7 +122,7 @@ class HID:
         if through_bridge():
             link = bridge_link[0]
             if not link.phone:
-                raise RuntimeError("no iPhone connected to the bridge (pair it with Phone Use Bridge)")
+                raise no_bridge_phone()
             if report_id == 3:  # a hover: newest wins on the bridge, no answer
                 for extra in self.nudge.before(report_id, payload):  # see _bridge
                     link.report(3, extra, False)
@@ -829,7 +839,16 @@ def watch_bridge(link):
             return
         try:
             was = link.phone
-            bridge_phone[0] = link.phone = bool(link.status().get("connected"))
+            st = link.status()
+            from .phones import other_phone
+            # Input goes to the bridge's phone only when it is the one that mirrors (the
+            # bridge may still hold another phone it was paired with)
+            other = other_phone(st.get("phone"), mirror_name[0]) if st.get("connected") else None
+            if other != bridge_other[0]:
+                log(f"bridge: connected to {other}, not the mirroring {mirror_name[0]}: input off" if other
+                    else "bridge: its phone is the mirroring one")
+            bridge_other[0] = other
+            bridge_phone[0] = link.phone = bool(st.get("connected")) and not other
             if link.phone and not was and hid.intr:  # back with the phone: one keyboard is enough
                 released.set()
                 hid.drop("the bridge reaches the iPhone again")
@@ -842,7 +861,7 @@ def watch_bridge(link):
             mirroring = mirroring if now is None else now
             if link.can_stand_by():
                 if mirroring is not None:
-                    bridge_phone[0] = link.phone = link.want(mirroring)
+                    bridge_phone[0] = link.phone = link.want(mirroring, mirror_name[0]) and not bridge_other[0]
             elif not link.phone and mirror_name[0]:
                 link.connect_phone()
         except Exception as e:
@@ -914,7 +933,7 @@ def run_command(line):
         fx, fy, hold = float(args[0]), float(args[1]), float(args[2]) if len(args) > 2 else 0.06
         if through_bridge() and bridge_link[0].can_tap():
             if not bridge_link[0].phone:
-                raise RuntimeError("no iPhone connected to the bridge (pair it with Phone Use Bridge)")
+                raise no_bridge_phone()
             for extra in hid.nudge.before(3, absolute(fx, fy, 1)):  # the tap is an absolute report (_bridge)
                 bridge_link[0].report(3, extra, False)
             bridge_link[0].tap(fx, fy, hold)  # timed on the bridge

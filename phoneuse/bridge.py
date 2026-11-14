@@ -736,13 +736,19 @@ class Link:
                 return False
         return self._can_stand_by
 
-    def want(self, mirroring):
-        """Tell the bridge whether this PC's phone is screen mirroring. While one is (said
-        again within 30 s), the bridge keeps the phone connected; otherwise it drops it and
-        turns invisible, so the phone keeps its own keyboard. Returns whether the phone is
-        connected."""
-        r = self._call(0x0E, bytes([1 if mirroring else 0]))
+    def want(self, mirroring, name=None):
+        """Tell the bridge whether a phone is screen mirroring to this PC, and which one (its
+        AirPlay name): while one is (said again within 30 s), the bridge pages and keeps only
+        the paired phone by that name (0.4.2+); otherwise it drops its phone and turns
+        invisible, so the phone keeps its own keyboard. Returns whether a phone is connected."""
+        body = bytes([1]) + (name or "").encode()[:39] if mirroring else bytes([0])
+        r = self._call(0x0E, body)
         return bool(r and r[0])
+
+    def drop(self):
+        """Disconnect the bridge's phone; the bridge doesn't page it again until mirroring
+        stops and starts again (firmware 0.4.2+)."""
+        self._call(0x0F)
 
     def open_setup(self):
         self._call(0x05)

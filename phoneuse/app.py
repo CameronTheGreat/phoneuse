@@ -362,7 +362,8 @@ class Window(Adw.ApplicationWindow):
         st = (s.get("bridge") or {}).get("status") or {}
         self.tabs["bridge"].set_needs_attention(running and (not (s.get("bridge") or {}).get("saved")
                                                              or bool(st.get("error"))
-                                                             or not (st.get("connected") or st.get("standby"))))
+                                                             or not (st.get("connected") or st.get("standby"))
+                                                             or bool((s.get("bridge") or {}).get("other_phone"))))
         fw = s.get("firewall")
         self.net_group.set_visible(bool(fw) and not s["confirmed"])
         self.fw_row.set_subtitle(f"If {CFG['name']} is missing from Screen Mirroring on the iPhone, {fw} is "
@@ -473,9 +474,15 @@ class Window(Adw.ApplicationWindow):
         if st.get("error"):
             state.set_label("Offline")
             state.add_css_class("error")
+        elif b.get("other_phone"):  # connected, but not to the phone that mirrors: nothing goes to it
+            state.set_label(b["other_phone"])
+            state.add_css_class("warning")
+            r.set_subtitle(f"Not the mirroring {b.get('mirroring_phone') or 'iPhone'}")
+            r.add_suffix(button("Disconnect", None, self._disconnect_bridge_phone))
         elif st.get("connected"):  # the iPhone's name, after a phone icon, in plain text
             state.set_label(st.get("phone") or "iPhone")
             r.add_suffix(Gtk.Image(icon_name="phone-symbolic"))
+            r.add_suffix(button("Disconnect", None, self._disconnect_bridge_phone))
         elif st.get("standby"):  # no phone mirrors: the bridge stays off the iPhone until one does
             state.set_label("Waiting for mirroring")
             state.add_css_class("dim-label")
@@ -589,6 +596,10 @@ class Window(Adw.ApplicationWindow):
             in_thread(claude_setup.connect, lambda _r, e: (
                 self.toast(f"Couldn't connect: {e}" if e else "Connected. New Claude Code sessions can use the "
                            "phone."), self.refresh()))
+
+    def _disconnect_bridge_phone(self):
+        """Drop the bridge's iPhone; it connects again when Screen Mirroring starts again."""
+        in_thread(lambda: api("/api/bridge/disconnect", {}), lambda *_: self.refresh())
 
     def _confirm_forget_bridge(self):
         confirm(self, "Forget the bridge?", "The bridge resets and disconnects from your iPhone. To use it again, "

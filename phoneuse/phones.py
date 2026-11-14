@@ -48,6 +48,26 @@ def seen(name, model):
     return new
 
 
+def same(a, b):
+    """Whether two phone names are the same phone's (AirPlay and Bluetooth both carry the
+    name from Settings > General > About; one may write ' where the other writes ’)."""
+    import unicodedata
+    n = lambda x: unicodedata.normalize("NFKC", x or "").replace("\u2019", "'").casefold().strip()
+    return bool(a and b) and n(a) == n(b)
+
+
+def other_phone(bridge_phone, mirroring):
+    """The bridge's connected phone, when it isn't the phone that mirrors; else None. The
+    bridge reports a Bluetooth address until it has read the phone's name: until then the
+    phone isn't known to be the mirroring one either."""
+    import re
+    if not mirroring:
+        return None
+    if not bridge_phone or re.fullmatch(r"[0-9a-f]{2}(:[0-9a-f]{2}){5}", bridge_phone):
+        return "an iPhone it hasn't named yet"
+    return None if same(bridge_phone, mirroring) else bridge_phone
+
+
 def current():
     """Name of the phone that is screen mirroring (or last mirrored), or None."""
     try:

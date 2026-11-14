@@ -89,6 +89,12 @@ class BridgeRoutes:
                 except Exception as e:
                     return {"error": str(e)}
             out["status"] = await asyncio.get_running_loop().run_in_executor(None, ask)
+            from . import phones
+            # the phone that screen mirrors is the target; a bridge holding another phone sends nothing to it
+            out["mirroring_phone"] = phones.current()
+            st = out["status"]
+            out["other_phone"] = (phones.other_phone(st.get("phone"), out["mirroring_phone"])
+                                  if st.get("connected") else None)
             out["daemon"] = await asyncio.get_running_loop().run_in_executor(None, _daemon, "status")
         return web.json_response(out)
 
@@ -266,6 +272,17 @@ class BridgeRoutes:
         answer = await asyncio.get_running_loop().run_in_executor(None, use_bridge, cfg)
         return web.json_response({"use": cfg["use"], "daemon": answer})
 
+    async def disconnect(self, req):
+        """Drop the bridge's phone; the bridge pages it again only once mirroring stops and
+        starts again (firmware 0.4.2+)."""
+        self._guard(req)
+        cfg = bridge.saved()
+        try:
+            await asyncio.get_running_loop().run_in_executor(None, lambda: bridge.Link(bridge.resolve(cfg) or cfg).drop())
+        except Exception as e:
+            return web.json_response({"error": f"the bridge didn't answer: {e}"})
+        return web.json_response({"ok": True})
+
     async def change(self, req):
         """Set the bridge up again over BLE (it keeps its network until a new one
         works). Changing networks doesn't need this: see change_network."""
@@ -289,3 +306,4 @@ class BridgeRoutes:
         r.add_post("/api/bridge/adopt/wait", self.adopt_wait)
         r.add_post("/api/bridge/use", self.use)
         r.add_post("/api/bridge/change", self.change)
+        r.add_post("/api/bridge/disconnect", self.disconnect)
