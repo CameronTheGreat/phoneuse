@@ -40,6 +40,9 @@
 //        preference (0 Wi-Fi, 1 Bluetooth, 2 balance), 2 = Wi-Fi TX power (0.25 dBm)
 // Packets after HELLO carry its session and a rising seq; an old seq is dropped,
 // the same seq again gets the same answer again (a lost reply), nothing is redone.
+// Except REPORTs (0.4.1): the PC pipelines drag motion and resends a report that
+// goes unanswered, so a REPORT among the last 64 seqs that wasn't done yet (lost,
+// or overtaken on Wi-Fi) is done when it arrives, once; a repeat is only answered.
 #include <stdio.h>
 #include <string.h>
 
@@ -65,6 +68,7 @@ static const char *TAG = "link";
 #define SESSIONS 4
 typedef struct {
     uint32_t sid, last_seq, last_hover, used_ms;
+    uint64_t seen;  // bit d: seq last_seq - d was done (reports that arrive overtaken still count once)
     int host;  // whose key: settings.hosts[host]
     uint8_t reply[600];
     int reply_len;
@@ -72,9 +76,11 @@ typedef struct {
     uint8_t next_recent;
 } session_t;
 
-static void remember(session_t *ss, uint32_t seq, const uint8_t *b, int n) {
-    memcpy(ss->reply, b, n);
-    ss->reply_len = n;
+static void remember(session_t *ss, uint32_t seq, const uint8_t *b, int n, bool newest) {
+    if (newest) {  // the answer a resend of last_seq gets
+        memcpy(ss->reply, b, n);
+        ss->reply_len = n;
+    }
     if (n <= 40) {
         int i = ss->next_recent++ % 6;
         ss->recent[i].seq = seq, ss->recent[i].len = n;
@@ -253,6 +259,7 @@ static void link_task(void *arg) {
                 if (sessions[i].used_ms < v->used_ms) v = &sessions[i];
             crypto_random(&v->sid, 4);
             v->last_seq = v->last_hover = 0;
+            v->seen = 0;
             v->reply_len = 0;
             memset(v->recent, 0, sizeof v->recent);
             v->used_ms = now_ms;
@@ -282,13 +289,34 @@ static void link_task(void *arg) {
             sendto(s, ss->reply, ss->reply_len, 0, (struct sockaddr *)&from, fl);
             continue;
         }
-        if (seq < ss->last_seq) {  // older: answer again if it was answered, never redo it
-            for (int i = 0; i < 6; i++)
-                if (ss->recent[i].seq == seq && ss->recent[i].len)
-                    sendto(s, ss->recent[i].buf, ss->recent[i].len, 0, (struct sockaddr *)&from, fl);
-            continue;
+        bool late = false;
+        if (seq < ss->last_seq) {
+            // Older. A REPORT not done yet was overtaken on Wi-Fi (the PC pipelines drag
+            // motion and resends what goes unanswered): do it now, once. Anything else,
+            // or a report already done: answer again if it was answered, never redo it.
+            uint32_t d = ss->last_seq - seq;
+            bool report = type == 0x02 && bn >= 2, known = d < 64;
+            if (!(report && known && !((ss->seen >> d) & 1))) {
+                bool answered = false;
+                for (int i = 0; i < 6; i++)
+                    if (ss->recent[i].seq == seq && ss->recent[i].len) {
+                        sendto(s, ss->recent[i].buf, ss->recent[i].len, 0, (struct sockaddr *)&from, fl);
+                        answered = true;
+                    }
+                if (!answered && report && known) {  // done, its answer no longer kept: "sent"
+                    uint8_t r[2] = {0, (uint8_t)bridge.pending};
+                    m = reply(out, 0x82, sid, seq, r, 2, key);
+                    sendto(s, out, m, 0, (struct sockaddr *)&from, fl);
+                }
+                continue;
+            }
+            ss->seen |= 1ULL << d;
+            late = true;
+        } else {
+            uint32_t d = seq - ss->last_seq;
+            ss->seen = (d >= 64 ? 0 : ss->seen << d) | 1;
+            ss->last_seq = seq;
         }
-        ss->last_seq = seq;
         bridge.last_cmd_ms = now_ms;
         if (type == 0x02 && bn >= 2) {  // REPORT
             uint8_t r[2];
@@ -317,7 +345,7 @@ static void link_task(void *arg) {
             int pn = crypto_open(k, body, bn, plain, sizeof plain - 1);
             uint8_t ok = pn > 0;
             m = reply(out, 0x87, sid, seq, &ok, 1, key);
-            remember(ss, seq, out, m);
+            remember(ss, seq, out, m, !late);
             sendto(s, out, m, 0, (struct sockaddr *)&from, fl);
             if (ok) {
                 plain[pn] = 0;
@@ -369,7 +397,7 @@ static void link_task(void *arg) {
         } else {
             continue;
         }
-        remember(ss, seq, out, m);
+        remember(ss, seq, out, m, !late);
         sendto(s, out, m, 0, (struct sockaddr *)&from, fl);
     }
 }
