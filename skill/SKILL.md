@@ -27,11 +27,12 @@ the full list.
    mirroring from the PC, and every input command refuses until it runs.
 3. **Show the user the phone** before your first action, so they can watch what
    you do: open http://localhost:8777 (`phoneuse view --print` prints the address).
-   If you have a browser of your own, such as a built-in browser pane, open it
-   there. Otherwise run `phoneuse view`, which opens it in the user's default
-   browser. Do this once per task; if the page is already open, leave it. The page
-   is for the user to watch: act through `phoneuse` commands, never by clicking in
-   the page.
+   Unless the user asks for another place, open it in your harness's own browser,
+   such as the Claude desktop app's browser pane, without asking first. Only when
+   you have no browser of your own, run `phoneuse view`, which opens it in the
+   user's default browser. Do this once per task; if the page is already open,
+   leave it. The page is for the user to watch: act through `phoneuse` commands,
+   never by clicking in the page.
 4. `connected=False`: run `phoneuse status` again after a few seconds (the daemon
    reconnects), then ask the user to tap "Phone Use" in the iPhone's Bluetooth settings
    (Windows: the PC's name, which `phoneuse status` shows as `name=`).
