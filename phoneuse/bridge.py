@@ -479,7 +479,7 @@ class Link:
     TIMEOUT = 0.06   # first wait for an answer; doubles on each retry
     CREDIT = 5       # unanswered async reports allowed at once (measured: 6 -> 107/s)
     RESEND = 0.12    # an async report unanswered this long goes again, with the same seq (firmware 0.4.1+)
-    TRIES = 5        # sends of one async report before it counts as lost
+    TRIES = 12       # sends of one async report before it counts as lost: rides out ~1.4 s of Wi-Fi gap
     EXPIRE = 0.25    # firmware before 0.4.1 can't take a resend: unanswered this long, it counts as lost
 
     def __init__(self, cfg=None):
