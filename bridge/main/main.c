@@ -64,6 +64,7 @@ static void housekeeping(void *arg) {
         if (bridge.asking && gpio_get_level(BUTTON_BOOT) == 0) bridge.answer = 1;
         if (++tick % 10) continue;
         hid_update_wanted();  // a PC's word that its phone mirrors lasts WANT_MS (link.c)
+        wifi_roam_check();
         // While a phone mirrors, keep it connected: page it every 5 s while it's away
         // (locked, out of range, Bluetooth toggled). iOS accepts a bonded keyboard's page.
         if (!bridge.phone_connected && tick % 50 == 0) hid_connect_last();

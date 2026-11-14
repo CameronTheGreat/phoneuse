@@ -18,12 +18,23 @@ static int failures;
 static bool joining_from_setup;
 static bool switching;  // changing networks from phoneuse: back to the old one if this fails
 static char old_ssid[33], old_pass[65];
+static bool pinned;  // joined one access point by its BSSID (wifi_roam_check)
 
-static void connect_to(const char *ssid, const char *pass) {
+// A network's station config. All channels are scanned and the strongest access point
+// wins: the default fast scan joins the first one it hears, and a network with several
+// (a mesh, an extender) left the bridge on a far one at -85 dBm while a near one gave -59.
+static wifi_config_t sta_config(const char *ssid, const char *pass) {
     wifi_config_t w = {0};
     strncpy((char *)w.sta.ssid, ssid, sizeof w.sta.ssid);
     strncpy((char *)w.sta.password, pass, sizeof w.sta.password);
     w.sta.threshold.authmode = pass[0] ? WIFI_AUTH_WPA_PSK : WIFI_AUTH_OPEN;
+    w.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+    w.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
+    return w;
+}
+
+static void connect_to(const char *ssid, const char *pass) {
+    wifi_config_t w = sta_config(ssid, pass);
     esp_wifi_set_config(WIFI_IF_STA, &w);
     esp_wifi_connect();
 }
@@ -46,6 +57,11 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {
         wifi_event_sta_disconnected_t *d = data;
         bridge.ip[0] = 0;
         if (d->reason == WIFI_REASON_ASSOC_LEAVE) return;  // we left on purpose (a switch)
+        if (pinned) {  // lost the access point roaming picked: any one of the network again
+            wifi_config_t w = sta_config(settings.ssid, settings.pass);
+            esp_wifi_set_config(WIFI_IF_STA, &w);
+            pinned = false;
+        }
         failures++;
         if (switching && failures >= 3) {
             // The new network didn't work: go back to the one that did.
@@ -128,9 +144,7 @@ void wifi_init(void) {
 #pragma GCC diagnostic pop
     ESP_LOGI(TAG, "power save off: %s", esp_err_to_name(e));
     if (settings.configured) {
-        wifi_config_t w = {0};
-        strncpy((char *)w.sta.ssid, settings.ssid, sizeof w.sta.ssid);
-        strncpy((char *)w.sta.password, settings.pass, sizeof w.sta.password);
+        wifi_config_t w = sta_config(settings.ssid, settings.pass);
         esp_wifi_set_config(WIFI_IF_STA, &w);
         bridge.state = ST_JOINING;
         esp_wifi_connect();
@@ -138,10 +152,7 @@ void wifi_init(void) {
 }
 
 void wifi_join(const char *ssid, const char *pass) {
-    wifi_config_t w = {0};
-    strncpy((char *)w.sta.ssid, ssid, sizeof w.sta.ssid);
-    strncpy((char *)w.sta.password, pass, sizeof w.sta.password);
-    w.sta.threshold.authmode = pass[0] ? WIFI_AUTH_WPA_PSK : WIFI_AUTH_OPEN;
+    wifi_config_t w = sta_config(ssid, pass);
     esp_wifi_disconnect();
     esp_wifi_set_config(WIFI_IF_STA, &w);
     failures = 0;
@@ -211,4 +222,40 @@ int wifi_scan_json(char *out, int cap) {
     *p++ = ']';
     *p = 0;
     return p - out;
+}
+
+// While the signal is weak, look for a stronger access point of the same network (a mesh
+// node, an extender) and move to it: the station stays on the one it joined however far the
+// bridge is carried. Called once a second; scans at most every ROAM_EVERY_S while weak.
+#define ROAM_WEAK -72       // dBm: below this, look
+#define ROAM_BETTER 10      // dB stronger before moving: no flapping between two similar ones
+#define ROAM_EVERY_S 120
+void wifi_roam_check(void) {
+    static int64_t last;
+    wifi_ap_record_t cur;
+    if (bridge.state != ST_ONLINE || switching || esp_wifi_sta_get_ap_info(&cur) != ESP_OK) return;
+    int64_t now = esp_timer_get_time() / 1000000;
+    if (cur.rssi >= ROAM_WEAK || now - last < ROAM_EVERY_S) return;
+    last = now;
+    if (!scan_done) scan_done = xSemaphoreCreateBinary();
+    xSemaphoreTake(scan_done, 0);
+    wifi_scan_config_t sc = {.ssid = cur.ssid, .show_hidden = false};
+    if (esp_wifi_scan_start(&sc, false) != ESP_OK) return;
+    xSemaphoreTake(scan_done, pdMS_TO_TICKS(6000));
+    uint16_t n = 8;
+    wifi_ap_record_t recs[8];
+    esp_wifi_scan_get_ap_records(&n, recs);
+    for (int i = 0; i < n; i++) {  // strongest first
+        if (strcmp((char *)recs[i].ssid, (char *)cur.ssid) || !memcmp(recs[i].bssid, cur.bssid, 6)) continue;
+        if (recs[i].rssi < cur.rssi + ROAM_BETTER) return;
+        ESP_LOGI(TAG, "roaming: %d dBm here, %d dBm at another access point", cur.rssi, recs[i].rssi);
+        wifi_config_t w = sta_config(settings.ssid, settings.pass);
+        w.sta.bssid_set = true;
+        pinned = true;
+        memcpy(w.sta.bssid, recs[i].bssid, 6);
+        esp_wifi_disconnect();  // WIFI_REASON_ASSOC_LEAVE: on_event leaves it to us
+        esp_wifi_set_config(WIFI_IF_STA, &w);
+        esp_wifi_connect();
+        return;
+    }
 }
