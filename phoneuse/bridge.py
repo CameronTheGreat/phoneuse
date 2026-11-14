@@ -682,6 +682,24 @@ class Link:
     def connect_phone(self):
         self._call(0x04)
 
+    def can_stand_by(self):
+        """Whether the bridge's firmware connects only while told a phone mirrors (0.4 and later)."""
+        if getattr(self, "_can_stand_by", None) is None:
+            try:
+                fw = self.status().get("fw", "0")
+                self._can_stand_by = tuple(int(p) for p in fw.split(".")[:2]) >= (0, 4)
+            except (RuntimeError, ValueError, OSError):
+                return False
+        return self._can_stand_by
+
+    def want(self, mirroring):
+        """Tell the bridge whether this PC's phone is screen mirroring. While one is (said
+        again within 30 s), the bridge keeps the phone connected; otherwise it drops it and
+        turns invisible, so the phone keeps its own keyboard. Returns whether the phone is
+        connected."""
+        r = self._call(0x0E, bytes([1 if mirroring else 0]))
+        return bool(r and r[0])
+
     def open_setup(self):
         self._call(0x05)
 

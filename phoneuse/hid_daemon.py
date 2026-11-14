@@ -801,10 +801,25 @@ def _set_bridge(args):
     return f"bridge {args[0]} phone={st.get('phone')!r} connected={st.get('connected')}"
 
 
+def mirroring_now():
+    """True or False: a phone is screen mirroring to this PC's UxPlay right now. None:
+    can't tell (screen.py needs numpy and Pillow; Windows may not answer)."""
+    try:
+        from .screen import airplay_mirroring
+    except ImportError:
+        return None
+    try:
+        return airplay_mirroring()
+    except (OSError, ValueError):
+        return None
+
+
 def watch_bridge(link):
-    """Keep the bridge's phone state current, and while a phone is screen
-    mirroring but not connected to the bridge, ask the bridge to page it."""
+    """Keep the bridge's phone state current, and tell the bridge whether a phone is
+    screen mirroring: it connects to the phone only while one is (firmware 0.4+;
+    older firmware is asked to page the phone whenever it isn't connected)."""
     failing = None  # the last error, logged once until the bridge answers again
+    mirroring = None  # the last answer mirroring_now() gave
     while True:
         time.sleep(2)
         if bridge_link[0] is not link:  # replaced or turned off while this slept: its socket is closed
@@ -818,7 +833,14 @@ def watch_bridge(link):
             if failing:
                 log("bridge: answering again")
                 failing = None
-            if not link.phone and mirror_name[0]:
+            now = mirroring_now()
+            if now is not None and now != mirroring:
+                log("bridge:", "a phone mirrors: connecting" if now else "no phone mirrors: the bridge stands by")
+            mirroring = mirroring if now is None else now
+            if link.can_stand_by():
+                if mirroring is not None:
+                    bridge_phone[0] = link.phone = link.want(mirroring)
+            elif not link.phone and mirror_name[0]:
                 link.connect_phone()
         except Exception as e:
             if bridge_link[0] is not link:
