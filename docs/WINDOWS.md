@@ -80,7 +80,8 @@ The window's own settings are in `%LOCALAPPDATA%\phoneuse\PhoneUseMirror.json`.
   Linux. Agents don't notice.
 - The PC isn't published over Bonjour (no Avahi), so the iPhone app finds it only at
   the address in its pairing link: pair again after the PC's address changes.
-- The bridge hasn't been tried on Windows.
+- The Bluetooth bridge works on Windows (Settings › Bluetooth bridge in the app), but
+  hasn't been tried with real hardware yet.
 
 Logs are in `%LOCALAPPDATA%\phoneuse\run` (`phoneuse-up.log` when the window started
 phoneuse). Agents use `bin\phoneuse.exe` (on your PATH after the install), guided by
