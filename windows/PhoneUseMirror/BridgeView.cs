@@ -128,13 +128,13 @@ public sealed class BridgeView : UserControl
         bool use = (bool?)saved["use"] ?? true;
         var sw = new ToggleSwitch
         {
-            OnContent = "The bridge", OffContent = "This PC's Bluetooth", IsOn = use, IsEnabled = !offline,
+            OnContent = "On", OffContent = "Off", IsOn = !use || offline, IsEnabled = !offline,
             MinWidth = 0,
         };
         sw.Toggled += async (_, _) =>
         {
             sw.IsEnabled = false;
-            var r = await _conn.PostAsync("api/bridge/use", new { on = sw.IsOn });
+            var r = await _conn.PostAsync("api/bridge/use", new { on = !sw.IsOn });
             var daemon = (string?)r?["daemon"];
             if (r?["error"] != null || (daemon != null && daemon.StartsWith("err")))
                 await Message("Couldn't switch", (string?)r?["error"] ?? daemon![4..]);
@@ -142,7 +142,7 @@ public sealed class BridgeView : UserControl
             await Refresh();
         };
         string daemonStatus = (string?)j["daemon"] ?? "";
-        _body.Children.Add(Row("Mouse and keyboard through",
+        _body.Children.Add(Row("Use this PC's Bluetooth",
             offline ? "The bridge isn't answering, so this PC's Bluetooth carries input."
             : use ? (daemonStatus.Contains(" le=closed") ? "This PC's Bluetooth keyboard is closed while the bridge carries input."
                                                          : "The bridge carries input; this PC's Bluetooth keyboard closes in a moment.")

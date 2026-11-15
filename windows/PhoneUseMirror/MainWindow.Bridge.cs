@@ -6,8 +6,8 @@ using Microsoft.UI.Xaml.Controls;
 namespace PhoneUseMirror;
 
 /// <summary>
-/// Settings › Bluetooth bridge: which Bluetooth the iPhone's keyboard and mouse come from,
-/// this PC's (LE) or the bridge's (/api/bridge/use {on}; in bridge mode the HID service
+/// Settings › Bluetooth bridge: "Use this PC's Bluetooth", on while this PC's (LE) keyboard
+/// carries input, off while the bridge does (/api/bridge/use {on}; in bridge mode the HID service
 /// closes this PC's LE keyboard), greyed out until a bridge is set up and answering; and
 /// Bridge Settings, the bridge's page (BridgeView) over the phone, where About shows.
 /// </summary>
@@ -27,7 +27,7 @@ public sealed partial class MainWindow
         bool answering = saved != null && st != null && st["error"] == null;
         bool use = saved != null && ((bool?)saved["use"] ?? true);
         _settingUp = true;
-        BridgeSwitch.IsOn = use;
+        BridgeSwitch.IsOn = !(use && answering);  // on whenever this PC's Bluetooth carries input, greyed out or not
         BridgeSwitch.IsEnabled = answering;
         _settingUp = false;
         string daemon = (string?)j?["daemon"] ?? "";
@@ -43,10 +43,12 @@ public sealed partial class MainWindow
 
     async void Bridge_Toggled(object sender, RoutedEventArgs e)
     {
-        if (_settingUp) return;
+        // IsOn="True" in the XAML toggles it while the window is built, before _conn exists;
+        // greyed out, only code changes it
+        if (_settingUp || _conn == null || !BridgeSwitch.IsEnabled) return;
         BridgeSwitch.IsEnabled = false;
-        BridgeText.Text = BridgeSwitch.IsOn ? "Switching to the bridge…" : "Switching to this PC's Bluetooth…";
-        var r = await _conn.PostAsync("api/bridge/use", new { on = BridgeSwitch.IsOn });
+        BridgeText.Text = BridgeSwitch.IsOn ? "Switching to this PC's Bluetooth…" : "Switching to the bridge…";
+        var r = await _conn.PostAsync("api/bridge/use", new { on = !BridgeSwitch.IsOn });
         var daemon = (string?)r?["daemon"];
         await LoadBridgeSwitch();
         if (r?["error"] != null || (daemon != null && daemon.StartsWith("err")))
