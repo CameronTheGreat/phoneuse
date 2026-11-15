@@ -10,6 +10,8 @@ $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "ARM64" } else { "x64" }
 
 Get-Process PhoneUseMirror -ErrorAction SilentlyContinue | Stop-Process  # the exe is locked while it runs
 # The trailing slash on -o keeps the XAML .xbf files inside dist (without it they land next to it).
-dotnet build $Proj -c Release -p:Platform=$arch -o "$Dist/" -nologo -v q
+# The same version as phoneuse (pyproject.toml), as package.ps1 gives it: About shows it
+$version = (Select-String -Path "$Root\pyproject.toml" -Pattern '^version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+dotnet build $Proj -c Release -p:Platform=$arch -p:Version=$version -o "$Dist/" -nologo -v q
 if ($LASTEXITCODE -ne 0) { throw "the mirror window didn't build" }
 Write-Host "==> Built $Dist\PhoneUseMirror.exe"

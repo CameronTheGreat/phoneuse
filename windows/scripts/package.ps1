@@ -2,7 +2,7 @@
 #   PhoneUse-<version>-win-x64-portable.zip   unzip anywhere and run PhoneUseMirror.exe; settings stay in data\
 #   PhoneUse-<version>-win-x64-setup.exe      per-user installer (no admin), Start menu, uninstaller
 #
-#   powershell -ExecutionPolicy Bypass -File windows\scripts\package.ps1 [-Version 0.1.0.42] [-Out windows\build\release]
+#   powershell -ExecutionPolicy Bypass -File windows\scripts\package.ps1 [-Version 0.1.5.42] [-Out windows\build\release]
 #
 # Layout (both):
 #   PhoneUseMirror.exe + the .NET and Windows App SDK runtime (self-contained)

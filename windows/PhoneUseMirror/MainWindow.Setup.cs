@@ -155,9 +155,13 @@ public sealed partial class MainWindow
         g.Children.Add(Badge(number, done, current));
 
         var col = new StackPanel { Spacing = 6 };
+        string? choice = (string?)item["choice"];
+        string title = (string?)item["title"] ?? id;
+        if (id == "input" && done)  // folded: say what was chosen
+            title = choice == "bridge" ? "Mouse and keyboard: the bridge" : "Mouse and keyboard: this PC's Bluetooth";
         col.Children.Add(new TextBlock
         {
-            Text = (string?)item["title"] ?? id, Style = Res<Style>("BodyStrongTextBlockStyle"),
+            Text = title, Style = Res<Style>("BodyStrongTextBlockStyle"),
             Opacity = done && !current ? 0.6 : 1, TextWrapping = TextWrapping.Wrap,
         });
         if (!done || current)  // done steps fold to their title
@@ -170,7 +174,7 @@ public sealed partial class MainWindow
             }
             var detail = (string?)item["detail"];
             if (!string.IsNullOrEmpty(detail)) col.Children.Add(Rich(detail, bold));
-            var action = StepAction(id, (string?)item["action"], done);
+            var action = id == "input" ? InputChoice(choice, done) : StepAction(id, (string?)item["action"], done);
             if (action != null) col.Children.Add(action);
             if (_setupError != null && _setupBusy == null && id == _setupErrorStep)
                 col.Children.Add(new TextBlock { Text = _setupError, Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0x45, 0x3A)), TextWrapping = TextWrapping.Wrap });
@@ -187,6 +191,86 @@ public sealed partial class MainWindow
     }
 
     string? _setupErrorStep;
+
+    /// <summary>The first step: this PC's Bluetooth LE or a bridge, side by side; once the bridge
+    /// is chosen but not set up yet, a way to set it up (or to change your mind).</summary>
+    FrameworkElement? InputChoice(string? choice, bool done)
+    {
+        if (done) return null;
+        var panel = new StackPanel { Spacing = 8 };
+        if (choice == "bridge")
+        {
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+            var set = new Button { Content = "Set Up Bridge…", Style = Res<Style>("AccentButtonStyle") };
+            set.Click += (_, _) => OpenBridgeSetup();
+            row.Children.Add(set);
+            var pc = new HyperlinkButton { Content = "Use this PC's Bluetooth instead", Padding = new Thickness(0) };
+            pc.Click += async (_, _) => await ChooseInput("pc");
+            row.Children.Add(pc);
+            panel.Children.Add(row);
+            return panel;
+        }
+        panel.Children.Add(Option("This PC's Bluetooth", "Recommended",
+            "Uses the Bluetooth this PC already has: nothing to buy or plug in. The phone takes a report every " +
+            "15 ms, so by hand the pointer feels a little slower than with a bridge; agents don't notice.",
+            async () => await ChooseInput("pc")));
+        panel.Children.Add(Option("A Bluetooth bridge", null,
+            "A LilyGO T-Display (an ESP32 board) near the iPhone, on your Wi-Fi, becomes the phone's mouse and " +
+            "keyboard over Bluetooth Classic: a quicker pointer (every 8 ms), and it works where this PC's " +
+            "Bluetooth can't reach. Takes a few minutes to set up; Phone Use can flash a new board.",
+            async () => await ChooseInput("bridge")));
+        return panel;
+    }
+
+    /// <summary>A choice as a big button: its name, a tag, and what it means.</summary>
+    static Button Option(string title, string? tag, string text, Func<Task> chosen)
+    {
+        var col = new StackPanel { Spacing = 4 };
+        var head = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        head.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold });
+        if (tag != null)
+            head.Children.Add(new Border
+            {
+                CornerRadius = new CornerRadius(4), Padding = new Thickness(6, 1, 6, 1), VerticalAlignment = VerticalAlignment.Center,
+                Background = Res<Brush>("AccentFillColorDefaultBrush"),
+                Child = new TextBlock { Text = tag, FontSize = 11, Foreground = new SolidColorBrush(Microsoft.UI.Colors.Black) },
+            });
+        col.Children.Add(head);
+        col.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Opacity = 0.75, FontSize = 13 });
+        var b = new Button
+        {
+            Content = col, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left,
+            Padding = new Thickness(12, 10, 12, 10),
+        };
+        b.Click += async (_, _) => await chosen();
+        return b;
+    }
+
+    async Task ChooseInput(string choice)
+    {
+        var r = await _conn.PostAsync("api/setup/input", new { choice });
+        if (r?["error"] != null)
+        {
+            _setupError = (string?)r["error"];
+            _setupErrorStep = "input";
+        }
+        await LoadSetup();
+        if (choice == "bridge") OpenBridgeSetup();
+    }
+
+    /// <summary>The bridge's page over the phone, with its setup dialog open.</summary>
+    void OpenBridgeSetup()
+    {
+        BridgeSettings_Click(this, new RoutedEventArgs());
+        var view = _bridgeView!;
+        if (view.XamlRoot != null && view.IsLoaded) view.BeginSetup();
+        else
+        {
+            RoutedEventHandler? once = null;
+            once = (_, _) => { view.Loaded -= once; view.BeginSetup(); };
+            view.Loaded += once;
+        }
+    }
 
     FrameworkElement? StepAction(string id, string? action, bool done)
     {
@@ -209,7 +293,7 @@ public sealed partial class MainWindow
         if (action == "setup_bridge")  // a link: the bridge is the other way to be the phone's keyboard
         {
             var link = new HyperlinkButton { Content = "Use a bridge instead", Padding = new Thickness(0) };
-            link.Click += (_, _) => BridgeSettings_Click(link, new RoutedEventArgs());
+            link.Click += async (_, _) => await ChooseInput("bridge");
             row.Children.Add(link);
         }
         if (busy) row.Children.Add(new ProgressRing { IsActive = true, Width = 18, Height = 18 });

@@ -946,7 +946,8 @@ def app(mirror):
                 calibrated = None
             return {"claude": claude_setup.state(), "firewall": netcheck.detect(),
                     "confirmed": netcheck.confirmed(), "paired": paired, "pc_bluetooth": bluetooth_setup.on(),
-                    "calibrated": calibrated, "pc": os.environ.get("COMPUTERNAME") or socket.gethostname()}
+                    "calibrated": calibrated, "pc": os.environ.get("COMPUTERNAME") or socket.gethostname(),
+                    "input_choice": overview.input_choice()}
         out = {"running": True, "picture": picture_state(), "name": NAME}
         out["bridge"], out["session"], out["awake"], out["passcode"], h = await asyncio.gather(
             get(bridges.state), get(sessions.setting), get(awake), get(passcode),
@@ -978,6 +979,26 @@ def app(mirror):
             return web.json_response({"error": str(e)})
         return web.json_response({"ok": True, "message": said})
     a.router.add_post("/api/setup/firewall", setup_firewall)
+
+    async def setup_input(req):
+        """{"choice": "pc" | "bridge" | null}: the setup checklist's choice of the phone's
+        mouse and keyboard. Choosing this PC turns input through a saved bridge off."""
+        if not same_origin(req):
+            return web.Response(status=403)
+        from . import bridge as bridge_mod, overview
+        choice = (await req.json()).get("choice")
+        try:
+            overview.set_input_choice(choice)
+        except ValueError as e:
+            return web.json_response({"error": str(e)}, status=400)
+        cfg = bridge_mod.saved()
+        if choice == "pc" and cfg and cfg.get("use", True):
+            from .bridge_web import use_bridge
+            cfg["use"] = False
+            bridge_mod.save(cfg)
+            await asyncio.get_running_loop().run_in_executor(None, use_bridge, cfg)
+        return web.json_response({"choice": choice})
+    a.router.add_post("/api/setup/input", setup_input)
 
     async def claude_connect(req):
         """{"on"}: connect Claude Code (the skill and the phoneuse command) or disconnect it."""

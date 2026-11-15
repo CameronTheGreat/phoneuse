@@ -13,6 +13,41 @@ fallback rather than the step itself.
 """
 
 
+def _setup_file():
+    import os
+    from .config import config_path
+    return os.path.join(os.path.dirname(config_path()), "setup.json")
+
+
+def input_choice():
+    """What the owner chose in setup for the phone's mouse and keyboard: "pc" (this PC's own
+    Bluetooth), "bridge", or None before choosing."""
+    import json
+    try:
+        with open(_setup_file()) as f:
+            v = json.load(f).get("input")
+    except (OSError, ValueError):
+        return None
+    return v if v in ("pc", "bridge") else None
+
+
+def set_input_choice(choice):
+    import json
+    import os
+    if choice not in ("pc", "bridge", None):
+        raise ValueError(f"no such choice: {choice!r}")
+    path = _setup_file()
+    try:
+        with open(path) as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        d = {}
+    d["input"] = choice
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(d, f)
+
+
 def _step(step, title, detail="", action=None, icon="phone", good=False, quiet=False, bold=None, steps=None, qr=None):
     return {"step": step, "title": title, "detail": detail, "action": action, "icon": icon,
             "good": good, "quiet": quiet, "bold": bold, "steps": steps, "qr": qr}
@@ -68,7 +103,9 @@ def checklist(s, name):
     done: [{"id", "title", "detail", "done", "optional", "action", "steps", "bold"}], in the
     order to do them. s: what /api/app gathers, plus "bluetooth" (the phone's input link is
     up), "calibrated" (the mirroring phone's pointer is measured; None: no phone yet) and
-    "pc" (this PC's Bluetooth name). Actions: allow_firewall, setup_bridge, pair_app, claude."""
+    "pc" (this PC's Bluetooth name), "input_choice" (input_choice()). Actions: choose_input
+    (the "input" step also says "choice": "pc", "bridge" or None), allow_firewall, setup_bridge,
+    pair_app, claude."""
     pic, b = s.get("picture") or {}, s.get("bridge") or {}
     saved = b.get("saved")
     live = bool(pic.get("live"))
@@ -78,6 +115,18 @@ def checklist(s, name):
         items.append({"id": id, "title": title, "detail": detail, "done": bool(done), "optional": optional,
                       "action": action, "steps": steps, "bold": bold})
 
+    # How the phone gets its mouse and keyboard: this PC's Bluetooth LE, or a bridge (Bluetooth
+    # Classic). Chosen once; a bridge already set up, or a phone already paired with this PC
+    # before the choice existed, counts as chosen.
+    choice = s.get("input_choice")
+    if saved:
+        choice = "bridge"
+    elif choice is None and s.get("bluetooth"):
+        choice = "pc"
+    add("input", "Choose how Phone Use controls the phone",
+        "Bridge chosen: set it up next (Bluetooth Settings has the steps)." if choice == "bridge" and not saved
+        else "", done=choice == "pc" or (choice == "bridge" and saved), action="choose_input")
+    items[-1]["choice"] = choice
     if s.get("firewall") and not s.get("confirmed"):  # Windows Firewall has no rule for UxPlay yet
         add("firewall", "Let the iPhone reach this PC",
             "Windows Firewall blocks Screen Mirroring until Phone Use has a rule for it (local network "

@@ -17,14 +17,15 @@ def test_a_new_pc_starts_at_mirroring_with_nothing_done():
     s = {"picture": {"live": False}, "bridge": {}, "paired": 0, "pc": "DESKTOP-1",
          "claude": {"claude": False}, "calibrated": None, "bluetooth": False}
     items = overview.checklist(s, "Phone Use")
-    assert ids(items) == ["mirroring", "bluetooth", "pointer", "app"]
+    assert ids(items) == ["input", "mirroring", "bluetooth", "pointer", "app"]
     assert not any(i["done"] for i in items)
-    assert "DESKTOP-1" in items[1]["detail"] and items[1]["action"] == "setup_bridge"
+    assert items[0]["choice"] is None and items[0]["action"] == "choose_input"
+    assert "DESKTOP-1" in items[2]["detail"] and items[2]["action"] == "setup_bridge"
 
 
 def test_the_firewall_step_shows_only_until_a_phone_got_through():
     s = {"picture": {}, "bridge": {}, "firewall": "windows", "confirmed": False}
-    assert ids(overview.checklist(s, "Phone Use"))[0] == "firewall"
+    assert ids(overview.checklist(s, "Phone Use"))[1] == "firewall"
     s["confirmed"] = True
     assert "firewall" not in ids(overview.checklist(s, "Phone Use"))
 
@@ -50,3 +51,21 @@ def test_this_pcs_bluetooth_counts_as_set_up_on_windows():
         assert bluetooth_setup.on()  # so hero() doesn't ask Windows users to set up a bridge
         s = {"picture": {"live": False}, "bridge": {}, "paired": 1, "pc_bluetooth": bluetooth_setup.on()}
         assert overview.hero(s, "Phone Use")["step"] == "start_mirroring"
+
+
+def test_the_input_choice():
+    base = {"picture": {}, "bridge": {}, "bluetooth": False}
+    step = lambda **kw: overview.checklist(dict(base, **kw), "Phone Use")[0]
+    assert not step()["done"] and step()["choice"] is None
+    assert step(input_choice="pc")["done"]
+    chose_bridge = step(input_choice="bridge")  # chosen, but not set up yet
+    assert not chose_bridge["done"] and chose_bridge["choice"] == "bridge"
+    assert step(bridge={"saved": {"id": "x"}})["done"]  # a bridge set up counts as chosen
+    assert step(bluetooth=True)["done"]  # paired with this PC before the choice existed
+
+
+def test_the_choice_is_saved(tmp_path, monkeypatch):
+    monkeypatch.setattr(overview, "_setup_file", lambda: str(tmp_path / "setup.json"))
+    assert overview.input_choice() is None
+    overview.set_input_choice("bridge")
+    assert overview.input_choice() == "bridge"

@@ -45,6 +45,14 @@ public sealed class BridgeView : UserControl
 
     public void Stop() => _poll.Stop();
 
+    /// <summary>Opens the setup dialog (the first-time setup's "A Bluetooth bridge"); with a bridge
+    /// already set up, its page is enough.</summary>
+    public async void BeginSetup()
+    {
+        var j = await _conn.CallAsync(HttpMethod.Get, "api/bridge", null, 15);
+        if (j?["saved"] == null && !_dialogUp) await Setup();
+    }
+
     // ------------------------------------------------------------------ the page
 
     async Task Refresh()
