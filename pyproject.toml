@@ -18,7 +18,7 @@ dependencies = [
     "psutil; sys_platform == 'win32'",            # is a phone mirroring (AirPlay's TCP connection)
     "cryptography; sys_platform == 'win32'",      # the companion app's and the bridge's encryption
     "bleak; sys_platform == 'win32'",             # the bridge's setup over BLE (bridge.py)
-    "pyserial; sys_platform == 'win32'",          # the bridge's firmware over USB
+    "pyserial; sys_platform == 'win32'",          # finding the bridge on USB (esptool comes when first flashing)
     # Bluetooth LE HID and notifications through the Windows Runtime
     "winrt-runtime; sys_platform == 'win32'",
     "winrt-Windows.Devices.Bluetooth; sys_platform == 'win32'",

@@ -7,12 +7,12 @@ using Microsoft.UI.Xaml.Media;
 namespace PhoneUseMirror;
 
 /// <summary>
-/// The settings flyout: the browser mirror's settings panel, natively, without
-/// the Bluetooth bridge (set that up in the browser mirror). Every setting goes
-/// through the same server routes the page uses:
+/// The settings flyout: the browser mirror's settings panel, natively. Every setting
+/// goes through the same server routes the page uses:
 ///   keep awake     /api/awake        {on}
 ///   agent control  /api/session/ask  {mode | seconds}
 ///   passcode       /api/passcode     GET / POST {code} / DELETE (never sent back)
+///   bridge         /api/bridge/...   (MainWindow.Bridge.cs)
 /// </summary>
 public sealed partial class MainWindow
 {
@@ -27,13 +27,13 @@ public sealed partial class MainWindow
         _settingUp = false;
         ShowVision();
         PasscodeBox.Password = "";
-        await Task.WhenAll(LoadStartMode(), LoadPasscode(), LoadPaired());
+        await Task.WhenAll(LoadStartMode(), LoadPasscode(), LoadPaired(), LoadBridgeSwitch());
     }
 
     // The (i) button next to Settings: opens About, or closes it again.
     void OpenAbout_Click(object sender, RoutedEventArgs e)
     {
-        if (AboutOverlay.Visibility == Visibility.Visible) HideAbout();
+        if (AboutOverlay.Visibility == Visibility.Visible && ReferenceEquals(AboutHost.Content, _aboutView)) HideAbout();
         else ShowAbout();
     }
 

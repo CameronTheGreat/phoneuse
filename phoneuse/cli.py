@@ -564,7 +564,7 @@ def settle():
         # (Windows; iPhone 14 Pro Max, iOS 26.5) the Home key's first change came up to 0.9 s after it
         # and a tap's hover highlight came before its page transition with a short gap, so LE waits
         # at least 1.5 s for the change and wants 0.25 s of stillness.
-        le = touch.LINK == "ble"
+        le = touch.link() == "ble"
         wait = max(REACT_WAIT, 1.5) if le else REACT_WAIT
         quiet = 0.25 if le else 0.1
         req = f"settle {since} {quiet} {wait:.1f}" if since is not None else "settle"
@@ -597,7 +597,7 @@ def key_combo(h, combo):
 # ---------- gestures and recipes (recipes.py; verified on iOS 26) ----------
 
 def home(h):
-    if touch.LINK == "ble":
+    if touch.link() == "ble":
         return _home_ble(h)
     h.cmd("key h gui")
 
@@ -755,7 +755,7 @@ def step(h, command, quiet=0.1, change=None):
     frames service), instead of a fixed pause. `quiet`: how long the picture
     must stay still, longer where results stream in (search)."""
     if change is None:  # the first change's wait: 0.6 s, or 1 s over Bluetooth LE (slower to show)
-        change = 1.0 if touch.LINK == "ble" else 0.6
+        change = 1.0 if touch.link() == "ble" else 0.6
     seq = frame_seq()
     steplog("send", command)
     h.cmd(command)
@@ -912,7 +912,7 @@ def awake_cmd(arg):
 
 
 def open_app(h, name):
-    if touch.LINK == "ble":
+    if touch.link() == "ble":
         return _open_app_ble(h, name)
     step(h, "key h gui", change=0.3)  # often already home (no change); also wakes a locked phone
     refuse_if_locked()

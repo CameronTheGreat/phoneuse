@@ -31,6 +31,9 @@ public sealed class MirrorConnection : IDisposable
     {
         _ws = new Uri($"ws://127.0.0.1:{port}/ws");
         _http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}/"), Timeout = Timeout.InfiniteTimeSpan };
+        // The page's own origin, as the browser mirror sends: the server refuses changes (the
+        // bridge's routes among them) from any other origin, which only a web page could fake
+        _http.DefaultRequestHeaders.TryAddWithoutValidation("Origin", $"http://127.0.0.1:{port}");
     }
 
     public void Start() => _ = Task.Run(RunAsync);

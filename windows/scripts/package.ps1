@@ -34,6 +34,8 @@ $PySha256 = $env:PHONEUSE_PY_SHA256  # optional: checked when set (CI sets it fr
 # GST_DEBUG=GST_PLUGIN_LOADING:4; the smoke test below fails the build if one goes missing.
 $Plugins = "app", "audioconvert", "audioresample", "coreelements", "level", "libav", "rtp", "udp",
            "videoparsersbad", "volume", "wasapi", "autodetect", "typefindfunctions", "playback"
+# Not packaged: the bridge firmware and esptool, which only flashing a bridge needs. The app
+# downloads them the first time someone flashes one (bridge.prepare_flashing).
 
 if (-not $Version) {
     $base = (Select-String -Path "$Root\pyproject.toml" -Pattern '^version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
@@ -77,7 +79,6 @@ Copy-Item "$Root\bin\phoneuse" "$Core\bin\phoneuse"
 Copy-Item "$PSScriptRoot\phoneuse.cmd" "$Core\bin\phoneuse.cmd"
 foreach ($s in "common.ps1", "setup-vision.ps1", "firewall.ps1") { Copy-Item "$PSScriptRoot\$s" "$Core\windows\scripts\" }
 Copy-Item "$Root\pyproject.toml", "$Root\LICENSE", "$Root\README.md" $Core
-
 # 3. Python
 Write-Step "Python (python-build-standalone) and phoneuse's packages"
 $tgz = Join-Path $Cache ([uri]::UnescapeDataString(($PyUrl -split "/")[-1]))
@@ -103,7 +104,7 @@ Get-ChildItem "$Core\python" -Recurse -File -Filter *.pdb | Remove-Item -Force  
 & $Py -m pip uninstall --quiet --yes pip
 Remove-Item "$Core\python\Scripts" -Recurse -Force -ErrorAction SilentlyContinue
 & $Py -m compileall -q -j 0 "$Core\phoneuse" "$Core\python\Lib" | Out-Null
-& $Py -c "import av, numpy, PIL, aiohttp, psutil, winrt.windows.devices.bluetooth; import sys; sys.path.insert(0, r'$Core'); import phoneuse.cli, phoneuse.windows.background"
+& $Py -c "import av, numpy, PIL, aiohttp, psutil, cryptography, bleak, serial, winrt.windows.devices.bluetooth; import sys; sys.path.insert(0, r'$Core'); import phoneuse.cli, phoneuse.windows.background"
 if ($LASTEXITCODE -ne 0) { throw "the bundled Python can't import phoneuse" }
 
 # 4. UxPlay and its GStreamer, with every DLL they load from MSYS2

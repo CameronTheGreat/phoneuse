@@ -107,9 +107,9 @@ def _ref(units):
 
 
 def _default(units):
-    """Points per report in the table drags use before calibration (touch.DEFAULT_PTS:
+    """Points per report in the table drags use before calibration (touch.default_pts():
     the 17 Pro's over Classic, an LE table on Windows), interpolated."""
-    pts = touch.DEFAULT_PTS
+    pts = touch.default_pts()
     for (u0, p0), (u1, p1) in zip(pts, pts[1:]):
         if u0 <= units <= u1:
             return p0 + (p1 - p0) * (units - u0) / (u1 - u0)

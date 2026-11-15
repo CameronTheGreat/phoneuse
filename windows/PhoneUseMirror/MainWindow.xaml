@@ -74,6 +74,15 @@
                                         <Button x:Name="UnpairButton" Content="Unpair" Click="Unpair_Click" Visibility="Collapsed" />
                                     </StackPanel>
 
+                                    <TextBlock Text="Bluetooth bridge" Margin="0,14,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                    <!-- greyed out until a bridge is set up and answering -->
+                                    <ToggleSwitch x:Name="BridgeSwitch" Header="Mouse and keyboard through"
+                                                  OnContent="The bridge" OffContent="This PC's Bluetooth"
+                                                  IsEnabled="False" Toggled="Bridge_Toggled" />
+                                    <TextBlock x:Name="BridgeText" Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.7"
+                                               TextWrapping="Wrap" Text="Checking for a bridge…" />
+                                    <Button x:Name="BridgeButton" Content="Bridge Settings" Click="BridgeSettings_Click" />
+
                                     <TextBlock Text="Screen reading" Margin="0,14,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" />
                                     <TextBlock x:Name="VisionText" Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.7"
                                                TextWrapping="Wrap" />

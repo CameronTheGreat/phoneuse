@@ -30,30 +30,56 @@ REF_MODEL = "iPhone18,1"  # the iPhone 17 Pro that REF_PTS was measured on: it n
 # connection interval instead of 8 ms. Until a phone is calibrated there, this table
 # stands in, measured over LE on an iPhone 14 Pro Max (iOS 26.5); an iPhone 17 Pro Max
 # measured within ~10% of it (8 and 20 units). No phone is the reference over LE.
-LINK = "ble" if IS_WINDOWS else "classic"
 BLE_REF_PTS = [(1, 0.3), (2, 0.6), (3, 1.1), (4, 1.6), (5, 2.3), (6, 3.0), (8, 4.7), (10, 6.9),
                (12, 9.3), (16, 15.4), (20, 23.0), (28, 42.7), (40, 84.0)]
-DEFAULT_PTS = BLE_REF_PTS if LINK == "ble" else REF_PTS
-DRAG_PTS = DEFAULT_PTS
+_link = ("ble" if IS_WINDOWS else "classic", 0.0)  # (link, when asked)
+
+
+def link():
+    """How input reaches the phone: "classic" (Bluetooth Classic: Linux's HID daemon, or the
+    ESP32 bridge) or "ble" (Windows' own Bluetooth LE). On Windows it changes while phoneuse
+    runs: input goes through the bridge while the bridge reaches the phone (windows/hid.py
+    says link=bridge), so the HID service is asked, at most every 2 s."""
+    global _link
+    if not IS_WINDOWS:
+        return "classic"
+    if time.time() - _link[1] > 2.0:
+        now = _link[0]
+        try:
+            from .hidclient import Hid
+            st = Hid(timeout=1.0).cmd("status")
+            now = "classic" if " link=bridge" in st else "ble"
+        except Exception:  # noqa: BLE001 - not running: keep the last answer
+            pass
+        _link = (now, time.time())
+    return _link[0]
+
+
+def default_pts():
+    return BLE_REF_PTS if link() == "ble" else REF_PTS
+
+
+DRAG_PTS = default_pts() if not IS_WINDOWS else BLE_REF_PTS
 _PTS = [p for _, p in DRAG_PTS]
 _stamp = None
 _checked = 0.0
 
 
 def refresh(force=False):
-    """Use the mirroring phone's calibration, if it has one (checked at most once a
-    second; long-running servers pick up a new phone or a new calibration)."""
+    """Use the mirroring phone's calibration for the link in use, if it has one (checked at
+    most once a second; long-running servers pick up a new phone, a new calibration, or the
+    bridge taking over from this PC's Bluetooth)."""
     global DRAG_PTS, _PTS, _stamp, _checked
     now = time.time()
     if not force and now - _checked < 1.0:
         return
     _checked = now
-    st = phones.stamp()
+    st = (phones.stamp(), link())
     if st == _stamp and not force:
         return
     _stamp = st
-    table = phones.entry().get("drag_pts")
-    DRAG_PTS = [tuple(x) for x in table] if table else DEFAULT_PTS
+    table = phones.entry().get(phones.drag_key(st[1]))
+    DRAG_PTS = [tuple(x) for x in table] if table else default_pts()
     _PTS = [p for _, p in DRAG_PTS]
 
 
@@ -183,21 +209,27 @@ SCROLL_HOLD = 0.15  # rest before lifting (s)
 # calibration, which is measured at a steady pace (iOS accelerates by speed: with
 # 3.6 pt steps and crawl pauses, scrolls fell 25-30% short). So over LE the tail goes
 # at a steady report per connection interval, sized for ~150 pt/s, the old crawl speed.
-REPORT_PERIOD = 0.015 if LINK == "ble" else TICK  # one report per 15 ms connection interval (LE)
+def report_period():
+    return 0.015 if link() == "ble" else TICK  # one report per 15 ms connection interval (LE)
+
+
 SCROLL_TAIL_SPEED = 150.0  # pt/s
 # Over LE, big reports move the touch unpredictably (calibration measures each size at
 # a steady pace, but a scroll starts its biggest reports from rest). Measured on the
 # Settings list, content moved for 0.2 / 0.3 screen: at most 30 pt per report 0.142-
 # 0.276 (up to 45% short); at most 6 pt 0.182-0.294 (within ~9%), 1.1-1.4 s a scroll.
-if LINK == "ble":
-    SCROLL_MAX = 6.0
+SCROLL_MAX_BLE = 6.0
+
+
+def scroll_max():
+    return SCROLL_MAX_BLE if link() == "ble" else SCROLL_MAX
 
 
 def scroll_tail_step():
     """Points per report in a scroll's tail: one unit, or the tail speed's worth per
     report where a unit moves less (the mirroring phone's table)."""
     refresh()
-    return max(DRAG_PTS[0][1], SCROLL_TAIL_SPEED * REPORT_PERIOD)
+    return max(DRAG_PTS[0][1], SCROLL_TAIL_SPEED * report_period())
 
 
 def scroll_crawls():
@@ -211,16 +243,17 @@ def scroll_crawls():
 # Max, iOS 26.5) scroll-by fell short by 7.5-10 pt whatever the distance (0.05-0.3 of
 # the screen). Scroll drags go that much further. Over Classic through the bridge (iPhone 15
 # Pro, iOS 26) content fell short of where the pointer stopped by 11-13 pt, so all links.
-SCROLL_SLOP = 8.0 if LINK == "ble" else 11.0
+def scroll_slop():
+    return 8.0 if link() == "ble" else 11.0
 
 
 def scroll_step(remaining, most=None):
     """Points to move this tick when `remaining` points are left of a scroll drag
-    (at most `most`, default SCROLL_MAX)."""
+    (at most `most`, default scroll_max())."""
     step = scroll_tail_step()
     if remaining <= SCROLL_TAIL:
         return min(remaining, step)
-    return min(max(remaining * SCROLL_SHARE, step), SCROLL_MAX if most is None else most)
+    return min(max(remaining * SCROLL_SHARE, step), scroll_max() if most is None else most)
 
 
 def scroll_drag(hid, fx0, fy0, fx1, fy1):
@@ -230,8 +263,9 @@ def scroll_drag(hid, fx0, fy0, fx1, fy1):
     total = (dx * dx + dy * dy) ** 0.5
     if total < 0.5:
         return
-    if SCROLL_SLOP:  # the finger goes further by the slop, so the content moves as asked
-        k = (total + SCROLL_SLOP) / total
+    slop = scroll_slop()
+    if slop:  # the finger goes further by the slop, so the content moves as asked
+        k = (total + slop) / total
         fx1, fy1 = _clamp(fx0 + (fx1 - fx0) * k), _clamp(fy0 + (fy1 - fy0) * k)
         dx, dy = (fx1 - fx0) * SCREEN_PT[0], (fy1 - fy0) * SCREEN_PT[1]
         total = (dx * dx + dy * dy) ** 0.5

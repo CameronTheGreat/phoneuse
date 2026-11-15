@@ -33,8 +33,8 @@ from . import touch
 # Over Bluetooth LE (Windows) a report takes a whole connection interval (~16 ms) to go
 # out, so the tick doesn't sleep after a hover report on top of that (the pointer got
 # ~42 updates a second instead of ~64).
-LE = touch.LINK == "ble"
-# The wheel drags faster than agents' exact scrolls (touch.SCROLL_MAX is small over LE
+# (touch.link(): Windows' own LE, unless input goes through the bridge, which is Classic.)
+# The wheel drags faster than agents' exact scrolls (touch.scroll_max() is small over LE
 # for accuracy): a hand on the wheel wants the page to keep up more than exactness.
 WHEEL_MAX = 30.0  # pt per report
 SCROLL_STILL = touch.SCROLL_HOLD  # lift once the wheel scroll is done and the wheel idle this long (s)
@@ -224,7 +224,7 @@ class Pointer:
             # Over Bluetooth LE a hover report already takes a connection interval
             # (~16 ms) to go out: sleeping a tick on top held the pointer to ~42 updates
             # a second. Drags keep the tick: the calibration was measured with it.
-            if not (hovered and LE):
+            if not (hovered and touch.link() == "ble"):
                 time.sleep(touch.TICK)
             hovered = False
             try:

@@ -264,9 +264,11 @@ def check_screen(size):
                    "changes them)")
     name = phones.current()
     if name:
-        e = phones.entry(name)
-        if e.get("drag_pts"):
-            report("ok", f"drags: {name} is calibrated ({e.get('calibrated', 'date unknown')})")
+        from .touch import link
+        e, via = phones.entry(name), link()
+        if e.get(phones.drag_key(via)):
+            where = " through the bridge" if IS_WINDOWS and via == "classic" else ""
+            report("ok", f"drags: {name} is calibrated{where} ({e.get('calibrated', 'date unknown')})")
         elif phones.needs_calibration(name):
             report("note", f"drags: {name} isn't calibrated yet, so drags and swipes may go the wrong distance "
                            "(it is measured by itself once its pointer is on)",

@@ -75,15 +75,12 @@ public sealed partial class MainWindow
     LogWindow? _log;
     public void ShowAbout()
     {
-        ShowFromTray();
-        AboutHost.Content ??= new AboutView();
-        AboutOverlay.Visibility = Visibility.Visible;
-        _conn.Send(new { t = "blur" });  // let go of anything held on the phone
-        AboutBack.Focus(FocusState.Programmatic);
+        ShowOverlay(_aboutView ??= new AboutView());
     }
 
     void HideAbout()
     {
+        _bridgeView?.Stop();
         AboutOverlay.Visibility = Visibility.Collapsed;
         Surface.Focus(FocusState.Programmatic);
     }

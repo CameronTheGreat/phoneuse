@@ -76,8 +76,10 @@ public sealed class AboutView : UserControl
         Bullet("A motherboard's Wi-Fi and Bluetooth card needs its antennas attached, even when the PC uses " +
                "Ethernet. Without them the link drops several times an hour, and keys and taps sent during a drop are lost.");
         Bullet("Windows keeps some Windows-key shortcuts (such as Win+L) for itself; those never reach the phone.");
-        Bullet("The Bluetooth bridge (an ESP32 as the keyboard and mouse) hasn't been tried on Windows, " +
-               "and its settings are only in the browser mirror.");
+        Bullet("Settings › Bluetooth bridge sets up a LilyGO T-Display as the keyboard and mouse instead " +
+               "(Bluetooth Classic, as on Linux) and flashes its firmware. While the bridge carries input, this " +
+               "PC's Bluetooth keyboard is closed; it opens again if the bridge stops answering for 15 seconds. " +
+               "The bridge hasn't been tried with real hardware on Windows yet.");
 
         if (Backend.Root != null)
         {
