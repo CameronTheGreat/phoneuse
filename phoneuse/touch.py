@@ -338,14 +338,22 @@ def describe_gesture(steps):
     return " ".join(out)
 
 
-def gesture(hid, steps, film=None):
-    """Run parsed gesture steps. A press that stays put (down, hold, up) goes as one
+def gesture(hid, steps, film=None, exact=False):
+    """Run parsed gesture steps. `exact`: before each lift that ends a drag, find the
+    pointer in the mirrored picture and slide the rest of the way (aim.py, about 1.6 s). A press that stays put (down, hold, up) goes as one
     timed tap, so a slow link can't stretch or cut the hold; anything that moves is
     an absolute press, relative motion and an absolute release (see the top).
     `film` (film.Film): frames at the end of each move, the end of each hold with the
     finger down, just before a long press lifts, and after the last lift."""
     t = Touch(hid)
     i = 0
+    moved = False  # the finger moved while down: a drag, which `exact` corrects before the lift
+
+    def lift():
+        if exact and t.down and moved:  # end the drag where it was sent (aim.py)
+            from . import aim
+            aim.correct(t, t.target or t.pos)
+        t.release()
     try:
         while i < len(steps):
             s = steps[i]
@@ -365,6 +373,7 @@ def gesture(hid, steps, film=None):
                 time.sleep(0.02)
             elif s[0] == "move":
                 _move(t, s[1], s[2], s[3])
+                moved = True
                 if film:  # a moment later when the finger rests next, so the picture catches up
                     rests = i + 1 < len(steps) and steps[i + 1][0] == "hold" and steps[i + 1][1] >= 0.15
                     film.mark("move", t.pos, True, 0.1 if rests else 0.0)
@@ -373,8 +382,10 @@ def gesture(hid, steps, film=None):
                 if film and t.down:
                     film.mark(f"hold {s[1]:g}", t.pos, True)
             elif s[0] == "up":
-                t.release()
+                lift()
+                moved = False
             i += 1
+        lift()  # a gesture ends lifted anyway
     finally:
         t.release()
         if film and t.pos:
@@ -426,6 +437,7 @@ def long_press(hid, fx, fy, hold=0.8):
     gesture(hid, [("down", fx, fy), ("hold", hold), ("up",)])
 
 
-def swipe(hid, fx0, fy0, fx1, fy1, duration=0.3, hold_end=0.0):
+def swipe(hid, fx0, fy0, fx1, fy1, duration=0.3, hold_end=0.0, exact=False):
     """Finger down at (fx0, fy0), move to (fx1, fy1) over `duration`, lift."""
-    gesture(hid, [("down", fx0, fy0), ("move", fx1, fy1, duration), ("hold", hold_end), ("up",)])
+    gesture(hid, [("down", fx0, fy0), ("move", fx1, fy1, duration), ("hold", hold_end), ("up",)],
+            exact=exact)

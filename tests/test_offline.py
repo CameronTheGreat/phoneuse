@@ -292,3 +292,43 @@ def test_companion_serves_only_the_mirroring_phones_app(monkeypatch):
     assert c.serves("old")              # it only said it isn't Meng's iPhone
     mirroring[0] = None
     assert c.serves("mine") and c.serves("hers")  # nothing mirrors: every app sees the PC
+
+
+def test_aim_finds_the_pointer_from_a_short_sideways_slide(monkeypatch):
+    from phoneuse import aim
+    from phoneuse.config import SCREEN_PT
+    px = W / SCREEN_PT[0]
+
+    def frame(x, y):  # a dark screen with an 18 pt grey pointer at (x, y) fractions
+        img = np.zeros((H, W, 3), np.int16)
+        yy, xx = np.mgrid[0:H, 0:W]
+        img[(xx - x * W) ** 2 + (yy - y * H) ** 2 <= (9 * px) ** 2] = 130
+        return img
+
+    real = [0.30, 0.20]  # where the pointer is; the drag thinks it's at 0.32
+    frames = iter([frame(*real), frame(real[0] + 10 / SCREEN_PT[0], real[1])])  # slides 10 pt, not 14
+    monkeypatch.setattr(aim, "_frame", lambda: next(frames))
+
+    class T:
+        pos = (0.32, 0.20)
+    t = T()
+    monkeypatch.setattr(aim, "_slide", lambda t, fx, fy: setattr(t, "pos", (fx, fy)))
+    x, y = aim.locate(t)
+    assert abs((x - real[0]) * SCREEN_PT[0] - 10) < 2.5 and abs(y - real[1]) * SCREEN_PT[1] < 2.5
+
+
+def test_exact_gesture_corrects_drags_only(monkeypatch):
+    from phoneuse import aim, touch
+    calls = []
+    monkeypatch.setattr(aim, "correct", lambda t, target, log=None: calls.append(target))
+    monkeypatch.setattr(touch, "_move", lambda t, x, y, s: setattr(t, "target", (x, y)))
+
+    class Hid:
+        def cmd(self, line):
+            return "ok"
+    monkeypatch.setattr(touch.Touch, "press", lambda t, x, y: (setattr(t, "pos", (x, y)), setattr(t, "down", True)))
+    monkeypatch.setattr(touch.Touch, "release", lambda t: setattr(t, "down", False))
+    touch.gesture(Hid(), touch.parse_gesture("down 0.5 0.4 hold 0.3 up"), exact=True)
+    assert calls == []
+    touch.gesture(Hid(), touch.parse_gesture("down 0.2 0.3 move 0.7 0.6 0.5"), exact=True)
+    assert calls == [(0.7, 0.6)]
