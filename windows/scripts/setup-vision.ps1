@@ -1,7 +1,7 @@
 # Local screen-reading models for `phoneuse text` / `phoneuse find` on Windows:
 # RapidOCR (PP-OCRv6) and GoClick-Large (GUI grounding), in their own venv (.venv-vision),
 # because GoClick needs transformers 4.45. With an NVIDIA GPU both run on CUDA 13.
-#   powershell -ExecutionPolicy Bypass -File scripts\windows\setup-vision.ps1
+#   powershell -ExecutionPolicy Bypass -File windows\scripts\setup-vision.ps1
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 . "$PSScriptRoot\common.ps1"

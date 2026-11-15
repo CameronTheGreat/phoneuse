@@ -6,7 +6,7 @@ namespace PhoneUseMirror;
 
 /// <summary>
 /// Settings › Screen reading: the local models that read the phone's screen
-/// (RapidOCR and GoClick, scripts\windows\setup-vision.ps1, in the checkout's
+/// (RapidOCR and GoClick, windows\scripts\setup-vision.ps1, in the checkout's
 /// .venv-vision). Agents need them to read text, tap labels, type and open apps by
 /// name. Install runs the setup script in the background (its output goes to
 /// phoneuse-vision-setup.log); Remove stops the OCR service and deletes .venv-vision.
@@ -75,7 +75,7 @@ public sealed partial class MainWindow
         try
         {
             var psi = new ProcessStartInfo("powershell.exe",
-                $"-NoProfile -ExecutionPolicy Bypass -File \"{Path.Combine(Backend.Root!, "scripts", "windows", "setup-vision.ps1")}\"")
+                $"-NoProfile -ExecutionPolicy Bypass -File \"{Path.Combine(Backend.Root!, "windows", "scripts", "setup-vision.ps1")}\"")
             {
                 WorkingDirectory = Backend.Root,
                 UseShellExecute = false,
@@ -140,7 +140,7 @@ public sealed partial class MainWindow
             try
             {
                 // The OCR service runs from .venv-vision: ask it to quit before deleting its files.
-                var stop = Process.Start(new ProcessStartInfo(Path.Combine(root, ".venv", "Scripts", "python.exe"),
+                var stop = Process.Start(new ProcessStartInfo(Backend.Python!,
                                                               "-c \"from phoneuse.cli import stop_vision; stop_vision()\"")
                 {
                     WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true,

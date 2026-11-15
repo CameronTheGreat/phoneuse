@@ -1,5 +1,5 @@
 """`phoneuse serve` without a console window: what the Phone Use window
-(winui/PhoneUseMirror) starts when phoneuse isn't running yet.
+(windows/PhoneUseMirror) starts when phoneuse isn't running yet.
 
   python -m phoneuse.windows.background
 

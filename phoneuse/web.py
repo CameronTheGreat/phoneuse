@@ -459,7 +459,9 @@ class Tab:
 
 NUDGED_FILE = runtime_path("phoneuse-nudged")  # touched when keep-awake nudged during an agent's session
 AWAKE_FILE = os.path.join(os.path.dirname(config_path()), "keep-awake")  # exists while "keep the screen awake" is on
-INPUT_TRACE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "phoneuse-input.jsonl")
+# Windows has no /tmp (it would be C:\tmp, usually missing): the runtime folder, %LOCALAPPDATA%\phoneuse\run
+INPUT_TRACE = runtime_path("phoneuse-input.jsonl") if IS_WINDOWS else \
+    os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "phoneuse-input.jsonl")
 
 
 def same_origin(req):

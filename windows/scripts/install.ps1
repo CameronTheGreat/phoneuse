@@ -1,5 +1,5 @@
 # phoneuse on Windows: everything it needs, in one go. Safe to run again (it updates).
-#   powershell -ExecutionPolicy Bypass -File scripts\windows\install.ps1 [-NoVision] [-NoUxPlay] [-NoFirewall] [-NoPath]
+#   powershell -ExecutionPolicy Bypass -File windows\scripts\install.ps1 [-NoVision] [-NoUxPlay] [-NoFirewall] [-NoPath]
 #
 #   1. .venv with phoneuse and its Python packages (PyAV, aiohttp, the Windows Runtime
 #      Bluetooth bindings); the `phoneuse` launcher in bin\
@@ -51,7 +51,7 @@ if (-not $NoUxPlay) {
     Invoke-Msys "pacman -Syuu --noconfirm --disable-download-timeout" | Out-Null
     Write-Step "Building UxPlay"
     Push-Location $Root
-    try { Invoke-Msys "bash scripts/windows/build-uxplay.sh" } finally { Pop-Location }
+    try { Invoke-Msys "bash windows/scripts/build-uxplay.sh" } finally { Pop-Location }
     if (-not (Test-Path $UxPlay)) { throw "UxPlay didn't build; see the output above" }
 }
 
@@ -69,7 +69,7 @@ if (-not $NoFirewall -and (Test-Path $UxPlay)) {
         $p = Start-Process powershell -Verb RunAs -ArgumentList $fwArgs -Wait -PassThru
         if ($p.ExitCode -ne 0) { Write-Warning "the firewall rule wasn't added (exit $($p.ExitCode))" }
     } catch {
-        Write-Warning "the firewall rule wasn't added ($($_.Exception.Message)). Run as admin: powershell -File scripts\windows\firewall.ps1 -Program $UxPlay"
+        Write-Warning "the firewall rule wasn't added ($($_.Exception.Message)). Run as admin: powershell -File windows\scripts\firewall.ps1 -Program $UxPlay"
     }
 }
 

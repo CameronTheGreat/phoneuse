@@ -95,7 +95,10 @@ from .config import CFG, HID_SOCKET, IS_WINDOWS, MACOS, NAME, RUNTIME_DIR, SCREE
 from .hidclient import Hid
 
 PKG = os.path.dirname(os.path.realpath(__file__))
-ROOT = os.path.dirname(PKG)  # the repository checkout
+ROOT = os.path.dirname(PKG)  # the repository checkout, or the Windows app's core\ folder
+# The installed or portable Windows app (windows/scripts/package.ps1): ROOT is core\, beside the window's exe.
+# It ships everything install.ps1 would set up except the firewall rule (and the optional vision models).
+APP = IS_WINDOWS and os.path.isfile(os.path.join(os.path.dirname(ROOT), "PhoneUseMirror.exe"))
 WEB_PORT = int(CFG["web_port"])
 
 PT = SCREEN_PT
@@ -104,17 +107,36 @@ LAST_ACTION = runtime_path("phoneuse-last-action")
 
 def uxplay_path():
     """The AirPlay receiver: `uxplay` on the PATH, or on Windows the MSYS2 build
-    (scripts/windows/build-uxplay.sh), unless config.toml names one."""
+    (windows/scripts/build-uxplay.sh), unless config.toml names one."""
     if os.environ.get("PHONEUSE_UXPLAY"):  # the app's own UxPlay (the Mac bundle's)
         return os.environ["PHONEUSE_UXPLAY"]
     if CFG.get("uxplay", "auto") != "auto":
         return CFG["uxplay"]
-    if IS_WINDOWS:
-        for p in (r"C:\msys64\ucrt64\bin\uxplay.exe", shutil.which("uxplay")):
+    if IS_WINDOWS:  # the installed/portable app's own (windows/scripts/package.ps1), then the MSYS2 build
+        for p in (os.path.join(ROOT, "uxplay", "bin", "uxplay.exe"), r"C:\msys64\ucrt64\bin\uxplay.exe",
+                  shutil.which("uxplay")):
             if p and os.path.exists(p):
                 return p
         return None
     return shutil.which("uxplay") or "uxplay"
+
+
+def install_app(args):
+    """`phoneuse install` in the installed or portable Windows app, which has no install.ps1: the
+    one thing it can't ship is the firewall rule that lets the iPhone reach UxPlay (one UAC prompt);
+    the screen-reading models stay optional (-NoVision, as install.ps1 takes)."""
+    if "-NoFirewall" not in args:
+        script = os.path.join(ROOT, "windows", "scripts", "firewall.ps1")
+        # Start-Process -Verb RunAs: elevated, and -Wait for its exit code
+        cmd = (f"$p = Start-Process powershell -Verb RunAs -Wait -PassThru -ArgumentList "
+               f"'-NoProfile -ExecutionPolicy Bypass -File \"{script}\" -Program \"{uxplay_path()}\"'; exit $p.ExitCode")
+        rc = subprocess.run(["powershell", "-NoProfile", "-Command", cmd]).returncode
+        print("Firewall rule for UxPlay:", "added" if rc == 0 else f"not added (exit {rc})")
+    if "-NoVision" not in args and not os.path.exists(os.path.join(ROOT, ".venv-vision")):
+        print("Screen-reading models (optional, a few GB): the Phone Use window's settings, or\n"
+              "  powershell -ExecutionPolicy Bypass -File \"" + os.path.join(ROOT, "windows", "scripts", "setup-vision.ps1") + '"')
+    from . import doctor
+    return doctor.main([])
 
 
 def device_id():
@@ -173,7 +195,7 @@ def uxplay_args():
 
 
 # UxPlay buffers its output when it goes to a pipe; stdbuf makes it line-buffered.
-# (The Windows build turns buffering off itself: scripts/windows/build-uxplay.sh.)
+# (The Windows build turns buffering off itself: windows/scripts/build-uxplay.sh.)
 UNBUFFERED = ["stdbuf", "-oL", "-eL"] if not IS_WINDOWS and shutil.which("stdbuf") else []
 UXPLAY_LOG = runtime_path("phoneuse-uxplay.log")
 MIRRORING_PHONE = runtime_path("mirroring-phone")  # name of the phone that last started mirroring
@@ -1246,7 +1268,7 @@ def vision(req, timeout=90):
         pass
     py = vision_python()
     if not py:
-        die("Vision models aren't installed. Run: " + (r"scripts\windows\setup-vision.ps1" if IS_WINDOWS
+        die("Vision models aren't installed. Run: " + (r"windows\scripts\setup-vision.ps1" if IS_WINDOWS
                                                        else f"{ROOT}/scripts/setup-vision.sh"))
     logf = open(VISION_LOG, "a")
     if IS_WINDOWS:  # detached, no console window; it outlives this command and keeps the models loaded
@@ -1407,10 +1429,21 @@ def hid_status():
 
 # Started by a short-lived middle process, so the HID service has no living parent:
 # stopping `phoneuse up` with its process tree (taskkill /T, as tools do) can't reach it.
+# It can itself be in a job that refuses CREATE_BREAKAWAY_FROM_JOB (Access is denied) even when
+# start_hid's breakaway worked: it then starts the service inside, as start_hid falls back to.
+# Its own errors go to the HID log (its stderr is DEVNULL), so a service that never starts says why.
 _SPAWN = ("import subprocess, sys\n"
           "log = open(sys.argv[1], 'a', encoding='utf-8')\n"
-          "subprocess.Popen(sys.argv[3:], stdout=log, stderr=log, stdin=subprocess.DEVNULL,"
-          " creationflags=int(sys.argv[2]))\n")
+          "sys.stderr = log\n"
+          "flags = int(sys.argv[2])\n"
+          "def start(f):\n"
+          "    subprocess.Popen(sys.argv[3:], stdout=log, stderr=log, stdin=subprocess.DEVNULL, creationflags=f)\n"
+          "try:\n"
+          "    start(flags)\n"
+          "except OSError:\n"
+          "    if not flags & 0x01000000:\n"
+          "        raise\n"
+          "    start(flags & ~0x01000000)\n")
 
 
 def start_hid():
@@ -1682,7 +1715,7 @@ def up_windows(headless=False):
         die("phoneuse up is already running on this PC (it owns the AirPlay and Bluetooth services).")
     ux = uxplay_path()
     if not ux:
-        die("UxPlay (the AirPlay receiver) isn't installed. Run scripts\\windows\\install.ps1, "
+        die("UxPlay (the AirPlay receiver) isn't installed. Run windows\\scripts\\install.ps1, "
             "or `phoneuse doctor` to see what is missing.")
     job = wprocs.Job()
     stop = threading.Event()
@@ -2051,9 +2084,11 @@ def _main():
     then_text = bool(args) and args[-1] == "--text" and cmd not in ("text", "screenshot")
     if then_text:
         args = args[:-1]
+    if cmd == "install" and APP:
+        sys.exit(install_app(args))
     if cmd == "install" and IS_WINDOWS:
         sys.exit(subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
-                                 os.path.join(ROOT, "scripts", "windows", "install.ps1")] + args).returncode)
+                                 os.path.join(ROOT, "windows", "scripts", "install.ps1")] + args).returncode)
     if cmd == "doctor":
         from . import doctor
         sys.exit(doctor.main(args))

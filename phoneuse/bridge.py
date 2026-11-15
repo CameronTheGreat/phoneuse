@@ -21,6 +21,7 @@ import hashlib
 import hmac
 import json
 import os
+import platform
 import socket
 import struct
 import subprocess
@@ -374,7 +375,7 @@ def nearby(timeout=1.0):
 
 
 def this_pc_name():
-    return (os.uname().nodename or "a computer")[:23]
+    return (platform.node() or "a computer")[:23]  # os.uname() doesn't exist on Windows
 
 
 class Adoption:

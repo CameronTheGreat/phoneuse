@@ -31,7 +31,10 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2957" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.5" />
+    <!-- WinUI and Foundation only, not the Microsoft.WindowsAppSDK metapackage: its AI, ML,
+         Search and Widgets parts add ~100 MB of DLLs (ONNX Runtime, DirectML) this app never loads. -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.6.5" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Foundation" Version="2.6.5" />
     <PackageReference Include="QRCoder" Version="1.6.0" />
     <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
     <PackageReference Include="Vortice.MediaFoundation" Version="3.8.3" />

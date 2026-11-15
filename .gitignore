@@ -10,15 +10,10 @@ bridge/sdkconfig.old
 bridge/managed_components/
 bridge/dependencies.lock
 
-# Windows launchers (scripts/windows/install.ps1 copies them from .venv)
+# Windows launchers (windows/scripts/install.ps1 copies them from .venv)
 bin/*.exe
 .scratch/
 phoneuse.egg-info/
 
 # Notes from dogfooding on the owner's own phone (private)
 DOGFOOD-NOTES.md
-
-# the native mirror window (scripts/windows/build-winui.ps1)
-winui/dist/
-winui/*/bin/
-winui/*/obj/

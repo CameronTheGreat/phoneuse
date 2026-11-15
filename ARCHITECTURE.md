@@ -178,7 +178,7 @@ there is nothing to renew or time out, and a viewer that falls behind skips to a
 fresh keyframe instead of piling up delay. Whether a phone is mirroring comes from
 UxPlay's TCP connection on port 7100 (psutil).
 
-**UxPlay** is built from source in MSYS2 (`scripts/windows/build-uxplay.sh`),
+**UxPlay** is built from source in MSYS2 (`windows/scripts/build-uxplay.sh`),
 pinned to a tested commit; 1.74 brings its own mDNS responder, so Bonjour isn't
 needed. It logs with `printf` and never flushes, which over a pipe would hold back
 the "connection request from" line that tells the HID service which phone is

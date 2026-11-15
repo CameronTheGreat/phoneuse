@@ -4,7 +4,7 @@ Windows can't act as a Bluetooth Classic keyboard, so on Windows Phone Use is a
 Bluetooth LE keyboard and mouse instead (HID over GATT, through the Windows
 Runtime). It uses the PC's own Bluetooth adapter, needs no driver and no admin
 rights, and Windows keeps using the adapter for everything else. The mirror window is
-a native WinUI 3 app (`winui/`), or the browser mirror in an Edge or Chrome window
+a native WinUI 3 app (`windows/PhoneUseMirror/`), or the browser mirror in an Edge or Chrome window
 when that app isn't built.
 
 | | Tested with |
@@ -18,16 +18,16 @@ when that app isn't built.
 
 1. **Install**, from the checkout, in PowerShell:
    ```powershell
-   powershell -ExecutionPolicy Bypass -File scripts\windows\install.ps1
+   powershell -ExecutionPolicy Bypass -File windows\scripts\install.ps1
    ```
    The installer makes `.venv`, installs MSYS2 to `C:\msys64` and builds UxPlay there,
-   builds the Phone Use window into `winui\dist` when the .NET SDK is installed
-   (`scripts\windows\build-winui.ps1` builds it again), adds a Windows Firewall rule
+   builds the Phone Use window into `windows\dist` when the .NET SDK is installed
+   (`windows\scripts\build-winui.ps1` builds it again), adds a Windows Firewall rule
    for UxPlay (it asks for admin rights once; the rule allows the local network only),
    puts `bin` on your PATH and downloads the models that read the screen (`-NoVision`
    skips them). It ends with `phoneuse doctor`, which checks each part and says how to
    fix what is missing.
-2. **Start Phone Use:** open `winui\dist\PhoneUseMirror.exe`, which starts phoneuse in
+2. **Start Phone Use:** open `windows\dist\PhoneUseMirror.exe`, which starts phoneuse in
    the background when it isn't running, or run `phoneuse up`, which opens the window.
    Then, on the iPhone, open Control Center, tap Screen Mirroring and choose
    **Phone Use on <your computer>**.

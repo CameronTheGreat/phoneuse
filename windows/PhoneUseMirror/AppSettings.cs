@@ -8,8 +8,9 @@ namespace PhoneUseMirror;
 /// </summary>
 public static class AppSettings
 {
-    static readonly string FilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "phoneuse", "PhoneUseMirror.json");
+    static readonly string FilePath = Backend.Portable
+        ? Path.Combine(Backend.PortableData, "PhoneUseMirror.json")
+        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "phoneuse", "PhoneUseMirror.json");
 
     static JsonObject Load()
     {

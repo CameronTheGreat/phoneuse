@@ -41,7 +41,8 @@ def powershell(script, timeout=30):
     return run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script], timeout=timeout)
 
 
-INSTALL = r"powershell -ExecutionPolicy Bypass -File scripts\windows\install.ps1"
+# The installed/portable app (cli.APP) ships its packages and UxPlay: what's missing there is a broken install
+INSTALL = "reinstall Phone Use" if cli.APP else r"powershell -ExecutionPolicy Bypass -File windows\scripts\install.ps1"
 
 
 # ---------- checks ----------
@@ -55,7 +56,7 @@ def check_python():
 
 
 def check_packages():
-    mods = ["av", "numpy", "PIL", "aiohttp", "psutil",
+    mods = ["av", "numpy", "PIL", "aiohttp", "psutil", "cryptography",
             "winrt.windows.devices.bluetooth", "winrt.windows.devices.bluetooth.genericattributeprofile",
             "winrt.windows.storage.streams", "winrt.windows.ui.notifications"]
     missing = []
@@ -65,7 +66,8 @@ def check_packages():
         except Exception:
             missing.append(m)
     if missing:
-        report("FAIL", "Python packages missing: " + ", ".join(missing), INSTALL + "   (or: .venv\\Scripts\\pip install -e .)")
+        report("FAIL", "Python packages missing: " + ", ".join(missing),
+               INSTALL + ("" if cli.APP else "   (or: .venv\\Scripts\\pip install -e .)"))
     else:
         report("ok", "Python packages (PyAV, aiohttp, Windows Runtime Bluetooth)")
 
@@ -124,8 +126,9 @@ def firewall_state(ux):
     return "allow" if "Allow" in actions else "missing"
 
 
-FIREWALL_FIX = ("as admin: powershell -ExecutionPolicy Bypass -File scripts\\windows\\firewall.ps1 -Program \"{ux}\"\n"
-                "(or rerun install.ps1, which asks for admin rights once)")
+# A full path to the script: the installed app's is under core\, and the command may run from anywhere
+FIREWALL_FIX = ("as admin: powershell -ExecutionPolicy Bypass -File \"" + os.path.join(ROOT, "windows", "scripts", "firewall.ps1")
+                + "\" -Program \"{ux}\"\n(or `phoneuse install`, which asks for admin rights once)")
 
 
 def check_firewall(ux):
@@ -273,7 +276,7 @@ def check_screen(size):
 def check_browser():
     from .windows import appwindow
     if appwindow.native_window():
-        report("ok", "mirror window: native (WinUI 3, winui\\dist\\PhoneUseMirror.exe)")
+        report("ok", f"mirror window: native (WinUI 3, {appwindow.native_window()})")
         return
     b = appwindow.browser()
     if b:
@@ -285,7 +288,7 @@ def check_browser():
 def check_vision(quick):
     if not os.path.exists(cli.VISION_PY):
         report("note", "screen-reading models aren't installed (phoneuse text / find / tap-on)",
-               r"powershell -ExecutionPolicy Bypass -File scripts\windows\setup-vision.ps1" if IS_WINDOWS
+               r"powershell -ExecutionPolicy Bypass -File windows\scripts\setup-vision.ps1" if IS_WINDOWS
                else "scripts/setup-vision.sh")
         return
     if quick:
@@ -312,7 +315,7 @@ def check_vision(quick):
         torch_cuda, ort_cuda = json.loads(out.splitlines()[-1])
     except (ValueError, IndexError):
         report("FAIL", f"screen-reading models don't load: {out[-300:]}",
-               r"powershell -ExecutionPolicy Bypass -File scripts\windows\setup-vision.ps1")
+               r"powershell -ExecutionPolicy Bypass -File windows\scripts\setup-vision.ps1")
         return
     if torch_cuda and ort_cuda:
         report("ok", "screen-reading models (OCR and grounding on the GPU)")

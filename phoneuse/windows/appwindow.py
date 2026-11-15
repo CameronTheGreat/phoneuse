@@ -40,20 +40,23 @@ def window_size():
     return int(height * dw / dh), height + 30  # + the title bar
 
 
-NATIVE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-                      "winui", "dist", "PhoneUseMirror.exe")
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# A checkout's build (windows\scripts\build-winui.ps1), or in the installed/portable app
+# (windows/scripts/package.ps1) the exe beside core\, which is this phoneuse's root.
+NATIVE = [os.path.join(_ROOT, "windows", "dist", "PhoneUseMirror.exe"),
+          os.path.join(os.path.dirname(_ROOT), "PhoneUseMirror.exe")]
 
 
 def native_window():
-    """The native mirror window (WinUI 3, winui/), when it's built and not turned off
+    """The native mirror window (WinUI 3, windows/PhoneUseMirror/), when it's built and not turned off
     (window = "browser" in config.toml)."""
     if CFG.get("window", "auto") == "browser":
         return None
-    return NATIVE if os.path.exists(NATIVE) else None
+    return next((p for p in NATIVE if os.path.exists(p)), None)
 
 
 def open_window(url=None):
-    """Open the mirror window: the native one when it's built (scripts\\windows\\build-winui.ps1),
+    """Open the mirror window: the native one when it's built (windows\\scripts\\build-winui.ps1),
     else the browser mirror in an Edge/Chrome app window. Returns False when neither is
     available (the caller then opens the page in the default browser)."""
     exe = native_window()
