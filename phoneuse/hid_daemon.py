@@ -445,6 +445,8 @@ class Busy:
 busy = Busy()
 released = threading.Event()  # link dropped on purpose: no reconnecting until real input
 last_use = [0.0]  # when a command last sent real input (not a hover)
+input_at = [0.0]  # when any input command (hovers too) last came in, from anyone
+finger_down = [False]  # an absolute report with a button held, not yet lifted
 
 
 def connect_out():
@@ -873,6 +875,20 @@ def watch_bridge(link):
             failing = str(e)
 
 
+def nudge(args):
+    """Keep-awake (web.py) moves the pointer a little about once a second so Auto-Lock
+    never fires, during an agent's session too: an agent that reads or thinks for a
+    minute between actions sends nothing, and a phone with a 30 s Auto-Lock locks.
+    The nudge goes only while no finger is down and no input came in for QUIET seconds,
+    so it never lifts a drag or moves the pointer between a hover and its press."""
+    quiet = float(args[2]) if len(args) > 2 else 2.0
+    if finger_down[0] or hid.buttons or time.time() - input_at[0] < quiet:
+        return "ok busy"
+    if released.is_set() and not hid.connected:
+        return "ok released"
+    return "ok" if hid.send_skippable(3, absolute(args[0], args[1], 0)) else "ok dropped"
+
+
 def run_command(line):
     parts = line.strip().split(" ", 1)
     cmd, rest = parts[0].lower(), (parts[1] if len(parts) > 1 else "")
@@ -892,6 +908,10 @@ def run_command(line):
         return "ok " + set_mirror(rest)
     if cmd == "release":
         return "ok " + release(float(args[0]) if args else 0.0)
+    if cmd == "nudge":  # nudge FX FY QUIET: keep-awake's hover, only while nobody touches the phone
+        return nudge(args)
+    if cmd in INPUT_COMMANDS:
+        input_at[0] = time.time()
     if cmd == "pair":
         pass
     elif passive(cmd, args):
@@ -951,6 +971,7 @@ def run_command(line):
         # next press at that point was ignored as a repeat, so the touch started wherever
         # the pointer already was (edge swipes became drags of the content).
         sure = len(args) > 3 and args[3] == "sure"
+        finger_down[0] = bool(buttons)
         if not buttons and not hid.buttons and not sure:
             # A hover while earlier reports still wait to go out (in the socket, the
             # controller, or the bridge): skip it, so the pointer jumps to the newest
@@ -1013,7 +1034,7 @@ def run_command(line):
 # `phoneuse up`) always pass, and only they may move the gate: the browser mirror
 # sends "gate open" / "gate closed" / "gate until <unix time>".
 OWNER_MODULES = ("phoneuse.web", "phoneuse.window")
-INPUT_COMMANDS = {"a", "tap", "m", "md", "k", "consumer", "eject", "move", "corner", "click", "down", "up", "scroll",
+INPUT_COMMANDS = {"a", "nudge", "tap", "m", "md", "k", "consumer", "eject", "move", "corner", "click", "down", "up", "scroll",
                   "key", "type"}
 gate_until = [0.0]  # agents may send input while time.time() < this; closed until the browser mirror opens it
 

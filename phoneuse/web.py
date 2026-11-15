@@ -29,7 +29,7 @@ from aiohttp import web
 
 from . import screen, unlock
 from .agent_session import AgentSession, set_start_setting, start_setting
-from .config import CFG, IS_WINDOWS, NAME, SCREEN_PT, config_path
+from .config import CFG, IS_WINDOWS, NAME, SCREEN_PT, config_path, runtime_path
 from .hidclient import Hid
 from .pointer import Keys, Pointer
 
@@ -161,7 +161,6 @@ class Mirror:
         self.stale = False  # the picture stopped following the phone (see check_stale)
         self.last_input_at = 0.0  # when the page or an agent last sent input
         self.awake = os.path.exists(AWAKE_FILE)  # keep the screen awake (see keep_awake)
-        self.screen_dark = False  # a keep-awake nudge drew no frame: the screen is off
         self.hover_at = PARK  # where the page's pointer last was (screen fractions)
         self.unlocks = None
         self.sessions = None
@@ -185,45 +184,38 @@ class Mirror:
             open(AWAKE_FILE, "w").close()
         elif os.path.exists(AWAKE_FILE):
             os.remove(AWAKE_FILE)
-        self.screen_dark = False
         log("keep awake", "on" if on else "off")
         self.broadcast_state()
 
     async def keep_awake(self):
         """While on, move the pointer a few pixels and back about once a second so
-        Auto-Lock never fires. Real input (the page, an agent) takes over; a nudge
-        that draws no new frame means the screen is off (the pointer always shows
-        when it moves), so nudging pauses until the picture changes again rather
-        than waking a phone that was just locked."""
+        Auto-Lock never fires, in an agent's session too, and never pause by itself:
+        only `phoneuse awake off` or the page's switch stops it. Each nudge waits in
+        the daemon until no finger is down and no input came for AWAKE_QUIET s, so it
+        never cuts into a gesture. (It once paused when three nudges drew no new
+        frame, taking that for a dark screen; on an iPhone 15 Pro the corner nudge
+        draws nothing, so it paused every half minute and the phone locked.)"""
         # Absolute moves: they land exactly on every phone, while a small relative
         # move can shift the pointer less than a pixel at a slow tracking speed.
-        sign, misses = 1, 0
+        sign = 1
         loop = asyncio.get_running_loop()
         while True:
             await asyncio.sleep(self.AWAKE_EVERY)
-            if (not self.awake or self.screen_dark or not self.live() or self.agent() != "idle"
-                    or time.time() - self.last_input_at < self.AWAKE_QUIET):
+            if not self.awake or not self.live() or time.time() - self.last_input_at < self.AWAKE_QUIET:
                 continue
-            before = self.last_frame_at
             try:
                 x, y = PARK
                 x += 0.01 * sign
-                r = await loop.run_in_executor(None, self.get_hid().cmd, f"a {x:.4f} {min(max(y, 0.0), 1.0):.4f} 0")
+                r = await loop.run_in_executor(
+                    None, self.get_hid().cmd, f"nudge {x:.4f} {min(max(y, 0.0), 1.0):.4f} {self.AWAKE_QUIET}")
             except Exception:
                 self.hid = None
                 continue
+            if r.split()[1:2] in (["busy"], ["dropped"], ["released"]):  # not sent: someone is acting
+                continue
             sign = -sign
-            if "dropped" in r:  # the link was busy; this nudge never left
-                continue
-            await asyncio.sleep(0.8)
-            if self.last_frame_at != before or time.time() - self.last_input_at < self.AWAKE_QUIET:
-                misses = 0
-                continue
-            misses += 1
-            if misses >= 3:  # three nudges in a row drew nothing: the screen is off
-                misses = 0
-                self.screen_dark = True
-                log("keep awake: no picture after three nudges; the screen is off, pausing")
+            if self.agent() != "idle":  # the agent's next action shouldn't report this as someone else's change
+                open(NUDGED_FILE, "w").close()
 
     # Releasing the link while idle (so iOS shows its own keyboard) is off: after
     # phoneuse drops the link, iOS refuses phoneuse's reconnects ("Connection
@@ -333,8 +325,6 @@ class Mirror:
         self.last_frame_at = time.time()
         if self.stale:
             self.loop.call_soon_threadsafe(self.check_stale)
-        if self.screen_dark:
-            self.screen_dark = False
         if self.loop is None:  # the hub's first keyframe can beat the server's start; tabs ask again
             return
         self.loop.call_soon_threadsafe(self._send_frame, data, key)
@@ -467,6 +457,7 @@ class Tab:
             log("closing tab:", e)
 
 
+NUDGED_FILE = runtime_path("phoneuse-nudged")  # touched when keep-awake nudged during an agent's session
 AWAKE_FILE = os.path.join(os.path.dirname(config_path()), "keep-awake")  # exists while "keep the screen awake" is on
 INPUT_TRACE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "phoneuse-input.jsonl")
 

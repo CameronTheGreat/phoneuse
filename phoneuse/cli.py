@@ -286,6 +286,7 @@ def need_mirror():
 
 
 LAST_SEEN = runtime_path("phoneuse-last-seen")
+NUDGED = runtime_path("phoneuse-nudged")  # web.py's keep-awake nudged during an agent's session
 NOTES = []  # remarks for the agent, printed with the action
 
 
@@ -355,7 +356,9 @@ def agent_turn():
         seen_at = os.path.getmtime(LAST_SEEN)
         acted_at = os.path.getmtime(LAST_ACTION) if os.path.exists(LAST_ACTION) else 0
         # only when the agent looked after its own last action (else its own frames count)
-        if time.time() - seen_at < 600 and seen_at >= acted_at:
+        # keep-awake's nudges (web.py) change the picture too: not someone else
+        nudged_at = os.path.getmtime(NUDGED) if os.path.exists(NUDGED) else 0
+        if time.time() - seen_at < 600 and seen_at >= acted_at and nudged_at < seen_at:
             seen, now = int(open(LAST_SEEN).read()), frame_seq()
             if now is not None and now > seen + 1:  # one late change is usually the end of an animation
                 NOTES.append("note: the screen changed since your last look without an action from you "
