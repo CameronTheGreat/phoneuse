@@ -31,7 +31,7 @@ def test_the_firewall_step_shows_only_until_a_phone_got_through():
 
 
 def test_steps_tick_off_and_claude_is_optional():
-    s = {"picture": {"live": True}, "bridge": {}, "paired": 1, "calibrated": True, "bluetooth": True,
+    s = {"picture": {"live": True}, "bridge": {}, "paired": 1, "calibrated": True, "bluetooth": True, "input_choice": "pc",
          "claude": {"claude": True, "skill": False, "command": False}}
     items = overview.checklist(s, "Phone Use")
     assert all(i["done"] for i in items if not i["optional"])
@@ -61,7 +61,7 @@ def test_the_input_choice():
     chose_bridge = step(input_choice="bridge")  # chosen, but not set up yet
     assert not chose_bridge["done"] and chose_bridge["choice"] == "bridge"
     assert step(bridge={"saved": {"id": "x"}})["done"]  # a bridge set up counts as chosen
-    assert step(bluetooth=True)["done"]  # paired with this PC before the choice existed
+    assert not step(bluetooth=True)["done"]  # a phone paired with this PC still gets asked
 
 
 def test_the_choice_is_saved(tmp_path, monkeypatch):

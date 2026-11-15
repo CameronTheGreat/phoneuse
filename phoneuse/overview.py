@@ -116,13 +116,10 @@ def checklist(s, name):
                       "action": action, "steps": steps, "bold": bold})
 
     # How the phone gets its mouse and keyboard: this PC's Bluetooth LE, or a bridge (Bluetooth
-    # Classic). Chosen once; a bridge already set up, or a phone already paired with this PC
-    # before the choice existed, counts as chosen.
+    # Classic). Asked until the owner picks one; a bridge already set up counts as chosen.
     choice = s.get("input_choice")
     if saved:
         choice = "bridge"
-    elif choice is None and s.get("bluetooth"):
-        choice = "pc"
     add("input", "Choose how Phone Use controls the phone",
         "Bridge chosen: set it up next (Bluetooth Settings has the steps)." if choice == "bridge" and not saved
         else "", done=choice == "pc" or (choice == "bridge" and saved), action="choose_input")

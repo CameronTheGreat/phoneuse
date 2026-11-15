@@ -151,7 +151,8 @@ public sealed partial class MainWindow : Window
         _stale = (bool?)m["stale"] ?? false;
         _awake = (bool?)m["awake"] ?? false;
         _bluetooth = (bool?)m["bluetooth"];
-        BluetoothBar.IsOpen = _bluetooth == false;  // not closable: it stays while the link is down
+        // not closable: it stays while the link is down (the setup checklist says it as a step instead)
+        BluetoothBar.IsOpen = _bluetooth == false && SetupOverlay.Visibility != Visibility.Visible;
         _agent = (string?)m["agent"] ?? "idle";
         _name = (string?)m["name"] ?? _name;
         if (m["screen"] is JsonArray s && s.Count == 2)
