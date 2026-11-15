@@ -1,0 +1,53 @@
+using System.Text.Json.Nodes;
+
+namespace PhoneUseMirror;
+
+/// <summary>
+/// This window's own settings (not phoneuse's, which the server keeps):
+/// %LOCALAPPDATA%\phoneuse\PhoneUseMirror.json.
+/// </summary>
+public static class AppSettings
+{
+    static readonly string FilePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "phoneuse", "PhoneUseMirror.json");
+
+    static JsonObject Load()
+    {
+        try { return JsonNode.Parse(File.ReadAllText(FilePath)) as JsonObject ?? new JsonObject(); }
+        catch (Exception) { return new JsonObject(); }
+    }
+
+    static void Save(JsonObject o)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+            File.WriteAllText(FilePath, o.ToJsonString());
+        }
+        catch (Exception) { }
+    }
+
+    /// <summary>"Agent control requires pairing" was closed: it stays gone for good.</summary>
+    public static bool PairingBarDismissed
+    {
+        get => (bool?)Load()["pairingBarDismissed"] ?? false;
+        set
+        {
+            var o = Load();
+            o["pairingBarDismissed"] = value;
+            Save(o);
+        }
+    }
+
+    /// <summary>The "Make sure AssistiveTouch is on" reminder at each launch.</summary>
+    public static bool AssistiveTouchReminder
+    {
+        get => (bool?)Load()["assistiveTouchReminder"] ?? true;
+        set
+        {
+            var o = Load();
+            o["assistiveTouchReminder"] = value;
+            Save(o);
+        }
+    }
+}

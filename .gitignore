@@ -17,3 +17,8 @@ phoneuse.egg-info/
 
 # Notes from dogfooding on the owner's own phone (private)
 DOGFOOD-NOTES.md
+
+# the native mirror window (scripts/windows/build-winui.ps1)
+winui/dist/
+winui/*/bin/
+winui/*/obj/

@@ -1227,9 +1227,8 @@ def vision_python():
         return sys.executable
     if os.environ.get("FLATPAK_ID") and importlib.util.find_spec("rapidocr"):
         return sys.executable  # the app's RapidOCR, even when the code comes from a checkout (dev-link.sh)
-    py = os.path.join(ROOT, ".venv-vision", "bin", "python")
-    if os.path.exists(py):
-        return py
+    if os.path.exists(VISION_PY):  # .venv-vision's Python: bin/python, or Scripts\python.exe on Windows
+        return VISION_PY
     return sys.executable if importlib.util.find_spec("rapidocr") else None
 
 
@@ -1391,7 +1390,7 @@ def tap_on(h, what, force=False):
 def up(headless=False):
     """Run everything. headless (`phoneuse serve`): no mirror window, so no Hyprland;
     the phone is watched and used in the browser mirror."""
-    return up_windows() if IS_WINDOWS else up_linux(headless)
+    return up_windows(headless) if IS_WINDOWS else up_linux(headless)
 
 
 HID_LOG = runtime_path("phoneuse-hid.log")
@@ -1669,13 +1668,14 @@ def stop_vision():
         pass  # not running
 
 
-def up_windows():
+def up_windows(headless=False):
     """Windows: the video hub, the frames service, the browser mirror and UxPlay, each
     restarted when it exits (frames and the browser mirror also when their code
     changes); the mirror opens in a window of its own. They are in a job object, so all
     of them stop with this command. The Bluetooth HID service (Bluetooth LE) is
     started if it isn't running and keeps running after this command stops
-    (keep_hid; `phoneuse down` stops it)."""
+    (keep_hid; `phoneuse down` stops it). headless (`phoneuse serve`, and the Phone
+    Use window's background start, windows/background.py): no window opened."""
     from .windows import appwindow
     from .windows import procs as wprocs
     if not wprocs.single_instance("phoneuse-up"):
@@ -1825,7 +1825,7 @@ def up_windows():
         if fw in ("block", "missing"):
             say(("Windows Firewall blocks UxPlay" if fw == "block" else "No Windows Firewall rule for UxPlay")
                 + f": the iPhone won't see {NAME}. Fix it once, " + doctor.FIREWALL_FIX.format(ux=ux))
-        if CFG.get("app_window", True) and not appwindow.open_window(url):
+        if not headless and CFG.get("app_window", True) and not appwindow.open_window(url):
             import webbrowser
             webbrowser.open(url)
     threading.Thread(target=first_status, daemon=True).start()

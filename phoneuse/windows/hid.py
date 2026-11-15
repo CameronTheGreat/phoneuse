@@ -563,6 +563,8 @@ class BleHid:
             except asyncio.TimeoutError:
                 raise RuntimeError(f"no iPhone connected. On the iPhone: Settings > Bluetooth, tap "
                                    f"{self.local_name()} (under My Devices once paired)")
+        if cmd == "gate":  # the browser mirror's agent gate: the Linux daemon enforces it, Windows doesn't yet
+            return "ok"
         if cmd == "mirror":
             self.mirror_name = rest.strip() or None
             log("mirroring phone:", self.mirror_name)
@@ -591,7 +593,7 @@ class BleHid:
         if cmd == "a":
             await self.send(3, absolute(args[0], args[1], int(args[2]) if len(args) > 2 else 0))
             return "ok"
-        if cmd == "m":
+        if cmd in ("m", "md"):  # md: a report that may be skipped (live pointer moves); sent like m here
             dx, dy = (max(-127, min(127, int(v))) for v in args[:2])
             wheel = max(-127, min(127, int(args[2]))) if len(args) > 2 else 0
             if len(args) > 3:

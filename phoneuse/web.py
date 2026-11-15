@@ -909,6 +909,14 @@ def app(mirror):
         return web.json_response({"link": await asyncio.get_running_loop().run_in_executor(None, companion.new_pairing)})
     a.router.add_post("/api/companion/pair", companion_pair)
 
+    async def companion_unpair(req):
+        # `phoneuse app unpair`, for windows that pair (the Windows app): forgets every paired app.
+        if req.headers.get("Origin") and not same_origin(req):
+            return web.Response(status=403)
+        from . import companion
+        return web.json_response({"unpaired": await asyncio.get_running_loop().run_in_executor(None, companion.forget)})
+    a.router.add_post("/api/companion/unpair", companion_unpair)
+
     async def app_state(req):
         # Everything a control window shows, in one call: the next step (overview.hero) and
         # the settings. Read-only; each setting still changes through its own route.

@@ -272,6 +272,9 @@ def check_screen(size):
 
 def check_browser():
     from .windows import appwindow
+    if appwindow.native_window():
+        report("ok", "mirror window: native (WinUI 3, winui\\dist\\PhoneUseMirror.exe)")
+        return
     b = appwindow.browser()
     if b:
         report("ok", f"mirror window: {os.path.basename(b)} in app mode")

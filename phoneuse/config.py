@@ -78,6 +78,8 @@ DEFAULTS = {
     "uxplay": "auto",
     "audio": True,
     "app_window": True,
+    # Windows: "auto" uses the native mirror window (winui/dist) when it's built, "browser" the Edge/Chrome one
+    "window": "auto",
     "service_port": 47810,
 }
 

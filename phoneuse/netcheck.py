@@ -67,7 +67,10 @@ def _system_bus():
 
 
 def _firewalld_running():
-    from gi.repository import GLib
+    try:
+        from gi.repository import GLib
+    except ImportError:  # no D-Bus bindings (Windows): no firewalld either
+        return False
     try:
         r = _system_bus().call_sync("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus",
                                     "NameHasOwner", GLib.Variant("(s)", (FIREWALLD,)), GLib.VariantType("(b)"),

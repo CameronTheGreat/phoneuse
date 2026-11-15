@@ -55,6 +55,12 @@ if (-not $NoUxPlay) {
     if (-not (Test-Path $UxPlay)) { throw "UxPlay didn't build; see the output above" }
 }
 
+# 2b. The native mirror window (WinUI 3), when the .NET SDK is here; else the Edge/Chrome one
+if (Get-Command dotnet -ErrorAction SilentlyContinue) {
+    Write-Step "Building the mirror window (WinUI 3)"
+    try { & "$PSScriptRoot\build-winui.ps1" } catch { Write-Warning "the native mirror window didn't build ($($_.Exception.Message)); the browser one is used" }
+}
+
 # 3. Firewall
 if (-not $NoFirewall -and (Test-Path $UxPlay)) {
     Write-Step "Firewall rule for UxPlay (Windows asks for admin rights once)"
