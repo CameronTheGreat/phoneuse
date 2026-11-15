@@ -52,6 +52,8 @@ public sealed partial class MainWindow : Window
         Video.CompositionScaleChanged += (_, _) => ResizeVideo();
         SetupClip();
         SizeToPhone();
+        // the minimum is in pixels: again when the window moves to a screen with other scaling
+        Root.Loaded += (_, _) => Root.XamlRoot.Changed += (r, _) => LimitSize(r.RasterizationScale);
 
         _conn = new MirrorConnection(port);
         _video.KeyframeNeeded += () => _conn.Send(new { t = "keyframe" });
@@ -84,7 +86,8 @@ public sealed partial class MainWindow : Window
         _tick.Tick += (_, _) => UpdateNote();
         _tick.Start();
         InitTray(port);
-        AssistiveTouchBar.IsOpen = AppSettings.AssistiveTouchReminder;
+        AssistiveTouchBar.IsOpen = AppSettings.AssistiveTouchReminder && AppSettings.SetupDone;
+        StartSetup();
 
         UpdateNote();
         _conn.Start();
@@ -278,6 +281,18 @@ public sealed partial class MainWindow : Window
         int w = (int)((h - chrome) * dw / dh + 24 * scale);
         AppWindow.Resize(new SizeInt32(w, h));
         AppWindow.Move(new PointInt32(area.X + (area.Width - w) / 2, area.Y + (area.Height - h) / 2));
+        LimitSize(scale);
+    }
+
+    /// <summary>No smaller than a usable phone: 360 x 600 (at 100% scaling), enough for the
+    /// title bar's buttons, the Settings flyout (340 wide), the setup checklist and a phone
+    /// you can still tap on; never more than the screen allows.</summary>
+    void LimitSize(double scale)
+    {
+        if (AppWindow.Presenter is not OverlappedPresenter p) return;
+        var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
+        p.PreferredMinimumWidth = Math.Min((int)(360 * scale), area.Width);
+        p.PreferredMinimumHeight = Math.Min((int)(600 * scale), area.Height);
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]

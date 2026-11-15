@@ -61,3 +61,51 @@ def hero(s, name):
         return _step("stale", "The picture is old", "The iPhone's screen is off, or mirroring stalled.",
                      "open_phone")
     return _step("mirroring", phone or st.get("phone") or "iPhone", "Mirroring to this PC", "open_phone", good=True)
+
+
+def checklist(s, name):
+    """First-time setup as a list the Windows window shows and ticks off as each step is seen
+    done: [{"id", "title", "detail", "done", "optional", "action", "steps", "bold"}], in the
+    order to do them. s: what /api/app gathers, plus "bluetooth" (the phone's input link is
+    up), "calibrated" (the mirroring phone's pointer is measured; None: no phone yet) and
+    "pc" (this PC's Bluetooth name). Actions: allow_firewall, setup_bridge, pair_app, claude."""
+    pic, b = s.get("picture") or {}, s.get("bridge") or {}
+    saved = b.get("saved")
+    live = bool(pic.get("live"))
+    items = []
+
+    def add(id, title, detail="", done=False, optional=False, action=None, steps=None, bold=None):
+        items.append({"id": id, "title": title, "detail": detail, "done": bool(done), "optional": optional,
+                      "action": action, "steps": steps, "bold": bold})
+
+    if s.get("firewall") and not s.get("confirmed"):  # Windows Firewall has no rule for UxPlay yet
+        add("firewall", "Let the iPhone reach this PC",
+            "Windows Firewall blocks Screen Mirroring until Phone Use has a rule for it (local network "
+            "only). Windows asks for permission once.", action="allow_firewall")
+    add("mirroring", "Start Screen Mirroring", done=live, bold=name,
+        steps=["On the iPhone, swipe down from the top-right corner.", "Tap {mirroring} Screen Mirroring.",
+               f"Choose {name}."])
+    if saved:
+        add("bluetooth", "Connect the bridge to the iPhone",
+            "On the iPhone, open Settings › Bluetooth and tap Phone Use Bridge. If it won't connect, "
+            "forget it there and tap it again.", done=s.get("bluetooth"), bold="Phone Use Bridge")
+    else:
+        pc = s.get("pc") or "this PC"
+        add("bluetooth", "Pair Bluetooth",
+            f"On the iPhone, open Settings › Bluetooth and tap {pc}, then confirm on both. Phone Use is the "
+            "phone's mouse and keyboard this way. A bridge can do it instead.",
+            done=s.get("bluetooth"), action="setup_bridge", bold=pc)
+    add("pointer", "Turn on AssistiveTouch",
+        "On the iPhone: Settings › Accessibility › Touch › AssistiveTouch on, and Dwell Control off. iOS ignores "
+        "a mouse without it. Then Phone Use measures this phone's pointer, for about 13 seconds: leave the "
+        "phone alone until it's done.", done=s.get("calibrated"))
+    add("app", "Pair the Phone Use app",
+        "Agents can use the phone only once the Phone Use app (App Store) is paired: it's where you allow "
+        "and stop them.", done=s.get("paired"), action="pair_app")
+    claude = s.get("claude") or {}
+    if claude.get("claude"):  # Claude Code is installed
+        add("claude", "Connect Claude Code",
+            "Lets Claude Code use the phone: links the phoneuse skill and puts the phoneuse command where "
+            "Claude Code finds it.", done=claude.get("skill") and claude.get("command"), optional=True,
+            action="claude")
+    return items

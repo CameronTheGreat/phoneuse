@@ -21,6 +21,7 @@ import json
 import os
 import secrets
 import shutil
+import socket
 import sys
 import threading
 import time
@@ -937,9 +938,15 @@ def app(mirror):
                 paired = len(companion.load().get("devices") or {})
             except Exception:  # noqa: BLE001
                 paired = 0
-            from . import bluetooth_setup
+            from . import bluetooth_setup, phones
+            phone = phones.current()
+            try:  # the mirroring phone's pointer is measured (None: no phone has mirrored yet)
+                calibrated = None if not phone else not phones.needs_calibration(phone)
+            except Exception:  # noqa: BLE001
+                calibrated = None
             return {"claude": claude_setup.state(), "firewall": netcheck.detect(),
-                    "confirmed": netcheck.confirmed(), "paired": paired, "pc_bluetooth": bluetooth_setup.on()}
+                    "confirmed": netcheck.confirmed(), "paired": paired, "pc_bluetooth": bluetooth_setup.on(),
+                    "calibrated": calibrated, "pc": os.environ.get("COMPUTERNAME") or socket.gethostname()}
         out = {"running": True, "picture": picture_state(), "name": NAME}
         out["bridge"], out["session"], out["awake"], out["passcode"], h = await asyncio.gather(
             get(bridges.state), get(sessions.setting), get(awake), get(passcode),
@@ -949,6 +956,8 @@ def app(mirror):
             netcheck.remember(mirrored=True)  # the iPhone reached this PC: the ports are open
             out["confirmed"] = True
         out["hero"] = overview.hero(out, NAME)
+        out["bluetooth"] = mirror.bluetooth
+        out["setup"] = overview.checklist(out, NAME)
         # What waits for the owner, for shells that notify natively (the Mac app); each is answered through
         # /api/session/answer or /api/unlock/answer with its id
         sp, up = mirror.sessions.pending, mirror.unlocks.pending
@@ -957,6 +966,32 @@ def app(mirror):
             "unlock": {"id": up["id"]} if up else None}
         return web.json_response(out)
     a.router.add_get("/api/app", app_state)
+
+    async def setup_firewall(req):
+        """The setup checklist's firewall step: open the ports (Windows: one UAC prompt)."""
+        if not same_origin(req):
+            return web.Response(status=403)
+        from . import netcheck
+        try:
+            said = await asyncio.get_running_loop().run_in_executor(None, netcheck.allow)
+        except Exception as e:  # noqa: BLE001
+            return web.json_response({"error": str(e)})
+        return web.json_response({"ok": True, "message": said})
+    a.router.add_post("/api/setup/firewall", setup_firewall)
+
+    async def claude_connect(req):
+        """{"on"}: connect Claude Code (the skill and the phoneuse command) or disconnect it."""
+        if not same_origin(req):
+            return web.Response(status=403)
+        from . import claude_setup
+        on = bool((await req.json()).get("on", True))
+        try:
+            await asyncio.get_running_loop().run_in_executor(
+                None, claude_setup.connect if on else claude_setup.disconnect)
+        except Exception as e:  # noqa: BLE001
+            return web.json_response({"error": str(e)})
+        return web.json_response(claude_setup.state())
+    a.router.add_post("/api/claude", claude_connect)
     return a
 
 

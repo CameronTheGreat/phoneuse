@@ -40,6 +40,18 @@ public static class AppSettings
         }
     }
 
+    /// <summary>The first-time setup checklist was finished or skipped: it no longer opens by itself.</summary>
+    public static bool SetupDone
+    {
+        get => (bool?)Load()["setupDone"] ?? false;
+        set
+        {
+            var o = Load();
+            o["setupDone"] = value;
+            Save(o);
+        }
+    }
+
     /// <summary>The "Make sure AssistiveTouch is on" reminder at each launch.</summary>
     public static bool AssistiveTouchReminder
     {

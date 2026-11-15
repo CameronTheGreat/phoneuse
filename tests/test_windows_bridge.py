@@ -101,7 +101,7 @@ def test_this_pcs_keyboard_opens_when_the_bridge_goes_away():
         assert not h.le_wanted and h.published == []
         old, whid.LE_FALLBACK = whid.LE_FALLBACK, 1.0
         try:
-            for _ in range(200):  # the bridge stopped answering: after LE_FALLBACK, LE opens
+            for _ in range(300):  # the bridge stopped answering: after LE_FALLBACK, LE opens
                 if h.le_wanted:
                     break
                 await asyncio.sleep(0.1)

@@ -46,7 +46,7 @@ public sealed partial class MainWindow
         PairButton.Content = n > 0 ? "Pair another" : "Pair iPhone";
         PairButton.IsEnabled = n >= 0;
         UnpairButton.Visibility = n > 0 ? Visibility.Visible : Visibility.Collapsed;
-        PairingBar.IsOpen = n == 0 && !AppSettings.PairingBarDismissed;
+        PairingBar.IsOpen = n == 0 && !AppSettings.PairingBarDismissed && SetupOverlay.Visibility != Visibility.Visible;
     }
 
     async void Pair_Click(object sender, RoutedEventArgs e)
