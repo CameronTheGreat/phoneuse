@@ -37,6 +37,9 @@ points if any value is > 1 (screen_points in ~/.config/phoneuse/config.toml):
   phoneuse recipe forget NAME   delete a saved recipe
   phoneuse longpress X Y [S]    = gesture down X Y hold S up (default 0.8 s)
   phoneuse swipe X0 Y0 X1 Y1 [S]  = gesture down X0 Y0 move X1 Y1 S up (default 0.3 s)
+                                --exact (swipe, gesture, recipe): before a drag lifts, find
+                                the pointer in the picture and slide the rest of the way
+                                (about 1.6 s more; for icons, sliders, text selection)
   phoneuse scroll up|down [N]   scroll the content by N half-screens (default 1)
   phoneuse scroll-by DY [X]     scroll exactly DY: a screen fraction, or phone points if above 1;
                                 positive shows what is below, negative what is above (X: column, default 0.5)
@@ -2061,7 +2064,8 @@ def main():
         paths = [x for x in args if not x.startswith("--")]  # (--keep-pointer: now always)
         return screenshot(paths[0] if paths else runtime_path("phoneuse.png"))
     force = "--force" in args
-    args = [a for a in args if a != "--force"]
+    exact = cmd in ("gesture", "recipe", "swipe") and "--exact" in args
+    args = [a for a in args if a not in ("--force", "--exact")]
     film_path = None
     if cmd in ("gesture", "recipe") and "--film" in args:
         k = args.index("--film")
@@ -2094,7 +2098,7 @@ def main():
         touch.long_press(h, *point(*args[:2]), hold=float(args[2]) if len(args) > 2 else 0.8)
     elif cmd == "swipe":
         x0, y0 = point(*args[0:2]); x1, y1 = point(*args[2:4])
-        touch.swipe(h, x0, y0, x1, y1, duration=float(args[4]) if len(args) > 4 else 0.3)
+        touch.swipe(h, x0, y0, x1, y1, duration=float(args[4]) if len(args) > 4 else 0.3, exact=exact)
     elif cmd in ("gesture", "recipe"):
         if steps is None:
             home(h)
@@ -2103,7 +2107,7 @@ def main():
             f = film.Film()
             before = link_counts(h)
             try:
-                touch.gesture(h, steps, film=f)
+                touch.gesture(h, steps, film=f, exact=exact)
             finally:
                 NOTES.append(save_film(f, film_path))
                 note = link_note(before, link_counts(h))
