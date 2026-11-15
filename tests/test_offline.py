@@ -332,3 +332,13 @@ def test_exact_gesture_corrects_drags_only(monkeypatch):
     assert calls == []
     touch.gesture(Hid(), touch.parse_gesture("down 0.2 0.3 move 0.7 0.6 0.5"), exact=True)
     assert calls == [(0.7, 0.6)]
+
+
+def test_scroll_by_half_screens_never_reads_as_points(monkeypatch):
+    from phoneuse import cli, touch
+    drags = []
+    monkeypatch.setattr(touch, "scroll_drag", lambda h, x0, y0, x1, y1: drags.append(y1 - y0))
+    for n in (1, 2, 4, 6):
+        drags.clear()
+        cli.scroll(None, "up", n)
+        assert abs(sum(drags) - 0.45 * n) < 1e-6, (n, drags)

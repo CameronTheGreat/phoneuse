@@ -698,7 +698,10 @@ def dismiss(h):
 
 def scroll(h, direction, n=1.0):
     """Scroll the content by n half-screens (0.45 of the screen height each)."""
-    scroll_by(h, 0.45 * n if direction == "down" else -0.45 * n)
+    # In points: scroll_by reads a value above 1 as points, so 3 or more half-screens
+    # given as a fraction (1.35) scrolled 1.35 pt, which is nothing.
+    pts = 0.45 * n * SCREEN_PT[1]
+    scroll_by(h, pts if direction == "down" else -pts)
 
 
 def scroll_by(h, dy, x=0.5):
@@ -713,7 +716,8 @@ def scroll_by(h, dy, x=0.5):
     n = max(1, math.ceil(abs(dy) / 0.7 - 1e-9))
     d = abs(dy) / n
     if d <= 0.005:
-        return
+        die(f"Not scrolled: {abs(dy) * SCREEN_PT[1]:.1f} pt is too little to scroll. scroll-by takes a "
+            "screen fraction up to 1, or phone points above 1.")
     for _ in range(n):
         y0, y1 = (0.85, 0.85 - d) if dy > 0 else (0.15, 0.15 + d)
         touch.scroll_drag(h, x, y0, x, y1)
@@ -2006,6 +2010,20 @@ def unlock_cmd():
 
 
 def main():
+    try:
+        _main()
+    except RuntimeError as e:  # the input service refused or the link failed mid-action
+        msg = str(e)
+        if msg.startswith("err "):
+            msg = msg[4:]
+        if "owner" in msg:  # the agent gate: nothing was sent
+            die(msg)
+        die(f"The phone input failed: {msg}. Part of the action may have happened: look before "
+            "repeating it. (`phoneuse status` shows the link; a bridge that didn't answer usually "
+            "answers again within seconds.)")
+
+
+def _main():
     if IS_WINDOWS:  # agents read our output through pipes: UTF-8, never the console's code page
         for stream in (sys.stdout, sys.stderr):
             try:
