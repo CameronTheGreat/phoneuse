@@ -209,8 +209,9 @@ def scroll_crawls():
 # A scroll view starts following the finger only once it has moved a few points
 # (touch slop), and the content never makes those up: over Bluetooth LE (iPhone 14 Pro
 # Max, iOS 26.5) scroll-by fell short by 7.5-10 pt whatever the distance (0.05-0.3 of
-# the screen). Scroll drags go that much further. Not measured over Classic (Linux).
-SCROLL_SLOP = 8.0 if LINK == "ble" else 0.0
+# the screen). Scroll drags go that much further. Over Classic through the bridge (iPhone 15
+# Pro, iOS 26) content fell short of where the pointer stopped by 11-13 pt, so all links.
+SCROLL_SLOP = 8.0 if LINK == "ble" else 11.0
 
 
 def scroll_step(remaining, most=None):
