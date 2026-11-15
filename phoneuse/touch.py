@@ -411,6 +411,28 @@ def _move(t, fx, fy, duration):
         if k >= 1.0 and time.time() - t0 > duration + 2.0:
             break
         time.sleep(TICK)
+    _push_to_edge(t, fx, fy)
+
+
+EDGE = 0.01  # a move this close to a screen edge goes all the way to it
+EDGE_PUSH = 40.0  # pt sent past the edge: iOS stops the pointer there
+
+
+def _push_to_edge(t, fx, fy):
+    """A move that ends at a screen edge keeps going EDGE_PUSH points past it. The
+    pointer stops at the edge, so it gets there however short the phone's drags fall
+    (an iPhone 15 Pro at a low Tracking Speed stopped at x 0.97 when sent to 0.995,
+    and holding there never turned the home screen page)."""
+    px = -EDGE_PUSH if fx <= EDGE else EDGE_PUSH if fx >= 1 - EDGE else 0.0
+    py = -EDGE_PUSH if fy <= EDGE else EDGE_PUSH if fy >= 1 - EDGE else 0.0
+    if not (px or py) or not t.down:
+        return
+    t.pos = (fx - px / SCREEN_PT[0], fy - py / SCREEN_PT[1])  # pretend to be short of it by the push
+    t.target = (fx, fy)
+    end = time.time() + 1.0
+    while time.time() < end and t.step() >= max(1.0, DRAG_PTS[0][1]):
+        time.sleep(TICK)
+    t.pos = t.target = (fx, fy)
 
 
 def tap(hid, fx, fy, hold=0.06, settle=True):

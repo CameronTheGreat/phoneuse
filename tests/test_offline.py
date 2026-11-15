@@ -342,3 +342,29 @@ def test_scroll_by_half_screens_never_reads_as_points(monkeypatch):
         drags.clear()
         cli.scroll(None, "up", n)
         assert abs(sum(drags) - 0.45 * n) < 1e-6, (n, drags)
+
+
+def test_status_bar_hides_its_own_items_but_not_buttons():
+    from phoneuse.cli import status_bar_item
+    assert status_bar_item(0.03, "4:43") and status_bar_item(0.03, "100%") and status_bar_item(0.03, "5G")
+    assert not status_bar_item(0.035, "Done") and not status_bar_item(0.035, "Edit")
+    assert not status_bar_item(0.2, "5G")
+
+
+def test_moves_to_an_edge_push_past_it(monkeypatch):
+    from phoneuse import touch
+    sent = []
+
+    class Hid:
+        def cmd(self, line):
+            sent.append(line)
+            return "ok"
+    t = touch.Touch(Hid())
+    t.pos = t.target = (0.5, 0.3)
+    t.down = True
+    touch._move(t, 0.6, 0.3, 0.05)
+    inner = len(sent)
+    touch._move(t, 1.0, 0.3, 0.05)  # to the right edge: more reports than the distance alone
+    assert t.pos == (1.0, 0.3)
+    xs = [int(l.split()[1]) for l in sent[inner:] if l.startswith("m ")]
+    assert sum(touch.points_for(abs(x)) for x in xs) >= 0.4 * 393 + touch.EDGE_PUSH * 0.8

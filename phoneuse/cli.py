@@ -1273,7 +1273,15 @@ def fresh_screenshot():
     return path
 
 
-STATUS_BAR = 0.055  # lines above this (time, signal, battery) are left out of `text`
+STATUS_BAR = 0.055  # the status bar's band: its own content (time, signal, battery) is left out of `text`
+
+
+def status_bar_item(y, text):
+    """A line the status bar shows (the time, "100%", "5G", "SOS", a glyph), as
+    opposed to a button iOS puts in that band (edit mode's Edit and Done)."""
+    import re
+    t = text.strip()
+    return y < STATUS_BAR and (len(t) <= 3 or bool(re.match(r"^\d{1,2}:\d{2}", t)) or t.endswith("%"))
 BACK_GLYPHS = {"く", "<", "‹", "〈", "〈"}  # how OCR reads the back chevron at the top left
 
 
@@ -1317,8 +1325,9 @@ def screen_text(show_all=False, shot=None):
         die(r["error"])
     lines = [(ln["x"], ln["y"], "[back]" if ln["text"].strip() in BACK_GLYPHS and ln["x"] < 0.15 else ln["text"])
              for ln in r["lines"]
-             if show_all or (ln["y"] >= STATUS_BAR and any(c.isalnum() for c in ln["text"]))]
-    lines += [(x, y, "[switch on]" if on else "[switch off]") for x, y, on in screen.find_switches(rgb)]
+             if show_all or (not status_bar_item(ln["y"], ln["text"]) and any(c.isalnum() for c in ln["text"]))]
+    lines += [(x, y, "[switch on]" if on else "[switch off]") for x, y, on in screen.find_switches(rgb)
+              if show_all or y >= STATUS_BAR]  # the battery icon can read as a switch
     return sorted(lines, key=lambda t: (round(t[1] / 0.012), t[0]))  # rows top to bottom, then left to right
 
 
@@ -1344,7 +1353,7 @@ def text_target(what):
     if not words:
         return None
     want = " ".join(words)
-    lines = [(x, y, t.lower().strip()) for x, y, t in screen_text() if y >= STATUS_BAR]
+    lines = [(x, y, t.lower().strip()) for x, y, t in screen_text()]
     exact = [(x, y) for x, y, t in lines if t == want]
     if exact:
         return exact[0]
