@@ -6,6 +6,7 @@ Setup and running:
                                bluetoothd config. Windows: UxPlay, the firewall rule
                                (asks for admin once). Both: the local vision models
   phoneuse doctor               check every part of the setup and say how to fix it
+  phoneuse claude [connect|disconnect]  Claude Code: the phoneuse skill and command (state)
   phoneuse up                   mirror window + mouse control (click/drag on the mirror)
   phoneuse down                 Windows: also stop the Bluetooth keyboard and mouse, which
                                keep running after `up` stops (see up_windows)
@@ -2092,6 +2093,18 @@ def _main():
     if cmd == "doctor":
         from . import doctor
         sys.exit(doctor.main(args))
+    if cmd == "claude":  # link the skill and write the phoneuse command for Claude Code (claude_setup)
+        from . import claude_setup
+        if args[:1] == ["connect"]:
+            claude_setup.connect()
+        elif args[:1] == ["disconnect"]:
+            claude_setup.disconnect()
+        elif args:
+            die("usage: phoneuse claude [connect|disconnect]")
+        st = claude_setup.state()
+        print(f"Claude Code: skill {'linked' if st['skill'] else 'not linked'} ({claude_setup.SKILL_DIR}), "
+              f"command {'in place' if st['command'] else 'not in place'} ({claude_setup.BIN})")
+        return
     if cmd == "install":
         subprocess.run(["sudo", os.path.join(ROOT, "scripts", "install.sh")], check=True)
         if not os.path.exists(os.path.join(ROOT, ".venv-vision")):
