@@ -90,7 +90,7 @@ import threading
 import time
 import urllib.request
 
-from . import calibrate, config, ipc, phones, screen, touch
+from . import calibrate, config, hidproto, ipc, phones, screen, touch
 from .config import CFG, HID_SOCKET, IS_WINDOWS, MACOS, NAME, RUNTIME_DIR, SCREEN_PT, VISION_SOCKET, runtime_path
 from .hidclient import Hid
 
@@ -448,9 +448,12 @@ class AgentHid:
         self.dots = _dots
 
     def cmd(self, line):
-        if self.first_seq is None and line != "status":
-            # Taken here, after any OCR lookup the action did first:
-            # changes during a lookup must not count as this action's result.
+        parts = line.split()
+        if self.first_seq is None and parts and parts[0] != "status" and not hidproto.passive(parts[0], parts[1:]):
+            # Taken here, after any OCR lookup the action did first, and after the hover that
+            # brings the pointer to a tap or a press: those changes must not count as this
+            # action's result. Counting the pointer's arrival read the screen in the still
+            # moment before an app's launch (0.17 s, iPhone 15 Pro): --text showed the old screen.
             self.first_seq = frame_seq()
         r = self.h.cmd(line)
         try:

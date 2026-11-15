@@ -30,6 +30,11 @@ from .config import IS_WINDOWS, SCREEN_PT
 DYNAMIC_AFTER = 1.0  # a region moving continuously this long (s) is video/animation: ignored
 AMBIENT_AFTER = 0.4  # after this long (s), only big motion keeps settle waiting
 BIG = 0.05  # a change of at least this share of the picture is big (a page, a scroll)
+# After an action whose changes so far are all small, stillness must last this long (s):
+# a tap's first change is often the button's highlight, and the page or app it opens
+# starts moving only after that (an app launch came 0.17 s after its icon's highlight
+# on an iPhone 15 Pro: a 0.1 s wait read the old screen).
+SMALL_QUIET = 0.3
 SHOT_SIZE = (SCREEN_PT[0] * 2, SCREEN_PT[1] * 2)
 
 
@@ -136,12 +141,15 @@ class Frames:
                     self.cv.wait(change - (time.time() - start))
                 if self.seq > since:
                     self.reacted = time.time() - start
-                start = time.time()  # the stillness wait starts at the change
+            acting = start if since is not None and self.reacted is not None else None
+            start = time.time()  # the stillness wait starts at the change
             still = False
             ambient = False
             while time.time() - start < limit:
                 idle = time.time() - self.frame_at
-                if idle >= quiet:
+                # only small changes since the action (a highlight): its real result may follow
+                q = max(quiet, SMALL_QUIET) if acting is not None and self.big_at < acting else quiet
+                if idle >= q:
                     still = True
                     break
                 # After AMBIENT_AFTER s (time for small animations like a switch to
@@ -149,10 +157,10 @@ class Frames:
                 # us waiting; small local changes that never stop (tiles cycling,
                 # clips swapping) are ambient: return, and say so.
                 now = time.time()
-                if now - start > AMBIENT_AFTER and now - self.big_at >= quiet:
+                if now - start > AMBIENT_AFTER and now - self.big_at >= q:
                     still = ambient = True
                     break
-                self.cv.wait(min(quiet - idle, 0.05))
+                self.cv.wait(min(q - idle, 0.05))
             self.ambient = ambient
             self.last_still = still
             return self.seq
