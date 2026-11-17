@@ -83,7 +83,7 @@ Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Fil
 
 [UninstallDelete]
 ; What phoneuse makes at run time: bytecode, core\.venv (system Python), core\.venv-vision (the
-; screen-reading models, a few GB). Settings in %APPDATA%\phoneuse stay.
+; screen-reading OCR, up to 2 GB). Settings in %APPDATA%\phoneuse stay.
 Type: filesandordirs; Name: "{app}\core"
 Type: dirifempty; Name: "{app}"
 

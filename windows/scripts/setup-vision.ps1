@@ -1,10 +1,16 @@
-# Local screen-reading models for `phoneuse text` / `phoneuse find` on Windows:
-# RapidOCR (PP-OCRv6) and GoClick-Large (GUI grounding), in their own venv (.venv-vision),
-# because GoClick needs transformers 4.45. With an NVIDIA GPU both run on CUDA 13.
+# Local screen reading for `phoneuse text` on Windows: RapidOCR (PP-OCRv6 small, ONNX) in its own
+# venv (.venv-vision), the same packages as scripts/setup-vision.sh. With an NVIDIA GPU it runs on
+# CUDA 13 through onnxruntime-gpu, whose CUDA and cuDNN DLLs come as pip packages ([cuda,cudnn]):
+# about 2 GB, against about 250 MB for the CPU. Nothing is kept in pip's cache (--no-cache-dir): the
+# packages are all there is to remove.
 #   powershell -ExecutionPolicy Bypass -File windows\scripts\setup-vision.ps1
+# PHONEUSE_PROGRESS=raw (the window's Settings > Screen reading sets it): pip-progress.py reports each
+# download, "Downloading <name> (<size>)" then "Progress <bytes> of <total>" lines (pip's --progress-bar
+# raw), and the unpacking after it the same way.
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 . "$PSScriptRoot\common.ps1"
+$Raw = $env:PHONEUSE_PROGRESS -eq "raw"
 
 $Py = Find-Python
 $Venv = Join-Path $Root ".venv-vision"
@@ -13,26 +19,19 @@ if (-not (Test-Path "$Venv\Scripts\python.exe")) {
     & $Py -m venv $Venv
 }
 $VPy = "$Venv\Scripts\python.exe"
-& $VPy -m pip install --quiet --upgrade pip
+& $VPy -m pip install --quiet --no-cache-dir --upgrade pip
 
 $gpu = $null -ne (Get-Command nvidia-smi -ErrorAction SilentlyContinue)
-if ($gpu) {
-    # One CUDA for both: onnxruntime-gpu is built for CUDA 13 and brings its CUDA and cuDNN
-    # DLLs as pip packages ([cuda,cudnn]); torch's CUDA 13.0 wheel matches them (two cuDNN
-    # builds of the same DLL name can't share a process).
-    Write-Step "Installing torch with CUDA 13 (about 3 GB)"
-    & $VPy -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cu130
-    $ort = "onnxruntime-gpu[cuda,cudnn]"
+$ort = if ($gpu) { "onnxruntime-gpu[cuda,cudnn]" } else { "onnxruntime" }
+$packages = "rapidocr", $ort, "pillow", "numpy"
+Write-Step ("Installing OCR" + $(if ($gpu) { " for the GPU (about 2 GB)" } else { " (about 250 MB)" }))
+if ($Raw) {
+    # Its own lines as they come (stderr too, as text: Windows PowerShell would make it an error)
+    $ErrorActionPreference = "Continue"
+    & $VPy -I "$PSScriptRoot\pip-progress.py" --no-cache-dir @packages 2>&1 | ForEach-Object { "$_" }
+    $ErrorActionPreference = "Stop"
 } else {
-    Write-Step "Installing torch (CPU)"
-    & $VPy -m pip install --quiet torch
-    $ort = "onnxruntime"
+    & $VPy -m pip install --quiet --no-cache-dir @packages
 }
-if ($LASTEXITCODE -ne 0) { throw "torch failed to install" }
-Write-Step "Installing OCR and the grounding model's libraries"
-& $VPy -m pip install --quiet "transformers==4.45.0" timm einops huggingface_hub rapidocr $ort pillow numpy psutil
-if ($LASTEXITCODE -ne 0) { throw "the vision libraries failed to install" }
-Write-Step "Downloading GoClick-Large"
-& $VPy -c "from huggingface_hub import snapshot_download; snapshot_download('HongxinLi/GoClick-Large', allow_patterns=['*.json', '*.py', 'model.safetensors'])"
-if ($LASTEXITCODE -ne 0) { throw "the model download failed" }
-Write-Host "vision models ready" -ForegroundColor Green
+if ($LASTEXITCODE -ne 0) { throw "the OCR packages failed to install" }
+Write-Host "screen reading ready" -ForegroundColor Green

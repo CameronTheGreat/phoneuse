@@ -348,8 +348,8 @@ public sealed partial class MainWindow
         var item = new JsonObject
         {
             ["id"] = "vision", ["title"] = "Screen reading", ["done"] = on, ["optional"] = true,
-            ["detail"] = busy ? "Installing (several GB, can take a while)… " + _visionStep
-                       : "Local models that let agents read the screen, tap text, type and open apps by name. A few GB.",
+            ["detail"] = busy ? "Installing (up to 2 GB, can take a while)… " + _visionStep
+                       : "Local OCR that lets agents read the screen, tap text, type and open apps by name. Up to 2 GB.",
         };
         var card = StepCard(item, 0, false);
         if (!on && Backend.Root != null && card.Child is Grid g && g.Children[^1] is StackPanel col)

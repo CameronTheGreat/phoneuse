@@ -6,7 +6,7 @@
 #   2. MSYS2 (C:\msys64) and UxPlay, the AirPlay receiver, built from source
 #   3. a Windows Firewall rule so the iPhone can reach UxPlay (one UAC prompt)
 #   4. bin\ on your PATH
-#   5. the screen-reading models (.venv-vision; a few GB; skip with -NoVision)
+#   5. screen reading, the OCR (.venv-vision; up to 2 GB; skip with -NoVision)
 #   6. `phoneuse doctor`, which checks all of it
 param([switch]$NoVision, [switch]$NoUxPlay, [switch]$NoFirewall, [switch]$NoPath)
 $ErrorActionPreference = "Stop"
@@ -83,7 +83,7 @@ if (-not $NoPath) {
     }
 }
 
-# 5. Vision models
+# 5. Screen reading (OCR)
 if (-not $NoVision) { & "$PSScriptRoot\setup-vision.ps1" }
 
 # 6. Check

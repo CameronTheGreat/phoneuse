@@ -15,7 +15,7 @@ app isn't built.
 | iPhone | iPhone 18 Pro Max, iPhone 17 Pro Max and iPhone 14 Pro Max, iOS 26 |
 | Python | 3.13 (the app ships python-build-standalone's; a checkout uses python.org's) |
 | UxPlay | 1.74, built in MSYS2 (UCRT64) |
-| NVIDIA GPU (optional) | NVENC for the video hub, CUDA for the models that read the screen |
+| NVIDIA GPU (optional) | NVENC for the video hub, CUDA for the OCR that reads the screen |
 
 ## Install the app
 
@@ -38,8 +38,11 @@ Each release, and each build of `main`, has two downloads (the GitHub workflow
 
 Both hold the window with its .NET runtime, phoneuse in `core\` (with `core\python\`, a
 standalone Python with phoneuse's packages), and UxPlay with the GStreamer and audio-only
-FFmpeg it needs in `core\uxplay\`. Neither includes the models that read the screen (a few
-GB): the window's Settings › Screen reading installs them. Nor do they include the bridge's
+FFmpeg it needs in `core\uxplay\`. Neither includes the OCR that reads the screen (about 2 GB
+with an NVIDIA GPU, 250 MB without): the window's Settings › Screen reading installs it into
+`core\.venv-vision`, with a progress bar for each download and for unpacking, and nothing
+kept in pip's cache. Cancel stops it and removes what it left; Remove deletes the folder. Nor
+do they include the bridge's
 firmware and flashing tool: the app downloads those only if you flash a bridge.
 
 ## Install from a checkout
@@ -53,8 +56,8 @@ powershell -ExecutionPolicy Bypass -File windows\scripts\install.ps1
 
 It makes `.venv`, installs MSYS2 to `C:\msys64` and builds UxPlay there, builds the Phone
 Use window into `windows\dist` (`windows\scripts\build-winui.ps1` builds it again), adds
-the firewall rule (one admin prompt), puts `bin` on your PATH and downloads the models
-that read the screen (`-NoVision` skips them). It ends with `phoneuse doctor`, which checks
+the firewall rule (one admin prompt), puts `bin` on your PATH and installs the OCR
+that reads the screen (`-NoVision` skips it). It ends with `phoneuse doctor`, which checks
 each part and says how to fix what is missing. `windows\scripts\package.ps1` builds the
 installer and the zip (it needs Inno Setup 6 for the installer).
 

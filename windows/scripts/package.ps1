@@ -82,7 +82,7 @@ robocopy "$Root\skill" "$Core\skill" /E /NFL /NDL /NJH /NJS /NP | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "copying phoneuse failed" }
 Copy-Item "$Root\bin\phoneuse" "$Core\bin\phoneuse"
 Copy-Item "$PSScriptRoot\phoneuse.cmd" "$Core\bin\phoneuse.cmd"
-foreach ($s in "common.ps1", "setup-vision.ps1", "firewall.ps1") { Copy-Item "$PSScriptRoot\$s" "$Core\windows\scripts\" }
+foreach ($s in "common.ps1", "setup-vision.ps1", "pip-progress.py", "firewall.ps1") { Copy-Item "$PSScriptRoot\$s" "$Core\windows\scripts\" }
 Copy-Item "$Root\pyproject.toml", "$Root\LICENSE", "$Root\README.md" $Core
 # 3. Python
 Write-Step "Python (python-build-standalone) and phoneuse's packages"

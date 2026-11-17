@@ -90,6 +90,10 @@
                                     <TextBlock Text="Screen reading" Margin="0,14,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" />
                                     <TextBlock x:Name="VisionText" Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.7"
                                                TextWrapping="Wrap" />
+                                    <!-- while installing: the current download's bytes, else indeterminate -->
+                                    <ProgressBar x:Name="VisionProgress" Maximum="1" Visibility="Collapsed" Margin="0,2,0,2" />
+                                    <TextBlock x:Name="VisionDetail" Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.7"
+                                               TextWrapping="Wrap" Visibility="Collapsed" />
                                     <StackPanel Orientation="Horizontal" Spacing="10">
                                         <Button x:Name="VisionButton" Content="Install" Click="Vision_Click" />
                                         <ProgressRing x:Name="VisionRing" Width="20" Height="20" IsActive="False"
