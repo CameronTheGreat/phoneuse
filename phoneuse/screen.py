@@ -15,8 +15,8 @@ import sys
 import numpy as np
 from PIL import Image
 
-from . import ipc
-from .config import CFG, IS_WINDOWS, PHONE_ASPECT
+from . import ipc, orientation
+from .config import CFG, IS_WINDOWS
 
 MIRROR_CLASS = "phoneuse-mirror"  # window class (Wayland app id) of the mirror window, window.py
 HUB_RTP_PORT = 5590  # UxPlay sends the phone's video here, to the hub (hub.py)
@@ -170,25 +170,29 @@ def mirror_window():
     return c["at"], c["size"]
 
 
-def design_size():
-    """(width, height) of the window in screen-width units."""
-    return 1 + 2 * BEZEL, 1 / PHONE_ASPECT + 2 * BEZEL
+def design_size(pts=None):
+    """(width, height) of the window in screen-width units. `pts`: the screen in points as it
+    faces (orientation.py); default: as the frames say now."""
+    pts = pts or orientation.current_points()
+    return 1 + 2 * BEZEL, pts[1] / pts[0] + 2 * BEZEL
 
 
-def window_size(screen_width):
-    dw, dh = design_size()
+def window_size(screen_width, pts=None):
+    dw, dh = design_size(pts)
     return round(dw * screen_width), round(dh * screen_width)
 
 
-def picture_rect(at, size):
+def picture_rect(at, size, pts=None):
     """Where the phone picture sits on screen, for a mirror window at `at` with
     `size`. The rest of the window is bezel. The picture is aspect-fit and
     centered, so a window of another shape gets a wider bezel on two sides, never
-    a squished picture."""
+    a squished picture. A sideways phone's picture is wider than tall."""
     (x, y), (w, h) = at, size
-    dw, dh = design_size()
+    pts = pts or orientation.current_points()
+    aspect = pts[0] / pts[1]
+    dw, dh = design_size(pts)
     u = min(w / dw, h / dh)  # pixels per screen width
-    return x + (w - u) / 2, y + (h - u / PHONE_ASPECT) / 2, u, u / PHONE_ASPECT
+    return x + (w - u) / 2, y + (h - u / aspect) / 2, u, u / aspect
 
 
 def grab_png():
