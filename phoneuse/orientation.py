@@ -44,9 +44,11 @@ def note_size(size):
 
 def refresh(timeout=0.5):
     """Ask the frames service for the frame size now. Keeps the old one if it can't answer."""
+    global _at
     try:
         line, _ = ipc.request("frames", "status", timeout)
-    except OSError:
+    except (OSError, RuntimeError, ValueError):  # not running, no token, a garbled reply
+        _at = time.time()  # don't ask again on every call while it's down
         return _size
     size = parse_size(line)
     note_size(size)

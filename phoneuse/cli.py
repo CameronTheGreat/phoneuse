@@ -294,7 +294,8 @@ def point(xs, ys):
     """Parse a coordinate pair: fractions, or iPhone points if either is > 1."""
     x, y = float(xs), float(ys)
     if x > 1 or y > 1:
-        x, y = x / orientation.current_points()[0], y / orientation.current_points()[1]
+        pw, ph = orientation.current_points()
+        x, y = x / pw, y / ph
     if not (0 <= x <= 1 and 0 <= y <= 1):
         die(f"coordinate out of range: {xs} {ys}")
     return x, y
@@ -492,8 +493,9 @@ class AgentHid:
                 if mag:
                     moved = touch.points_for(mag)
                     x, y, down = self.dot
-                    self.dot = (min(max(x + moved * ux / mag / orientation.current_points()[0], 0.0), 1.0),
-                                min(max(y + moved * uy / mag / orientation.current_points()[1], 0.0), 1.0), down)
+                    pw, ph = orientation.current_points()
+                    self.dot = (min(max(x + moved * ux / mag / pw, 0.0), 1.0),
+                                min(max(y + moved * uy / mag / ph, 0.0), 1.0), down)
                     self.dots.show(self.dot)
         except (IndexError, ValueError):
             pass
@@ -627,7 +629,8 @@ def gesture_point(xs, ys):
     """point(), for gesture steps: an error the caller reports instead of an exit."""
     x, y = float(xs), float(ys)
     if x > 1 or y > 1:
-        x, y = x / orientation.current_points()[0], y / orientation.current_points()[1]
+        pw, ph = orientation.current_points()
+        x, y = x / pw, y / ph
     if not (0 <= x <= 1 and 0 <= y <= 1):
         raise touch.GestureError(f"position out of range: {xs} {ys}")
     return x, y
@@ -731,14 +734,15 @@ def scroll_by(h, dy, x=0.5):
     shows what is below. A drag that slows down before it lifts, so iOS doesn't
     fling and the content stops where the finger lifts; long scrolls take
     several drags."""
+    ph = orientation.current_points()[1]
     if abs(dy) > 1:
-        dy /= orientation.current_points()[1]
+        dy /= ph
     # Equal drags of at most 0.7: splitting 0.72 into 0.7 + 0.02 left a 17 pt drag
     # at the end, short enough for iOS to read as a tap on whatever was there.
     n = max(1, math.ceil(abs(dy) / 0.7 - 1e-9))
     d = abs(dy) / n
     if d <= 0.005:
-        die(f"Not scrolled: {abs(dy) * orientation.current_points()[1]:.1f} pt is too little to scroll. scroll-by takes a "
+        die(f"Not scrolled: {abs(dy) * ph:.1f} pt is too little to scroll. scroll-by takes a "
             "screen fraction up to 1, or phone points above 1.")
     for _ in range(n):
         y0, y1 = (0.85, 0.85 - d) if dy > 0 else (0.15, 0.15 + d)
@@ -1229,7 +1233,8 @@ def screenshot(path):
     img = Image.open(io.BytesIO(png))
     save_look(img.convert("RGB"))
     w, hgt = img.size
-    print(f"{path} ({w}x{hgt} px = {orientation.current_points()[0]}x{orientation.current_points()[1]} pt; tap with fractions of this image or points)")
+    pw, ph = orientation.current_points()
+    print(f"{path} ({w}x{hgt} px = {pw}x{ph} pt; tap with fractions of this image or points)")
 
 
 # ---------- vision (OCR, see vision.py) ----------
