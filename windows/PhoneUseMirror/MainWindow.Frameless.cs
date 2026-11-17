@@ -31,7 +31,6 @@ public sealed partial class MainWindow
 
     void Frameless()
     {
-        AppTitleBar.Title = "";
         AppTitleBar.Background = BarBrush;
         SystemBackdrop = new ClearBackdrop();
 
@@ -110,7 +109,7 @@ public sealed partial class MainWindow
         var status = !_live ? (_mirroring ? "Starting" : "Not mirroring") : _stale ? "Picture is old" : "Live";
         if (_agent == "driving") status += " · Agent in control";
         else if (_agent == "paused") status += " · Agent paused";
-        AppTitleBar.Subtitle = status;
+        StatusText.Text = status;
     }
 
     // ---------------------------------------------------------------- size

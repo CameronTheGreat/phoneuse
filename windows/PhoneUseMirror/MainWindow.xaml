@@ -12,10 +12,16 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <TitleBar x:Name="AppTitleBar" Title="Phone Use" Subtitle="">
-            <TitleBar.IconSource>
-                <ImageIconSource ImageSource="ms-appx:///Assets/AppIcon.png" />
-            </TitleBar.IconSource>
+        <TitleBar x:Name="AppTitleBar">
+            <!-- the icon, rounded as everywhere else (scripts/make-icons.py), bigger than the title bar's own
+                 icon slot allows, and the mirroring status (ShowStatus) -->
+            <TitleBar.LeftHeader>
+                <StackPanel Orientation="Horizontal" Spacing="10" Margin="10,0,0,0" VerticalAlignment="Center"
+                            IsHitTestVisible="False">
+                    <Image Source="ms-appx:///Assets/AppIcon.png" Width="30" Height="30" />
+                    <TextBlock x:Name="StatusText" VerticalAlignment="Center" FontSize="12" Opacity="0.8" />
+                </StackPanel>
+            </TitleBar.LeftHeader>
             <TitleBar.RightHeader>
                 <StackPanel x:Name="BarButtons" Orientation="Horizontal" Spacing="2" Margin="0,0,4,0">
                 <Button x:Name="AboutButton" Padding="8,5" Click="OpenAbout_Click"

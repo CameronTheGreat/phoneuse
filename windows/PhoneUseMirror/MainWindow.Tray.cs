@@ -24,7 +24,7 @@ public sealed partial class MainWindow
         _tray.About += () => _ui.TryEnqueue(ShowAbout);
         _tray.Quit += () => _ui.TryEnqueue(QuitApp);
         _tick.Tick += (_, _) =>
-            _tray?.SetTip("Phone Use" + (string.IsNullOrEmpty(AppTitleBar.Subtitle) ? "" : " · " + AppTitleBar.Subtitle));
+            _tray?.SetTip("Phone Use" + (string.IsNullOrEmpty(StatusText.Text) ? "" : " · " + StatusText.Text));
 
         AppWindow.Closing += (_, e) =>
         {
