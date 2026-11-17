@@ -306,15 +306,21 @@ public sealed partial class MainWindow : Window
         LimitSize(scale);
     }
 
-    /// <summary>The phone turned: give the window the other shape, centered where it was, on the
-    /// display it is on and inside its work area.</summary>
+    /// <summary>The phone turned: turn the window with it, so the phone keeps its size on screen
+    /// (the room the phone had across becomes the room it has down, and the other way round),
+    /// centered where it was, shrunk to fit the work area of the display it is on.</summary>
     void ReshapeWindow()
     {
+        if (AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Maximized }) return;
         var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
         double scale = WindowScale();
         LimitSize(scale);  // the minimum changes shape too, before resizing under it
-        var size = PhoneWindowSize(area, scale);
-        int cx = AppWindow.Position.X + AppWindow.Size.Width / 2, cy = AppWindow.Position.Y + AppWindow.Size.Height / 2;
+        double padW = 24 * scale, padH = (48 + 72) * scale;  // beside the phone; title bar + room below it
+        var now = AppWindow.Size;
+        double w = Math.Max(1, now.Height - padH) + padW, h = Math.Max(1, now.Width - padW) + padH;
+        double fit = Math.Min(1.0, Math.Min(area.Width * 0.95 / w, area.Height * 0.95 / h));
+        var size = new SizeInt32((int)(w * fit), (int)(h * fit));
+        int cx = AppWindow.Position.X + now.Width / 2, cy = AppWindow.Position.Y + now.Height / 2;
         int x = Math.Clamp(cx - size.Width / 2, area.X, Math.Max(area.X, area.X + area.Width - size.Width));
         int y = Math.Clamp(cy - size.Height / 2, area.Y, Math.Max(area.Y, area.Y + area.Height - size.Height));
         AppWindow.MoveAndResize(new RectInt32(x, y, size.Width, size.Height));
