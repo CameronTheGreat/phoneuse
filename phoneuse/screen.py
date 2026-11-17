@@ -171,13 +171,16 @@ def mirror_window():
 
 
 def design_size(pts=None):
-    """(width, height) of the window in screen-width units. `pts`: the screen in points as it
-    faces (orientation.py); default: as the frames say now."""
+    """(width, height) of the window in units of the screen's short side (its width when
+    upright): the bezel is a fraction of that, so a sideways phone keeps the same bezel.
+    `pts`: the screen in points as it faces (orientation.py); default: as the frames say now."""
     pts = pts or orientation.current_points()
-    return 1 + 2 * BEZEL, pts[1] / pts[0] + 2 * BEZEL
+    short = min(pts)
+    return pts[0] / short + 2 * BEZEL, pts[1] / short + 2 * BEZEL
 
 
 def window_size(screen_width, pts=None):
+    """The window for a phone whose screen is `screen_width` px across its short side."""
     dw, dh = design_size(pts)
     return round(dw * screen_width), round(dh * screen_width)
 
@@ -189,10 +192,11 @@ def picture_rect(at, size, pts=None):
     a squished picture. A sideways phone's picture is wider than tall."""
     (x, y), (w, h) = at, size
     pts = pts or orientation.current_points()
-    aspect = pts[0] / pts[1]
+    short = min(pts)
     dw, dh = design_size(pts)
-    u = min(w / dw, h / dh)  # pixels per screen width
-    return x + (w - u) / 2, y + (h - u / aspect) / 2, u, u / aspect
+    u = min(w / dw, h / dh)  # pixels per screen short side
+    sw, sh = u * pts[0] / short, u * pts[1] / short
+    return x + (w - sw) / 2, y + (h - sh) / 2, sw, sh
 
 
 def grab_png():

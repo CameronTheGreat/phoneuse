@@ -29,11 +29,14 @@ def test_points_swap_only_for_a_wide_frame():
 def test_window_and_picture_follow_the_shape():
     up = screen.window_size(500, PORTRAIT)
     side = screen.window_size(500, (874, 402))
-    assert up[1] > up[0] and side[0] > side[1]
-    # a sideways picture in a sideways window fills it up to the bezel, never squeezed
+    assert up[1] > up[0] and side == (up[1], up[0])  # the same phone, turned
+    # a sideways picture in a sideways window fills it up to the bezel, never squeezed, and
+    # the bezel is the upright one (a fraction of the short side)
     x, y, w, h = screen.picture_rect((0, 0), side, (874, 402))
     assert abs(w / h - 874 / 402) < 1e-6
-    assert abs(x - screen.BEZEL * w) < 1 and abs(y - screen.BEZEL * w) < 1
+    assert abs(x - screen.BEZEL * h) < 1 and abs(y - screen.BEZEL * h) < 1
+    _, _, uw, _ = screen.picture_rect((0, 0), up, PORTRAIT)
+    assert abs(h - uw) < 1  # the screen's short side is as long as when upright
     # an upright picture in the same window is aspect-fit with a wider bezel
     _, _, w2, h2 = screen.picture_rect((0, 0), side, PORTRAIT)
     assert abs(w2 / h2 - 402 / 874) < 1e-6 and h2 < side[1]
