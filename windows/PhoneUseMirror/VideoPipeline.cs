@@ -292,6 +292,7 @@ public sealed unsafe class VideoPipeline : IDisposable
             catch (SharpGenException) { }
             try { _stride = (int)current.GetUInt32(MediaTypeAttributeKeys.DefaultStride); }
             catch (SharpGenException) { _stride = _videoW; }
+            _crop = ReadAperture(current, _videoW, _videoH);
         }
         var info = mft.GetOutputStreamInfo(0);
         _decoderProvidesSamples = (info.Flags & (int)(OutputStreamInfoFlags.OutputStreamProvidesSamples
@@ -302,6 +303,30 @@ public sealed unsafe class VideoPipeline : IDisposable
     }
 
     int _outputSize;
+
+    // The part of the decoded frame that is the picture. H.264 codes whole 16-pixel blocks,
+    // so the frame is padded on the right and bottom (FrameSize), and drawing the padding
+    // showed as a black strip along those edges of the screen.
+    Vortice.RawRect _crop;
+
+    /// <summary>The minimum display aperture (an MFVideoArea: x and y as 16.16 fixed point,
+    /// then width and height), or the whole frame when the decoder gives none.</summary>
+    static Vortice.RawRect ReadAperture(IMFMediaType type, int w, int h)
+    {
+        try
+        {
+            var a = type.GetBlob(MediaTypeAttributeKeys.MinimumDisplayAperture);
+            if (a.Length >= 16)
+            {
+                int x = BitConverter.ToInt16(a, 2), y = BitConverter.ToInt16(a, 6);
+                int cw = BitConverter.ToInt32(a, 8), ch = BitConverter.ToInt32(a, 12);
+                if (cw > 0 && ch > 0 && x >= 0 && y >= 0 && (w <= 0 || x + cw <= w) && (h <= 0 || y + ch <= h))
+                    return new Vortice.RawRect(x, y, x + cw, y + ch);
+            }
+        }
+        catch (SharpGenException) { }
+        return new Vortice.RawRect(0, 0, w, h);
+    }
 
     void ReleaseDecoder()
     {
@@ -460,7 +485,8 @@ public sealed unsafe class VideoPipeline : IDisposable
         using (inView)
         using (outView)
         {
-            var src = new Vortice.RawRect(0, 0, inW, inH);
+            var src = _crop.Right > _crop.Left && _crop.Right <= inW && _crop.Bottom <= inH
+                ? _crop : new Vortice.RawRect(0, 0, inW, inH);  // the picture, without the padding
             var dst = new Vortice.RawRect(0, 0, _swapW, _swapH);
             _videoContext!.VideoProcessorSetStreamSourceRect(_vp!, 0, true, src);
             _videoContext.VideoProcessorSetStreamDestRect(_vp!, 0, true, dst);
