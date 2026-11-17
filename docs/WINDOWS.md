@@ -85,6 +85,10 @@ The window is a client of the browser mirror's server (`phoneuse/web.py`): the s
 video, input and settings, with lower latency (Media Foundation's hardware H.264
 decoder straight to a Direct3D swap chain).
 
+- **The window** is only the phone: no border, see-through around the frame. Point just
+  above the phone for its bar (the mirroring status, About, Settings, minimize, close);
+  drag the bar to move the window, and Ctrl + wheel over the phone resizes it. Setup,
+  About and notices appear on the phone's screen.
 - **Input:** click to tap, drag to swipe, scroll with the wheel; a press on the bezel
   touches the nearest screen edge. Ctrl works as the phone's Cmd (the Windows key
   belongs to the Start menu) and the Windows key as its Ctrl; F1 Siri, F2 Home,
@@ -94,7 +98,7 @@ decoder straight to a Direct3D swap chain).
   Quit stops the phoneuse the window started (not a `phoneuse up` in a terminal); the
   Bluetooth keyboard and mouse keep running, as after `phoneuse up`.
 - **Settings** (the gear): keep the screen awake, start with Windows (phoneuse starts
-  at sign-in with the window in the tray), the AssistiveTouch reminder, agent control,
+  at sign-in with the window in the tray), agent control,
   the iPhone app's pairing, the Bluetooth bridge, screen reading (install or remove the
   models), and the passcode.
 - **About** (the ⓘ button): how to use it and these differences from Linux.

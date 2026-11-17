@@ -41,6 +41,7 @@ public sealed partial class MainWindow : Window
         _ui = DispatcherQueue.GetForCurrentThread();
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
+        AppTitleBar.SizeChanged += (_, _) => AlignBarButtons();
         AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
         var icon = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
         if (File.Exists(icon)) AppWindow.SetIcon(icon);
@@ -48,6 +49,7 @@ public sealed partial class MainWindow : Window
         _video = new VideoPipeline(Video, _ui);
         Video.SizeChanged += (_, _) => ResizeVideo();
         Video.CompositionScaleChanged += (_, _) => ResizeVideo();
+        Frameless();
         SizeToPhone();
         // the minimum is in pixels: again when the window moves to a screen with other scaling
         Root.Loaded += (_, _) => Root.XamlRoot.Changed += (r, _) => LimitSize(r.RasterizationScale);
@@ -84,7 +86,6 @@ public sealed partial class MainWindow : Window
         _tick.Tick += (_, _) => UpdateNote();
         _tick.Start();
         InitTray(port);
-        AssistiveTouchBar.IsOpen = AppSettings.AssistiveTouchReminder && AppSettings.SetupDone;
         StartSetup();
 
         UpdateNote();
@@ -149,8 +150,6 @@ public sealed partial class MainWindow : Window
         _stale = (bool?)m["stale"] ?? false;
         _awake = (bool?)m["awake"] ?? false;
         _bluetooth = (bool?)m["bluetooth"];
-        // not closable: it stays while the link is down (the setup checklist says it as a step instead)
-        BluetoothBar.IsOpen = _bluetooth == false && SetupOverlay.Visibility != Visibility.Visible;
         _agent = (string?)m["agent"] ?? "idle";
         _name = (string?)m["name"] ?? _name;
         if (m["screen"] is JsonArray s && s.Count == 2)
@@ -183,7 +182,7 @@ public sealed partial class MainWindow : Window
             AwakeSwitch.IsOn = _awake;
             _settingUp = false;
         }
-        AppTitleBar.Subtitle = !_live ? (_mirroring ? "Starting" : "Not mirroring") : _stale ? "Picture is old" : "Live";
+        ShowStatus();
         Layout();
         ShowAgent();
         UpdateNote();
@@ -203,6 +202,12 @@ public sealed partial class MainWindow : Window
         if (connected && _live && _stale)
         {
             SetNote("This picture is old.\nThe iPhone's screen is off, or mirroring stalled. Wake the phone, or reconnect Screen Mirroring.");
+            return;
+        }
+        // it stays while the link is down (the setup checklist says it as a step instead)
+        if (connected && _bluetooth == false && SetupOverlay.Visibility != Visibility.Visible)
+        {
+            SetNote("Mouse and keyboard not connected.\nClicks and typing can't reach the iPhone. Pair it once: iPhone Settings › Bluetooth › this PC's name.");
             return;
         }
         if (_playing) { _troubleSince = 0; SetNote(null); return; }
@@ -309,8 +314,8 @@ public sealed partial class MainWindow : Window
         double W = Stage.ActualWidth, H = Stage.ActualHeight;
         if (W <= 0 || H <= 0) return;
         var (w, h, dw, dh) = PhoneUnits();
-        const double below = 64, above = 8;  // room for the agent button below
-        double u = Math.Min((W - 24) / dw, (H - below - above) / dh);  // px per screen short side
+        const double below = 4, above = 4;
+        double u = Math.Min((W - PadW) / dw, (H - below - above) / dh);  // px per screen short side
         if (u <= 10) return;
 
         double pw = dw * u, ph = dh * u, sw = w * u, sh = h * u, sr = _radius * u;
@@ -324,6 +329,7 @@ public sealed partial class MainWindow : Window
         Screen.Height = sh;
         DotLayer.Width = sw;
         DotLayer.Height = sh;
+        PlaceScreenUi(o, sw, sh);
 
         // Drawn over the screen's square corners; each ring and the one inside it share an outline,
         // so the edges always meet.
@@ -333,6 +339,7 @@ public sealed partial class MainWindow : Window
             FillRule = FillRule.EvenOdd,
             Children = { outer, Squircle(k + t, k + t, pw - 2 * (k + t), ph - 2 * (k + t), sr + g) },
         };
+        Back.Data = Squircle(k + t, k + t, pw - 2 * (k + t), ph - 2 * (k + t), sr + g);
         Body.Data = new GeometryGroup
         {
             FillRule = FillRule.EvenOdd,
@@ -365,9 +372,9 @@ public sealed partial class MainWindow : Window
     SizeInt32 PhoneWindowSize(RectInt32 area, double scale)
     {
         var (_, _, dw, dh) = PhoneUnits();
-        double chrome = (48 + 72) * scale;  // title bar + room below the phone
+        double chrome = PadH * scale;  // the bar + room above and below the phone
         double h = area.Height * 0.85;
-        double w = (h - chrome) * dw / dh + 24 * scale;
+        double w = (h - chrome) * dw / dh + PadW * scale;
         double fit = Math.Min(1.0, Math.Min(area.Width * 0.95 / w, area.Height * 0.95 / h));  // landscape is wide
         return new SizeInt32((int)(w * fit), (int)(h * fit));
     }
@@ -398,7 +405,7 @@ public sealed partial class MainWindow : Window
         var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
         double scale = WindowScale();
         LimitSize(scale);  // the minimum changes shape too, before resizing under it
-        double padW = 24 * scale, padH = (48 + 72) * scale;  // beside the phone; title bar + room below it
+        double padW = PadW * scale, padH = PadH * scale;  // beside the phone; title bar + room above and below it
         var now = AppWindow.Size;
         double w = Math.Max(1, now.Height - padH) + padW, h = Math.Max(1, now.Width - padW) + padH;
         double fit = Math.Min(1.0, Math.Min(area.Width * 0.95 / w, area.Height * 0.95 / h));
@@ -416,7 +423,7 @@ public sealed partial class MainWindow : Window
     {
         if (AppWindow.Presenter is not OverlappedPresenter p) return;
         var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
-        int w = _sideways ? 600 : 360, h = _sideways ? 360 : 600;
+        int w = _sideways ? MinLong : MinShort, h = _sideways ? MinShort : MinLong;
         p.PreferredMinimumWidth = Math.Min((int)(w * scale), area.Width);
         p.PreferredMinimumHeight = Math.Min((int)(h * scale), area.Height);
     }
@@ -428,7 +435,10 @@ public sealed partial class MainWindow : Window
 
     // While an agent drives the phone, this window sends no input: mixing in clicks
     // and keys would confuse it. "Take over" stops the agent.
-    bool Active => _live && _playing && _agent != "driving";
+    bool Active => _live && _playing && _agent != "driving" && !Covered;
+
+    /// <summary>The setup checklist or About is on the phone's screen: input goes to it, not the phone.</summary>
+    bool Covered => SetupOverlay.Visibility == Visibility.Visible || AboutOverlay.Visibility == Visibility.Visible;
 
     (double x, double y) At(PointerRoutedEventArgs e)
     {
@@ -477,6 +487,13 @@ public sealed partial class MainWindow : Window
     // wheel). One notch is 100 px, as in the browser.
     void Surface_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
     {
+        if (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Control))
+        {
+            e.Handled = true;  // Ctrl + wheel: the window's size, not the phone's scrolling
+            ResizeBy(e.GetCurrentPoint(Surface).Properties.MouseWheelDelta);
+            return;
+        }
+        if (Covered) return;  // the checklist or About scrolls
         e.Handled = true;
         if (!Active) return;
         var props = e.GetCurrentPoint(Screen).Properties;
@@ -522,8 +539,7 @@ public sealed partial class MainWindow : Window
         bool driving = _agent == "driving";
         if (!driving) AgentDot.Visibility = Visibility.Collapsed;
         Rim.Visibility = driving ? Visibility.Visible : Visibility.Collapsed;
-        TakeoverButton.Visibility = !_live && _agent == "idle" ? Visibility.Collapsed : Visibility.Visible;
-        TakeoverButton.IsEnabled = _agent != "idle";
+        AgentPanel.Visibility = _agent == "idle" ? Visibility.Collapsed : Visibility.Visible;
         TakeoverLabel.Text = driving ? "Agent in control" : _agent == "paused" ? "You took over" : "You're in control";
         TakeoverAction.Text = driving ? "Take over" : _agent == "paused" ? "Resume agent" : "";
         TakeoverAction.Visibility = _agent == "idle" ? Visibility.Collapsed : Visibility.Visible;

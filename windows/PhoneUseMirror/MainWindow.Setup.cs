@@ -34,7 +34,6 @@ public sealed partial class MainWindow
     {
         SetupOverlay.Visibility = Visibility.Visible;
         SetupResume.Visibility = Visibility.Collapsed;
-        AssistiveTouchBar.IsOpen = false;  // the checklist says it, as a step
         PairingBar.IsOpen = false;
         _conn.Send(new { t = "blur" });
         if (_setupPoll == null)
@@ -79,7 +78,14 @@ public sealed partial class MainWindow
         try
         {
             var j = await _conn.CallAsync(System.Net.Http.HttpMethod.Get, "api/app", null, 15);
-            if (j?["setup"] is JsonArray items) _setupItems = items;
+            if (j?["setup"] is JsonArray items)
+            {
+                _setupItems = items;
+                // AssistiveTouch: done once you say so (the pointer's measurement still runs by itself)
+                if (AppSettings.AssistiveTouchDone)
+                    foreach (var i in items.OfType<JsonObject>().Where(i => (string?)i["id"] == "pointer"))
+                        i["done"] = true;
+            }
             else if (j?["_failed"] != null) _setupItems = null;
             if (SetupOverlay.Visibility == Visibility.Visible) DrawSetup(j?["_failed"] != null);
         }
@@ -277,6 +283,12 @@ public sealed partial class MainWindow
 
     FrameworkElement? StepAction(string id, string? action, bool done)
     {
+        if (!done && id == "pointer")  // nothing to check from here: a box to tick
+        {
+            var ok = new Button { Content = "Done", Style = Res<Style>("AccentButtonStyle") };
+            ok.Click += async (_, _) => { AppSettings.AssistiveTouchDone = true; await LoadSetup(); };
+            return ok;
+        }
         if (done || action == null) return null;
         bool busy = _setupBusy == id;
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };

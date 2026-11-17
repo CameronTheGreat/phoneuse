@@ -22,7 +22,6 @@ public sealed partial class MainWindow
     {
         _settingUp = true;
         AwakeSwitch.IsOn = _awake;
-        ReminderSwitch.IsOn = AppSettings.AssistiveTouchReminder;
         StartupSwitch.IsOn = Startup.Enabled;
         _settingUp = false;
         ShowVision();
@@ -46,15 +45,6 @@ public sealed partial class MainWindow
     {
         if (_settingUp) return;
         await _conn.PostAsync("api/awake", new { on = AwakeSwitch.IsOn });
-    }
-
-    // ---------------------------------------------------------------- AssistiveTouch reminder (this app's own)
-
-    void Reminder_Toggled(object sender, RoutedEventArgs e)
-    {
-        if (_settingUp) return;
-        AppSettings.AssistiveTouchReminder = ReminderSwitch.IsOn;
-        AssistiveTouchBar.IsOpen = ReminderSwitch.IsOn;
     }
 
     // ---------------------------------------------------------------- start with Windows (this app's own)

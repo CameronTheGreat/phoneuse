@@ -5,9 +5,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:PhoneUseMirror"
     Title="Phone Use">
-    <Grid x:Name="Root" RequestedTheme="Dark" Background="#FF0F0F11">
+    <!-- See-through around the phone (MainWindow.Frameless.cs): only the phone, and its bar above it on hover -->
+    <Grid x:Name="Root" RequestedTheme="Dark" Background="Transparent">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
@@ -17,7 +17,7 @@
                 <ImageIconSource ImageSource="ms-appx:///Assets/AppIcon.png" />
             </TitleBar.IconSource>
             <TitleBar.RightHeader>
-                <StackPanel Orientation="Horizontal" Spacing="2" Margin="0,0,4,0">
+                <StackPanel x:Name="BarButtons" Orientation="Horizontal" Spacing="2" Margin="0,0,4,0">
                 <Button x:Name="AboutButton" Padding="8,5" Click="OpenAbout_Click"
                         ToolTipService.ToolTip="About Phone Use" Style="{StaticResource SubtleButtonStyle}">
                     <FontIcon Glyph="&#xE946;" FontSize="14" />
@@ -26,7 +26,9 @@
                         ToolTipService.ToolTip="Settings" Style="{StaticResource SubtleButtonStyle}">
                     <FontIcon Glyph="&#xE713;" FontSize="14" />
                     <Button.Flyout>
-                        <Flyout x:Name="SettingsFlyout" Placement="BottomEdgeAlignedRight" Opening="Settings_Opening">
+                        <!-- may reach past the window: it's only as wide as the phone -->
+                        <Flyout x:Name="SettingsFlyout" Placement="BottomEdgeAlignedRight" Opening="Settings_Opening" Closed="Settings_Closed"
+                                ShouldConstrainToRootBounds="False">
                             <Flyout.FlyoutPresenterStyle>
                                 <Style TargetType="FlyoutPresenter">
                                     <Setter Property="MaxHeight" Value="760" />
@@ -45,11 +47,6 @@
                                                   OnContent="On" OffContent="Off" Toggled="Startup_Toggled" />
                                     <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.7" TextWrapping="Wrap"
                                                Text="Starts phoneuse when you sign in, with Phone Use waiting in the tray." />
-
-                                    <ToggleSwitch x:Name="ReminderSwitch" Header="AssistiveTouch reminder" Margin="0,14,0,0"
-                                                  OnContent="On" OffContent="Off" Toggled="Reminder_Toggled" />
-                                    <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.7" TextWrapping="Wrap"
-                                               Text="Shows &#x201C;Make sure AssistiveTouch is on&#x201D; each time Phone Use opens." />
 
                                     <TextBlock Text="Agent control" Margin="0,14,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" />
                                     <ComboBox x:Name="StartMode" HorizontalAlignment="Stretch" SelectionChanged="StartMode_Changed">
@@ -119,32 +116,25 @@
                         </Flyout>
                     </Button.Flyout>
                 </Button>
+                <!-- no system caption buttons without a frame: its own -->
+                <Button x:Name="BarMinimize" Padding="8,5" Click="BarMinimize_Click"
+                        ToolTipService.ToolTip="Minimize" Style="{StaticResource SubtleButtonStyle}">
+                    <FontIcon Glyph="&#xE921;" FontSize="12" />
+                </Button>
+                <Button x:Name="BarClose" Padding="8,5" Click="BarClose_Click"
+                        ToolTipService.ToolTip="Close" Style="{StaticResource SubtleButtonStyle}">
+                    <FontIcon Glyph="&#xE8BB;" FontSize="12" />
+                </Button>
                 </StackPanel>
             </TitleBar.RightHeader>
         </TitleBar>
 
-        <StackPanel Grid.Row="1" Margin="12,0,12,0" Spacing="6" Canvas.ZIndex="5">
-            <InfoBar x:Name="BluetoothBar" IsOpen="False" IsClosable="False" Severity="Warning"
-                     Title="Mouse and keyboard not connected"
-                     Message="Clicks and typing can't reach the iPhone. Pair it once: iPhone Settings › Bluetooth › this PC's name." />
-            <!-- while no iPhone app is paired: phoneuse refuses every agent action until one is -->
-            <InfoBar x:Name="PairingBar" IsOpen="False" IsClosable="True" Severity="Informational"
-                     Title="Agent control requires pairing"
-                     Message="AI agents can't use the phone until you pair the Phone Use app (App Store) on the iPhone: it's where you allow and stop them."
-                     Closed="PairingBar_Closed">
-                <InfoBar.ActionButton>
-                    <Button Content="Pair iPhone" Click="Pair_Click" />
-                </InfoBar.ActionButton>
-            </InfoBar>
-            <!-- shown on every launch: without AssistiveTouch, iOS ignores the Bluetooth mouse entirely -->
-            <InfoBar x:Name="AssistiveTouchBar" IsOpen="False" IsClosable="True" Severity="Informational"
-                     Title="Make sure AssistiveTouch is on"
-                     Message="iOS ignores the mouse without it. On the iPhone: Settings › Accessibility › Touch › AssistiveTouch on, and Dwell Control off." />
-        </StackPanel>
-
-        <Grid x:Name="Stage" Grid.Row="2" SizeChanged="Stage_SizeChanged">
+        <Grid x:Name="Stage" Grid.Row="1" SizeChanged="Stage_SizeChanged">
             <local:InputSurface x:Name="Surface" HorizontalAlignment="Center" VerticalAlignment="Top">
                 <Grid x:Name="Phone">
+                    <!-- solid under everything inside the titanium band: the window is see-through, and where two
+                         edges meet at a fraction of a pixel the desktop would show through the seam -->
+                    <Path x:Name="Back" Fill="Black" HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False" />
                     <!-- the screen: a plain rectangle; the body drawn over it gives it its corners -->
                     <Grid x:Name="Screen" Background="Black" HorizontalAlignment="Left" VerticalAlignment="Top">
                         <!-- a pixel past the screen on every side, under the body: no sliver of background at any size -->
@@ -160,6 +150,70 @@
                                        Foreground="#EBEBF5" FontSize="14" LineHeight="20" />
                         </Border>
                     </Grid>
+
+                    <!-- This window's own things, on the phone's screen and under its body, so they get its corners
+                         (placed with the screen in Layout). Presses on them stay here, never reaching the phone. -->
+                    <Grid x:Name="ScreenUi" HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <!-- notices, below the Dynamic Island (the AssistiveTouch reminder is a setup step) -->
+                        <StackPanel x:Name="Bars" VerticalAlignment="Top" Margin="10,0,10,0" Spacing="6">
+                            <!-- while no iPhone app is paired: phoneuse refuses every agent action until one is -->
+                            <InfoBar x:Name="PairingBar" IsOpen="False" IsClosable="True" Severity="Informational"
+                                     Title="Agent control requires pairing"
+                                     Message="AI agents can't use the phone until you pair the Phone Use app (App Store) on the iPhone: it's where you allow and stop them."
+                                     Closed="PairingBar_Closed">
+                                <InfoBar.ActionButton>
+                                    <Button Content="Pair iPhone" Click="Pair_Click" />
+                                </InfoBar.ActionButton>
+                            </InfoBar>
+                        </StackPanel>
+
+                        <!-- first-time setup hidden but not finished -->
+                        <Button x:Name="SetupResume" Click="SetupResume_Click" HorizontalAlignment="Center" VerticalAlignment="Top"
+                                CornerRadius="16" Padding="14,6" Visibility="Collapsed"
+                                Style="{StaticResource AccentButtonStyle}" />
+
+                        <!-- while an agent has the phone (or you took it back): who, and the way to switch -->
+                        <StackPanel x:Name="AgentPanel" HorizontalAlignment="Center" VerticalAlignment="Bottom" Spacing="6"
+                                    Visibility="Collapsed">
+                            <TextBlock x:Name="AgentWhat" HorizontalAlignment="Center" Margin="16,0,16,0"
+                                       Foreground="#CCEBEBF5" FontSize="12" TextTrimming="CharacterEllipsis" />
+                            <Button x:Name="TakeoverButton" Click="Takeover_Click" HorizontalAlignment="Center"
+                                    CornerRadius="16" Padding="14,6" Background="#E61C1C1E">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Ellipse x:Name="AgentLight" Width="8" Height="8" Fill="#30D158" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="TakeoverLabel" Text="You're in control" />
+                                    <TextBlock x:Name="TakeoverAction" FontWeight="SemiBold"
+                                               Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <!-- first-time setup (MainWindow.Setup.cs): the phone's screen until it's done or hidden -->
+                        <!-- a pixel past the screen on every side, as the video: no lighter seam against the body at any size -->
+                        <Grid x:Name="SetupOverlay" Background="#FF0F0F11" Visibility="Collapsed" Margin="-1">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel x:Name="SetupBody" Padding="16,4,16,24" Spacing="10" />
+                            </ScrollViewer>
+                        </Grid>
+
+                        <!-- About Phone Use, and the bridge's page: the phone's screen (the bar's (i), or the tray menu) -->
+                        <Grid x:Name="AboutOverlay" Background="#FF0F0F11" Visibility="Collapsed" Margin="-1" KeyDown="AboutOverlay_KeyDown">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Button x:Name="AboutBack" Click="AboutBack_Click" Style="{StaticResource SubtleButtonStyle}"
+                                    Margin="8,0,0,4" Padding="8,5">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE72B;" FontSize="14" />
+                                    <TextBlock Text="Back to the phone" />
+                                </StackPanel>
+                            </Button>
+                            <ContentControl x:Name="AboutHost" Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" IsTabStop="False" />
+                        </Grid>
+                    </Grid>
+
                     <!-- An iPhone drawn over the screen's edges (Layout): side buttons, a thin titanium band,
                          and a thin black border around the glass with the screen's squircle cut out. -->
                     <Path x:Name="Buttons" HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False">
@@ -189,47 +243,6 @@
                           IsHitTestVisible="False" />
                 </Grid>
             </local:InputSurface>
-
-            <!-- who has the phone: the owner or an agent -->
-            <Button x:Name="TakeoverButton" Click="Takeover_Click" HorizontalAlignment="Center" VerticalAlignment="Bottom"
-                    Margin="0,0,0,14" CornerRadius="16" Padding="14,6" Visibility="Collapsed">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Ellipse x:Name="AgentLight" Width="8" Height="8" Fill="#30D158" VerticalAlignment="Center" />
-                    <TextBlock x:Name="TakeoverLabel" Text="You're in control" />
-                    <TextBlock x:Name="TakeoverAction" FontWeight="SemiBold"
-                               Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
-                </StackPanel>
-            </Button>
-            <TextBlock x:Name="AgentWhat" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="16,0,16,52"
-                       Foreground="#99EBEBF5" FontSize="12" TextTrimming="CharacterEllipsis" />
-
-            <!-- first-time setup (MainWindow.Setup.cs): over the phone until it's done or hidden -->
-            <Button x:Name="SetupResume" Click="SetupResume_Click" HorizontalAlignment="Center" VerticalAlignment="Top"
-                    Margin="0,8,0,0" CornerRadius="16" Padding="14,6" Visibility="Collapsed"
-                    Style="{StaticResource AccentButtonStyle}" />
-            <Grid x:Name="SetupOverlay" Background="#FF0F0F11" Visibility="Collapsed" Canvas.ZIndex="4">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel x:Name="SetupBody" MaxWidth="460" Padding="20,12,20,24" Spacing="10" />
-                </ScrollViewer>
-            </Grid>
-        </Grid>
-
-        <!-- About Phone Use: over the phone, inside this window (Settings › About, or the tray menu) -->
-        <Grid x:Name="AboutOverlay" Grid.Row="1" Grid.RowSpan="2" Background="#FF0F0F11" Visibility="Collapsed"
-              Canvas.ZIndex="10" KeyDown="AboutOverlay_KeyDown">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-            <Button x:Name="AboutBack" Click="AboutBack_Click" Style="{StaticResource SubtleButtonStyle}"
-                    Margin="8,2,0,4" Padding="8,5">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE72B;" FontSize="14" />
-                    <TextBlock Text="Back to the phone" />
-                </StackPanel>
-            </Button>
-            <ContentControl x:Name="AboutHost" Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                            HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" IsTabStop="False" />
         </Grid>
     </Grid>
 </Window>

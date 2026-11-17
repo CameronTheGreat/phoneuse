@@ -52,14 +52,14 @@ public static class AppSettings
         }
     }
 
-    /// <summary>The "Make sure AssistiveTouch is on" reminder at each launch.</summary>
-    public static bool AssistiveTouchReminder
+    /// <summary>The setup checklist's "Turn on AssistiveTouch" step was ticked off by hand.</summary>
+    public static bool AssistiveTouchDone
     {
-        get => (bool?)Load()["assistiveTouchReminder"] ?? true;
+        get => (bool?)Load()["assistiveTouchDone"] ?? false;
         set
         {
             var o = Load();
-            o["assistiveTouchReminder"] = value;
+            o["assistiveTouchDone"] = value;
             Save(o);
         }
     }
