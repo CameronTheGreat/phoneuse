@@ -15,7 +15,8 @@ import threading
 import time
 
 from . import phones
-from .config import IS_WINDOWS, SCREEN_PT  # the phone screen in points (config: screen_points)
+from .config import IS_WINDOWS
+from .orientation import current_points as pt  # the phone screen in points, as it faces now (config: screen_points)
 TICK = 0.008  # one relative report per tick (Bluetooth LE: the HID service spaces them further, windows/hid.py)
 RAMP = 1.0  # no start-of-motion correction: touchlab shows requested distances land exactly
 
@@ -162,8 +163,8 @@ class Touch:
         """Send one relative report moving toward the target. Returns remaining distance (pt)."""
         if not self.down or self.pos is None or self.target is None:
             return 0.0
-        ex = (self.target[0] - self.pos[0]) * SCREEN_PT[0]
-        ey = (self.target[1] - self.pos[1]) * SCREEN_PT[1]
+        ex = (self.target[0] - self.pos[0]) * pt()[0]
+        ey = (self.target[1] - self.pos[1]) * pt()[1]
         dist = (ex * ex + ey * ey) ** 0.5
         if dist < 1.0:
             return dist
@@ -173,8 +174,8 @@ class Touch:
         mag = (ux * ux + uy * uy) ** 0.5
         moved = points_for(mag) * RAMP
         self.hid.cmd(f"m {ux} {uy} 0 0")
-        self.pos = (self.pos[0] + moved * ux / mag / SCREEN_PT[0],
-                    self.pos[1] + moved * uy / mag / SCREEN_PT[1])
+        self.pos = (self.pos[0] + moved * ux / mag / pt()[0],
+                    self.pos[1] + moved * uy / mag / pt()[1])
         return max(0.0, dist - moved)
 
     def release(self):
@@ -259,7 +260,7 @@ def scroll_step(remaining, most=None):
 def scroll_drag(hid, fx0, fy0, fx1, fy1):
     """Drag from (fx0, fy0) to (fx1, fy1), slowing down at the end, and lift: the
     content moves exactly as far as the finger, with no fling."""
-    dx, dy = (fx1 - fx0) * SCREEN_PT[0], (fy1 - fy0) * SCREEN_PT[1]
+    dx, dy = (fx1 - fx0) * pt()[0], (fy1 - fy0) * pt()[1]
     total = (dx * dx + dy * dy) ** 0.5
     if total < 0.5:
         return
@@ -267,7 +268,7 @@ def scroll_drag(hid, fx0, fy0, fx1, fy1):
     if slop:  # the finger goes further by the slop, so the content moves as asked
         k = (total + slop) / total
         fx1, fy1 = _clamp(fx0 + (fx1 - fx0) * k), _clamp(fy0 + (fy1 - fy0) * k)
-        dx, dy = (fx1 - fx0) * SCREEN_PT[0], (fy1 - fy0) * SCREEN_PT[1]
+        dx, dy = (fx1 - fx0) * pt()[0], (fy1 - fy0) * pt()[1]
         total = (dx * dx + dy * dy) ** 0.5
     t = Touch(hid)
     t.press(fx0, fy0)
@@ -461,7 +462,7 @@ def _push_to_edge(t, fx, fy):
     py = -EDGE_PUSH if fy <= EDGE else EDGE_PUSH if fy >= 1 - EDGE else 0.0
     if not (px or py) or not t.down:
         return
-    t.pos = (fx - px / SCREEN_PT[0], fy - py / SCREEN_PT[1])  # pretend to be short of it by the push
+    t.pos = (fx - px / pt()[0], fy - py / pt()[1])  # pretend to be short of it by the push
     t.target = (fx, fy)
     end = time.time() + 1.0
     while time.time() < end and t.step() >= max(1.0, DRAG_PTS[0][1]):
