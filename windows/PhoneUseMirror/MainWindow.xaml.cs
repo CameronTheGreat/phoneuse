@@ -86,6 +86,7 @@ public sealed partial class MainWindow : Window
         _tick.Tick += (_, _) => UpdateNote();
         _tick.Start();
         InitTray(port);
+        InitUpdates();
         StartSetup();
 
         UpdateNote();

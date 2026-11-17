@@ -22,7 +22,9 @@ param(
     # The audio-only FFmpeg (windows/scripts/build-ffmpeg-audio.sh); without it, MSYS2's full one (~150 MB more)
     [string]$FFmpegAudio = $env:PHONEUSE_FFMPEG_AUDIO,
     [switch]$NoInstaller,
-    [switch]$NoZip
+    [switch]$NoZip,
+    # The GitHub repository whose releases update the app (Updater.cs): in CI, the one being built
+    [string]$UpdateRepo = $(if ($env:GITHUB_REPOSITORY) { $env:GITHUB_REPOSITORY } else { "lxe/phoneuse" })
 )
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Invoke-WebRequest is many times slower with its progress bar
@@ -66,7 +68,7 @@ Write-Step "Phone Use $Version for Windows (x64)"
 # the window dies at start. The trailing slash on -o keeps the .xbf files inside the folder.
 Write-Step "Building the mirror window"
 dotnet build "$Root\windows\PhoneUseMirror\PhoneUseMirror.csproj" -c Release -r win-x64 -p:Platform=x64 `
-    -p:SatelliteResourceLanguages=en -p:DebugType=none -p:Version=$Version -o "$Stage/" -nologo -v q
+    -p:SatelliteResourceLanguages=en -p:DebugType=none -p:Version=$Version -p:UpdateRepo=$UpdateRepo -o "$Stage/" -nologo -v q
 if ($LASTEXITCODE -ne 0) { throw "the mirror window didn't build" }
 foreach ($f in "PhoneUseMirror.exe", "PhoneUseMirror.pri", "App.xbf", "MainWindow.xbf") {
     if (-not (Test-Path "$Stage\$f")) { throw "the mirror window's build has no $f" }

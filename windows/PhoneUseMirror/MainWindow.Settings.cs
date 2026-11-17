@@ -23,7 +23,9 @@ public sealed partial class MainWindow
         _settingUp = true;
         AwakeSwitch.IsOn = _awake;
         StartupSwitch.IsOn = Startup.Enabled;
+        UpdateAuto.IsChecked = AppSettings.AutoUpdate;
         _settingUp = false;
+        ShowUpdate();
         ShowVision();
         PasscodeBox.Password = "";
         await Task.WhenAll(LoadStartMode(), LoadPasscode(), LoadPaired(), LoadBridgeSwitch());

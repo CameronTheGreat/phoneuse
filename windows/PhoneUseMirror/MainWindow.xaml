@@ -114,6 +114,19 @@
                                                    Style="{StaticResource CaptionTextBlockStyle}" Visibility="Collapsed" />
                                     </StackPanel>
 
+                                    <!-- the installed and portable app only (Updater.Mode) -->
+                                    <StackPanel x:Name="UpdateSection" Spacing="6">
+                                        <TextBlock Text="Updates" Margin="0,14,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                        <TextBlock x:Name="UpdateText" Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.7"
+                                                   TextWrapping="Wrap" />
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <Button x:Name="UpdateButton" Content="Check for updates" Click="UpdateButton_Click" />
+                                            <ProgressRing x:Name="UpdateRing" Width="20" Height="20" IsActive="False"
+                                                          Visibility="Collapsed" />
+                                        </StackPanel>
+                                        <CheckBox x:Name="UpdateAuto" Content="Check automatically" Click="UpdateAuto_Click" />
+                                    </StackPanel>
+
                                     <HyperlinkButton Content="Setup guide" Margin="0,12,0,0" Padding="0" Click="SetupGuide_Click" />
                                     <HyperlinkButton x:Name="OpenBrowser" Content="Open the browser mirror"
                                                      Padding="0" Click="OpenBrowser_Click" />
@@ -169,6 +182,13 @@
                                      Closed="PairingBar_Closed">
                                 <InfoBar.ActionButton>
                                     <Button Content="Pair iPhone" Click="Pair_Click" />
+                                </InfoBar.ActionButton>
+                            </InfoBar>
+                            <!-- a newer release on GitHub (MainWindow.Update.cs) -->
+                            <InfoBar x:Name="UpdateNotice" IsOpen="False" IsClosable="True" Severity="Success"
+                                     Closed="UpdateNotice_Closed">
+                                <InfoBar.ActionButton>
+                                    <Button x:Name="UpdateNoticeButton" Content="Install" Click="UpdateButton_Click" />
                                 </InfoBar.ActionButton>
                             </InfoBar>
                         </StackPanel>

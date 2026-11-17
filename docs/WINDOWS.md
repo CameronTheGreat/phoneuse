@@ -102,6 +102,16 @@ decoder straight to a Direct3D swap chain).
   the iPhone app's pairing, the Bluetooth bridge, screen reading (install or remove the
   models), and the passcode.
 - **About** (the ⓘ button): how to use it and these differences from Linux.
+- **Updates** (Settings › Updates): the installed and portable app look for a newer
+  [GitHub release](https://github.com/lxe/phoneuse/releases) 20 s after starting and every
+  6 hours (or on Check for updates). A newer one shows a notice on the phone's screen, and
+  a tray notification while the window is hidden. Nothing installs by itself: **Install**
+  downloads the release's `-setup.exe`, checks it against the SHA-256 GitHub keeps for it,
+  and runs it silently over this install, which restarts Phone Use (and phoneuse) without
+  asking for the firewall rule again. The portable app's **Download** opens the release's
+  page. Only published releases count: the workflow's draft releases and prereleases are
+  never offered. A build checks the repository it was built from (`package.ps1 -UpdateRepo`,
+  `GITHUB_REPOSITORY` in CI); a checkout never checks.
 
 The window's own settings are in `%LOCALAPPDATA%\phoneuse\PhoneUseMirror.json`.
 `window = "browser"` in `config.toml` uses Edge or Chrome even when the window is built.

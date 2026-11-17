@@ -21,7 +21,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- The GitHub repository whose releases update this app (Updater.cs): package.ps1 passes
+         the one CI built from, so a fork's builds update from the fork. -->
+    <UpdateRepo Condition="'$(UpdateRepo)' == ''">lxe/phoneuse</UpdateRepo>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyMetadata Include="UpdateRepo" Value="$(UpdateRepo)" />
+  </ItemGroup>
 
   <ItemGroup>
     <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />

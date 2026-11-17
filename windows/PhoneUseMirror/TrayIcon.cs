@@ -11,6 +11,7 @@ public sealed class TrayIcon : IDisposable
 {
     const int WM_APP_TRAY = 0x8000 + 1;
     const int WM_LBUTTONUP = 0x0202, WM_LBUTTONDBLCLK = 0x0203, WM_RBUTTONUP = 0x0205, WM_CONTEXTMENU = 0x007B;
+    const int NIN_BALLOONUSERCLICK = 0x0400 + 5;  // the notification was clicked
     const int NIM_ADD = 0, NIM_MODIFY = 1, NIM_DELETE = 2;
     const int NIF_MESSAGE = 1, NIF_ICON = 2, NIF_TIP = 4, NIF_INFO = 0x10;
     const int CmdOpen = 1, CmdLogs = 2, CmdQuit = 3, CmdAbout = 4;
@@ -89,7 +90,8 @@ public sealed class TrayIcon : IDisposable
             switch ((int)l & 0xFFFF)
             {
                 case WM_LBUTTONUP:
-                case WM_LBUTTONDBLCLK: Open?.Invoke(); break;
+                case WM_LBUTTONDBLCLK:
+                case NIN_BALLOONUSERCLICK: Open?.Invoke(); break;
                 case WM_RBUTTONUP:
                 case WM_CONTEXTMENU: Menu(); break;
             }

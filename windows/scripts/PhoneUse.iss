@@ -67,8 +67,12 @@ Name: "{autodesktop}\Phone Use"; Filename: "{app}\PhoneUseMirror.exe"; Tasks: de
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Phone Use"; ValueData: """{app}\PhoneUseMirror.exe"" --tray"; Tasks: startup
 
 [Run]
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\core\windows\scripts\firewall.ps1"" -Program ""{app}\core\uxplay\bin\uxplay.exe"""; Verb: runas; Flags: shellexec runhidden waituntilterminated; StatusMsg: "Adding the firewall rule for AirPlay..."; Tasks: firewall
+; Not again on an update from the app (/UPDATE): the rule is for the same uxplay.exe, and the admin prompt
+; would interrupt it. The task stays selected, so uninstalling still removes the rule.
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\core\windows\scripts\firewall.ps1"" -Program ""{app}\core\uxplay\bin\uxplay.exe"""; Verb: runas; Flags: shellexec runhidden waituntilterminated; StatusMsg: "Adding the firewall rule for AirPlay..."; Tasks: firewall; Check: not IsAppUpdate
 Filename: "{app}\PhoneUseMirror.exe"; Description: "Start Phone Use"; Flags: nowait postinstall skipifsilent
+; The app's own updater (Updater.cs) runs this silently with /UPDATE=1, or /UPDATE=tray when the window was hidden
+Filename: "{app}\PhoneUseMirror.exe"; Parameters: "{code:RelaunchArgs}"; Flags: nowait; Check: IsAppUpdate
 
 [UninstallRun]
 ; Stop the Bluetooth HID service the way `phoneuse down` does (it outlives the rest on purpose), then the
@@ -93,6 +97,18 @@ var
 function NeedBundledPython: Boolean;
 begin
   Result := not SystemPythonOK;
+end;
+
+{ Started by the app's updater: setup.exe /SILENT ... /UPDATE=1 (or /UPDATE=tray) }
+function IsAppUpdate: Boolean;
+begin
+  Result := ExpandConstant('{param:update|}') <> '';
+end;
+
+function RelaunchArgs(Param: string): string;
+begin
+  if CompareText(ExpandConstant('{param:update|}'), 'tray') = 0 then Result := '--tray'
+  else Result := '';
 end;
 
 procedure EnvAddPath(Dir: string);

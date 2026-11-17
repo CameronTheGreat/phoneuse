@@ -52,6 +52,30 @@ public static class AppSettings
         }
     }
 
+    /// <summary>Look for a newer release on GitHub now and then (Updater).</summary>
+    public static bool AutoUpdate
+    {
+        get => (bool?)Load()["autoUpdate"] ?? true;
+        set
+        {
+            var o = Load();
+            o["autoUpdate"] = value;
+            Save(o);
+        }
+    }
+
+    /// <summary>The release whose "update available" notice was closed: it isn't shown again for that one.</summary>
+    public static string? UpdateDismissed
+    {
+        get => (string?)Load()["updateDismissed"];
+        set
+        {
+            var o = Load();
+            o["updateDismissed"] = value;
+            Save(o);
+        }
+    }
+
     /// <summary>The setup checklist's "Turn on AssistiveTouch" step was ticked off by hand.</summary>
     public static bool AssistiveTouchDone
     {
