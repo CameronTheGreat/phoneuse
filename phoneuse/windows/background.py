@@ -42,14 +42,19 @@ def _to_log():
     sys.stderr = open(2, "w", encoding="utf-8", errors="replace", buffering=1, closefd=False)
 
 
+def _own_pid():
+    with open(PID, "w") as f:
+        f.write(str(os.getpid()))
+
+
 def main():
     os.makedirs(os.path.dirname(LOG), exist_ok=True)
     _to_log()
-    with open(PID, "w") as f:
-        f.write(str(os.getpid()))
     try:
         from .. import cli
-        cli.up_windows(headless=True)
+        # The pid is written once this copy is the backend: one that finds a backend
+        # answering exits, and must not take the window's Quit away from that one.
+        cli.up_windows(headless=True, started=_own_pid)
     finally:
         try:
             with open(PID) as f:

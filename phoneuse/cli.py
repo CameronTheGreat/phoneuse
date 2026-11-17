@@ -1707,18 +1707,50 @@ def stop_vision():
         pass  # not running
 
 
-def up_windows(headless=False):
+def backend_answers():
+    """Windows: the running backend's services answer (the video hub and the browser mirror),
+    not only hold their ports."""
+    try:
+        if not screen.hub_request("status", timeout=2)[0].startswith("ok"):
+            return False
+        urllib.request.urlopen(f"http://127.0.0.1:{WEB_PORT}/api/picture", timeout=3).read()
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def up_windows(headless=False, started=None):
     """Windows: the video hub, the frames service, the browser mirror and UxPlay, each
     restarted when it exits (frames and the browser mirror also when their code
     changes); the mirror opens in a window of its own. They are in a job object, so all
     of them stop with this command. The Bluetooth HID service (Bluetooth LE) is
     started if it isn't running and keeps running after this command stops
     (keep_hid; `phoneuse down` stops it). headless (`phoneuse serve`, and the Phone
-    Use window's background start, windows/background.py): no window opened."""
+    Use window's background start, windows/background.py): no window opened.
+
+    Another `phoneuse up` that answers is left running (this one exits); one that doesn't,
+    and whatever old backends are left (orphaned services, a HID service that doesn't
+    answer, copies from another install or checkout), are stopped first (windows/stale.py).
+    started: called once this one is the backend, before its services start."""
     from .windows import appwindow
     from .windows import procs as wprocs
+    from .windows import stale
+
+    def note(*a):
+        print(time.strftime("%H:%M:%S"), *a, flush=True)
+
     if not wprocs.single_instance("phoneuse-up"):
-        die("phoneuse up is already running on this PC (it owns the AirPlay and Bluetooth services).")
+        if backend_answers():
+            die("phoneuse up is already running on this PC (it owns the AirPlay and Bluetooth services).")
+        note("phoneuse up is already running, but its services don't answer: stopping it")
+        stale.stop_old(note, hid_answers=hid_status() is not None)
+        if not wprocs.take_over("phoneuse-up", wait=10):
+            die("An old phoneuse up didn't stop. Stop it (Task Manager: python.exe running phoneuse), "
+                "then run phoneuse up again.")
+    else:
+        stale.stop_old(note, hid_answers=hid_status() is not None)
+    if started:
+        started()
     ux = uxplay_path()
     if not ux:
         die("UxPlay (the AirPlay receiver) isn't installed. Run windows\\scripts\\install.ps1, "

@@ -68,13 +68,14 @@ public static class Backend
         catch (Exception) { return false; }
     }
 
-    /// <summary>Start phoneuse in the background unless something already serves the port.
-    /// Returns a line for the log/tooltip.</summary>
+    /// <summary>Start phoneuse in the background. Always, even when something holds the port: a
+    /// port that takes connections can belong to an old backend that no longer answers. The
+    /// background copy decides (cli.up_windows): it exits when a backend answers, and otherwise
+    /// stops the old ones and takes over. Returns a line for the log/tooltip.</summary>
     public static string EnsureRunning(int port)
     {
-        if (Answers(port)) return "phoneuse is already running";
-        if (Background() != null) return "phoneuse is starting";
-        if (Root == null) return "phoneuse not found next to this app: run `phoneuse up`";
+        if (Root == null)
+            return Answers(port) ? "phoneuse is already running" : "phoneuse not found next to this app: run `phoneuse up`";
         var python = Python;
         if (python == null) return "phoneuse's Python is missing: reinstall Phone Use";
         var psi = new ProcessStartInfo(python, "-u -m phoneuse.windows.background")
