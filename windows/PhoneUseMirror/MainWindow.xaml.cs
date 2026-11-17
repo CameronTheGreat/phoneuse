@@ -32,6 +32,7 @@ public sealed partial class MainWindow : Window
     string _agent = "idle", _name = "Phone Use", _agentAction = "";
     double _screenW = 402, _screenH = 874, _bezel = 30.0 / 498, _radius = 60.0 / 498;
 
+    bool _sideways;         // the phone is in landscape (the server's screen is wider than tall)
     bool _playing;          // a frame of the current stream is on screen
     bool _pressed;          // the left button went down over the phone
     long _troubleSince;     // when the current no-picture problem started (ticks), 0 = none
@@ -162,6 +163,12 @@ public sealed partial class MainWindow : Window
         }
         _bezel = (double?)m["bezel"] ?? _bezel;
         _radius = (double?)m["radius"] ?? _radius;
+        // reshape the window only when the phone turns, not on every state (the user may have sized it)
+        if ((_screenW > _screenH) != _sideways)
+        {
+            _sideways = _screenW > _screenH;
+            ReshapeWindow();
+        }
 
         if (!_live && wasLive)
         {
@@ -269,31 +276,60 @@ public sealed partial class MainWindow : Window
         Rim.CornerRadius = new CornerRadius(sr + 2);
     }
 
-    /// <summary>A phone-shaped window, about 85% of the work area's height, centered.</summary>
+    /// <summary>The window's size for the phone's shape: about 85% of the work area's height,
+    /// as wide as the phone needs, and never beyond 95% of the work area either way.</summary>
+    SizeInt32 PhoneWindowSize(RectInt32 area, double scale)
+    {
+        double aspect = _screenW / _screenH;
+        double dw = 1 + 2 * _bezel, dh = 1 / aspect + 2 * _bezel;
+        double chrome = (48 + 72) * scale;  // title bar + room below the phone
+        double h = area.Height * 0.85;
+        double w = (h - chrome) * dw / dh + 24 * scale;
+        double fit = Math.Min(1.0, Math.Min(area.Width * 0.95 / w, area.Height * 0.95 / h));  // landscape is wide
+        return new SizeInt32((int)(w * fit), (int)(h * fit));
+    }
+
+    double WindowScale()
+    {
+        double scale = GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this)) / 96.0;
+        return scale <= 0 ? 1 : scale;
+    }
+
+    /// <summary>A phone-shaped window, centered on the work area.</summary>
     void SizeToPhone()
     {
         var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
-        double scale = GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this)) / 96.0;
-        if (scale <= 0) scale = 1;
-        double aspect = _screenW / _screenH;
-        double dw = 1 + 2 * _bezel, dh = 1 / aspect + 2 * _bezel;
-        int h = (int)(area.Height * 0.85);
-        double chrome = (48 + 72) * scale;  // title bar + room below the phone
-        int w = (int)((h - chrome) * dw / dh + 24 * scale);
-        AppWindow.Resize(new SizeInt32(w, h));
-        AppWindow.Move(new PointInt32(area.X + (area.Width - w) / 2, area.Y + (area.Height - h) / 2));
+        double scale = WindowScale();
+        var size = PhoneWindowSize(area, scale);
+        AppWindow.Resize(size);
+        AppWindow.Move(new PointInt32(area.X + (area.Width - size.Width) / 2, area.Y + (area.Height - size.Height) / 2));
         LimitSize(scale);
     }
 
-    /// <summary>No smaller than a usable phone: 360 x 600 (at 100% scaling), enough for the
-    /// title bar's buttons, the Settings flyout (340 wide), the setup checklist and a phone
-    /// you can still tap on; never more than the screen allows.</summary>
+    /// <summary>The phone turned: give the window the other shape, centered where it was, on the
+    /// display it is on and inside its work area.</summary>
+    void ReshapeWindow()
+    {
+        var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
+        double scale = WindowScale();
+        LimitSize(scale);  // the minimum changes shape too, before resizing under it
+        var size = PhoneWindowSize(area, scale);
+        int cx = AppWindow.Position.X + AppWindow.Size.Width / 2, cy = AppWindow.Position.Y + AppWindow.Size.Height / 2;
+        int x = Math.Clamp(cx - size.Width / 2, area.X, Math.Max(area.X, area.X + area.Width - size.Width));
+        int y = Math.Clamp(cy - size.Height / 2, area.Y, Math.Max(area.Y, area.Y + area.Height - size.Height));
+        AppWindow.MoveAndResize(new RectInt32(x, y, size.Width, size.Height));
+    }
+
+    /// <summary>No smaller than a usable phone: 360 x 600 (at 100% scaling), turned sideways
+    /// with the phone, enough for the title bar's buttons, the Settings flyout (340 wide),
+    /// the setup checklist and a phone you can still tap on; never more than the screen allows.</summary>
     void LimitSize(double scale)
     {
         if (AppWindow.Presenter is not OverlappedPresenter p) return;
         var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
-        p.PreferredMinimumWidth = Math.Min((int)(360 * scale), area.Width);
-        p.PreferredMinimumHeight = Math.Min((int)(600 * scale), area.Height);
+        int w = _sideways ? 600 : 360, h = _sideways ? 360 : 600;
+        p.PreferredMinimumWidth = Math.Min((int)(w * scale), area.Width);
+        p.PreferredMinimumHeight = Math.Min((int)(h * scale), area.Height);
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
