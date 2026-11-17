@@ -161,6 +161,8 @@ def request(name, cmd, timeout=3.0):
         s.sendall(cmd.encode() + b"\n")
         f = s.makefile("rb")
         line = f.readline().decode().strip()
+        if not line:
+            raise ConnectionResetError(f"the {name} service closed the connection without a reply (authentication rejected or stale service)")
         data = f.read(int(line.split()[1])) if cmd == "shot" and line.startswith("ok ") else b""
         return line, data
 

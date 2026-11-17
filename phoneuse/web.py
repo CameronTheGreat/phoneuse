@@ -30,7 +30,7 @@ from aiohttp import web
 
 from . import orientation, screen, unlock
 from .agent_session import AgentSession, set_start_setting, start_setting
-from .config import CFG, IS_WINDOWS, NAME, config_path, runtime_path
+from .config import CFG, IS_WINDOWS, NAME, config_path, mirroring_model, runtime_path
 from .hidclient import Hid
 from .pointer import Keys, Pointer
 
@@ -410,6 +410,8 @@ class Tab:
                           "agent": self.told_agent, "bluetooth": self.mirror.bluetooth,
                           "awake": self.mirror.awake, "stale": self.mirror.stale,
                           "name": NAME, "screen": self.mirror.screen,
+                          # the model identifier ("iPhone17,1"): the mirror window draws its frame
+                          "model": mirroring_model(),
                           "bezel": screen.BEZEL, "radius": screen.SCREEN_RADIUS})
         asyncio.ensure_future(self.ws.send_str(msg))
 

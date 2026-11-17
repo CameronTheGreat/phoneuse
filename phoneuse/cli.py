@@ -1427,7 +1427,8 @@ HID_SOURCES = ("windows/hid.py", "hidproto.py", "ipc.py")
 def hid_status():
     """The HID service's status line, or None when it isn't running."""
     try:
-        return ipc.request("hid", "status", timeout=3)[0]
+        reply = ipc.request("hid", "status", timeout=3)[0]
+        return reply if reply.startswith("ok ") else None
     except OSError:
         return None
 
