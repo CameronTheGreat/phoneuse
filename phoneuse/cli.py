@@ -1719,6 +1719,49 @@ def backend_answers():
         return False
 
 
+def hub_port_taken():
+    """Windows: a backend runs, whoever started it: the hub's video port (UDP) is taken. Unlike
+    the up lock, this is seen from inside a sandbox too (an agent's tool sandbox has its own
+    lock namespace, so a `phoneuse up` there got "the lock" beside a running backend and started
+    services that crashed on their taken ports)."""
+    import socket
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        probe.bind(("127.0.0.1", screen.HUB_RTP_PORT))
+        return False
+    except OSError:
+        return True
+    finally:
+        probe.close()
+
+
+SANDBOXED = ("phoneuse can't reach its services: this process isn't allowed to connect to 127.0.0.1 "
+             "(WinError 10013), as in an agent's sandbox (Codex's, for one). phoneuse itself is most likely "
+             "running fine; don't start it again. Run phoneuse with local network access: allow it for the "
+             "sandbox, or run the command outside it.")
+
+
+def can_reach_services():
+    """Windows: this process may connect to the services' local ports. A sandbox that blocks
+    local connections refuses them outright (WinError 10013, PermissionError)."""
+    try:
+        ipc._tcp(config.SERVICE_PORTS["hub"], 1).close()
+    except PermissionError:
+        return False
+    except OSError:
+        pass  # nobody listening is still reachable
+    return True
+
+
+def wait_hub_port_free(wait=10.0):
+    deadline = time.time() + wait
+    while hub_port_taken():
+        if time.time() >= deadline:
+            return False
+        time.sleep(0.25)
+    return True
+
+
 def up_windows(headless=False, started=None):
     """Windows: the video hub, the frames service, the browser mirror and UxPlay, each
     restarted when it exits (frames and the browser mirror also when their code
@@ -1739,14 +1782,22 @@ def up_windows(headless=False, started=None):
     def note(*a):
         print(time.strftime("%H:%M:%S"), *a, flush=True)
 
-    if not wprocs.single_instance("phoneuse-up"):
+    # A backend runs if another `up` holds the lock, or (seen from a sandbox too) if the hub's
+    # port is taken.
+    locked = wprocs.single_instance("phoneuse-up")
+    if not locked or hub_port_taken():
         if backend_answers():
             die("phoneuse up is already running on this PC (it owns the AirPlay and Bluetooth services).")
+        if not can_reach_services():
+            die(SANDBOXED)
         note("phoneuse up is already running, but its services don't answer: stopping it")
         stale.stop_old(note, hid_answers=hid_status() is not None)
-        if not wprocs.take_over("phoneuse-up", wait=10):
+        if not locked and not wprocs.take_over("phoneuse-up", wait=10):
             die("An old phoneuse up didn't stop. Stop it (Task Manager: python.exe running phoneuse), "
                 "then run phoneuse up again.")
+        if not wait_hub_port_free(10):
+            die("An old phoneuse backend still holds its ports and couldn't be stopped from here. "
+                "Quit Phone Use (tray icon > Quit) or stop python.exe running phoneuse in Task Manager, then try again.")
     else:
         stale.stop_old(note, hid_answers=hid_status() is not None)
     if started:
@@ -2130,6 +2181,10 @@ def _main():
     if cmd == "doctor":
         from . import doctor
         sys.exit(doctor.main(args))
+    # A sandbox that blocks local connections (Codex's, for one) makes every service look stopped:
+    # say so, instead of "not running", which sent agents to start a second backend.
+    if IS_WINDOWS and cmd not in ("claude", "up", "serve", "install") and not can_reach_services():
+        die(SANDBOXED)
     if cmd == "claude":  # link the skill and write the phoneuse command for Claude Code (claude_setup)
         from . import claude_setup
         if args[:1] == ["connect"]:
