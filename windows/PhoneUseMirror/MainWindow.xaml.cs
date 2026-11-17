@@ -29,7 +29,8 @@ public sealed partial class MainWindow : Window
     string _agent = "idle", _name = "Phone Use", _agentAction = "";
     double _screenW = 402, _screenH = 874, _radius = 60.0 / 498;
 
-    bool _sideways;         // the phone is in landscape (the server's screen is wider than tall)
+    bool _sideways;         // the window is shaped for a phone in landscape
+    bool? _frameSideways;   // the decoded picture is wider than tall; null before a picture
     bool _playing;          // a frame of the current stream is on screen
     bool _pressed;          // the left button went down over the phone
     long _troubleSince;     // when the current no-picture problem started (ticks), 0 = none
@@ -54,6 +55,7 @@ public sealed partial class MainWindow : Window
         _conn = new MirrorConnection(port);
         _video.KeyframeNeeded += () => _conn.Send(new { t = "keyframe" });
         _video.Playing += () => _ui.TryEnqueue(OnPlaying);
+        _video.FrameSize += (w, h) => _ui.TryEnqueue(() => OnFrameSize(w, h));
         _conn.Frame += (key, data) => { if (!_hidden) _video.Push(key, data); };  // straight from the socket's thread
         _conn.Message += m => _ui.TryEnqueue(() => OnMessage(m));
         _conn.ConnectedChanged += on => _ui.TryEnqueue(() => OnConnected(on));
@@ -157,16 +159,15 @@ public sealed partial class MainWindow : Window
             _screenH = (double?)s[1] ?? _screenH;
         }
         _radius = (double?)m["radius"] ?? _radius;
-        // reshape the window only when the phone turns, not on every state (the user may have sized it)
-        if ((_screenW > _screenH) != _sideways)
-        {
-            _sideways = _screenW > _screenH;
-            ReshapeWindow();
-        }
+        // The decoder hears of a turn first (OnFrameSize); the server's screen catches up up to a
+        // second later and must not turn the phone back meanwhile.
+        if (_frameSideways is bool side) FaceScreen(side);
+        Turned();
 
         if (!_live && wasLive)
         {
             _playing = false;
+            _frameSideways = null;
             _video.Stop();  // never leave an old picture up
         }
         else if (_live && !wasLive && !_playing)
@@ -269,6 +270,32 @@ public sealed partial class MainWindow : Window
     }
 
     void Stage_SizeChanged(object sender, SizeChangedEventArgs e) => Layout();
+
+    /// <summary>The decoder's picture changed size: when the phone turned, turn the window now,
+    /// with the first frame of the new shape, not when the server notices.</summary>
+    void OnFrameSize(int w, int h)
+    {
+        if (w <= 0 || h <= 0) return;
+        _frameSideways = w > h;
+        FaceScreen(w > h);
+        Turned();
+        Layout();
+    }
+
+    /// <summary>The screen's size in points, upright or sideways.</summary>
+    void FaceScreen(bool sideways)
+    {
+        double s = Math.Min(_screenW, _screenH), l = Math.Max(_screenW, _screenH);
+        (_screenW, _screenH) = sideways ? (l, s) : (s, l);
+    }
+
+    /// <summary>Reshape the window only when the phone turns, not on every state (the user may have sized it).</summary>
+    void Turned()
+    {
+        if ((_screenW > _screenH) == _sideways) return;
+        _sideways = _screenW > _screenH;
+        ReshapeWindow();
+    }
 
     void ResizeVideo()
     {

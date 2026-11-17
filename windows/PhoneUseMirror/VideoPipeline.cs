@@ -54,6 +54,10 @@ public sealed unsafe class VideoPipeline : IDisposable
     /// <summary>Raised (on the video thread) once per stream, when the first picture is presented.</summary>
     public event Action? Playing;
 
+    /// <summary>The picture's size changed (the phone turned, or the first picture): its width and
+    /// height in pixels, without the decoder's padding. Raised on the decoding thread.</summary>
+    public event Action<int, int>? FrameSize;
+
     // the panel's size in physical pixels, and its DPI scale (set from the UI thread)
     volatile int _targetW, _targetH;
     float _scaleX = 1, _scaleY = 1;
@@ -293,6 +297,7 @@ public sealed unsafe class VideoPipeline : IDisposable
             try { _stride = (int)current.GetUInt32(MediaTypeAttributeKeys.DefaultStride); }
             catch (SharpGenException) { _stride = _videoW; }
             _crop = ReadAperture(current, _videoW, _videoH);
+            FrameSize?.Invoke(_crop.Right - _crop.Left, _crop.Bottom - _crop.Top);
         }
         var info = mft.GetOutputStreamInfo(0);
         _decoderProvidesSamples = (info.Flags & (int)(OutputStreamInfoFlags.OutputStreamProvidesSamples
