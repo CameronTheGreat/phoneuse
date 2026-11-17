@@ -160,13 +160,29 @@
                                        Foreground="#EBEBF5" FontSize="14" LineHeight="20" />
                         </Border>
                     </Grid>
-                    <!-- the phone's body over the screen's edges: a squircle with the screen's squircle cut
-                         out (Layout). One shape for both edges, so they always meet. -->
-                    <Path x:Name="Body" Fill="#FF18181C" HorizontalAlignment="Left" VerticalAlignment="Top"
+                    <!-- An iPhone drawn over the screen's edges (Layout): side buttons, a thin titanium band,
+                         and a thin black border around the glass with the screen's squircle cut out. -->
+                    <Path x:Name="Buttons" HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False">
+                        <Path.Fill>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                <GradientStop Color="#FF3A3A3E" Offset="0" />
+                                <GradientStop Color="#FF77777D" Offset="0.5" />
+                                <GradientStop Color="#FF3A3A3E" Offset="1" />
+                            </LinearGradientBrush>
+                        </Path.Fill>
+                    </Path>
+                    <Path x:Name="Titanium" HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False"
+                          Stroke="#59FFFFFF" StrokeThickness="0.75">
+                        <Path.Fill>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#FF6C6C72" Offset="0" />
+                                <GradientStop Color="#FF2E2E33" Offset="0.45" />
+                                <GradientStop Color="#FF55555B" Offset="1" />
+                            </LinearGradientBrush>
+                        </Path.Fill>
+                    </Path>
+                    <Path x:Name="Body" Fill="#FF050506" HorizontalAlignment="Left" VerticalAlignment="Top"
                           IsHitTestVisible="False" />
-                    <!-- the body's outer edge, a hairline against the window -->
-                    <Path x:Name="BodyEdge" Stroke="#33FFFFFF" StrokeThickness="1" HorizontalAlignment="Left"
-                          VerticalAlignment="Top" IsHitTestVisible="False" />
                     <!-- a ring around the screen while an agent drives -->
                     <Path x:Name="Rim" Stroke="{ThemeResource AccentFillColorDefaultBrush}" StrokeThickness="2"
                           HorizontalAlignment="Left" VerticalAlignment="Top" Visibility="Collapsed"

@@ -27,7 +27,7 @@ public sealed partial class MainWindow : Window
     bool _live, _mirroring, _stale, _awake;
     bool? _bluetooth;
     string _agent = "idle", _name = "Phone Use", _agentAction = "";
-    double _screenW = 402, _screenH = 874, _bezel = 30.0 / 498, _radius = 60.0 / 498;
+    double _screenW = 402, _screenH = 874, _radius = 60.0 / 498;
 
     bool _sideways;         // the phone is in landscape (the server's screen is wider than tall)
     bool _playing;          // a frame of the current stream is on screen
@@ -156,7 +156,6 @@ public sealed partial class MainWindow : Window
             _screenW = (double?)s[0] ?? _screenW;
             _screenH = (double?)s[1] ?? _screenH;
         }
-        _bezel = (double?)m["bezel"] ?? _bezel;
         _radius = (double?)m["radius"] ?? _radius;
         // reshape the window only when the phone turns, not on every state (the user may have sized it)
         if ((_screenW > _screenH) != _sideways)
@@ -221,13 +220,27 @@ public sealed partial class MainWindow : Window
 
     // ---------------------------------------------------------------- layout
 
-    /// <summary>The screen and the whole phone in units of the screen's short side: the bezel and
-    /// the corner radius are fractions of it, so a sideways phone keeps the same bezel and corners.</summary>
+    // The phone around the screen, in units of the screen's short side (so a sideways phone keeps
+    // them): a thin black border around the glass, the titanium band, and how far the side buttons
+    // stand out. Slimmer than the server's bezel, which the browser mirror uses: this is an iPhone 15/16 Pro.
+    const double Glass = 0.024, Band = 0.017, Knob = 0.009;
+    const double Frame = Glass + Band + Knob;
+
+    // Side buttons of an upright phone: (left side?, top, bottom) as fractions of the band's height.
+    static readonly (bool left, double top, double bottom)[] SideButtons =
+    {
+        (true, 0.150, 0.186),   // Action button
+        (true, 0.245, 0.316),   // volume up
+        (true, 0.340, 0.411),   // volume down
+        (false, 0.265, 0.385),  // side button
+    };
+
+    /// <summary>The screen and the whole phone (buttons included) in units of the screen's short side.</summary>
     (double w, double h, double dw, double dh) PhoneUnits()
     {
         double s = Math.Max(1, Math.Min(_screenW, _screenH));
         double w = _screenW / s, h = _screenH / s;
-        return (w, h, w + 2 * _bezel, h + 2 * _bezel);
+        return (w, h, w + 2 * Frame, h + 2 * Frame);
     }
 
     /// <summary>A w x h rectangle at (x, y) whose corners are superellipse quarters (|x|^3 + |y|^3 = 1)
@@ -273,25 +286,51 @@ public sealed partial class MainWindow : Window
         double u = Math.Min((W - 24) / dw, (H - below - above) / dh);  // px per screen short side
         if (u <= 10) return;
 
-        double pw = dw * u, ph = dh * u, b = _bezel * u, sw = w * u, sh = h * u, sr = _radius * u;
+        double pw = dw * u, ph = dh * u, sw = w * u, sh = h * u, sr = _radius * u;
+        double k = Knob * u, t = Band * u, g = Glass * u, o = k + t + g;  // o: the screen's offset
         Surface.Width = pw;
         Surface.Height = ph;
         Surface.Margin = new Thickness(0, Math.Max(above, (H - below - ph) / 2), 0, 0);
 
-        Screen.Margin = new Thickness(b, b, 0, 0);
+        Screen.Margin = new Thickness(o, o, 0, 0);
         Screen.Width = sw;
         Screen.Height = sh;
         DotLayer.Width = sw;
         DotLayer.Height = sh;
 
-        // the body covers the screen's square corners: it and its hole share one outline
+        // Drawn over the screen's square corners; each ring and the one inside it share an outline,
+        // so the edges always meet.
+        var outer = Squircle(k, k, pw - 2 * k, ph - 2 * k, sr + g + t);
+        Titanium.Data = new GeometryGroup
+        {
+            FillRule = FillRule.EvenOdd,
+            Children = { outer, Squircle(k + t, k + t, pw - 2 * (k + t), ph - 2 * (k + t), sr + g) },
+        };
         Body.Data = new GeometryGroup
         {
             FillRule = FillRule.EvenOdd,
-            Children = { Squircle(0, 0, pw, ph, sr + b), Squircle(b, b, sw, sh, sr) },
+            Children = { Squircle(k + t, k + t, pw - 2 * (k + t), ph - 2 * (k + t), sr + g), Squircle(o, o, sw, sh, sr) },
         };
-        BodyEdge.Data = Squircle(0.5, 0.5, pw - 1, ph - 1, sr + b - 0.5);
-        Rim.Data = Squircle(b - 1, b - 1, sw + 2, sh + 2, sr + 1);  // the 2 px stroke sits just outside the screen
+        Buttons.Data = ButtonGeometry(pw, ph, k, t);
+        Rim.Data = Squircle(o - 1, o - 1, sw + 2, sh + 2, sr + 1);  // the 2 px stroke sits just outside the screen
+    }
+
+    /// <summary>The side buttons, standing k out from the band and tucked under it. Sideways, the
+    /// phone is drawn turned to the left (its top at the left), so the volume buttons are below.</summary>
+    GeometryGroup ButtonGeometry(double pw, double ph, double k, double t)
+    {
+        bool sideways = _screenW > _screenH;
+        double uw = sideways ? ph : pw, uh = sideways ? pw : ph;  // the upright phone's size
+        double bandH = uh - 2 * k;
+        var group = new GeometryGroup();
+        foreach (var (left, top, bottom) in SideButtons)
+        {
+            double x = left ? 0 : uw - k - t, y = k + top * bandH, bw = k + t, bh = (bottom - top) * bandH;
+            // upright (x, y) turned to the left: the top goes left, the left side goes down
+            var (rx, ry, rw, rh) = sideways ? (y, uw - x - bw, bh, bw) : (x, y, bw, bh);
+            group.Children.Add(Squircle(rx, ry, rw, rh, k * 0.9));
+        }
+        return group;
     }
 
     /// <summary>The window's size for the phone's shape: about 85% of the work area's height,
