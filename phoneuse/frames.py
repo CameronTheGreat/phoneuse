@@ -177,7 +177,9 @@ class Frames:
             cmd, _, arg = line.decode(errors="replace").strip().partition(" ")
             try:
                 if cmd == "status":
-                    conn.sendall(f"ok live={int(self.source.live())} seq={self.seq}\n".encode())
+                    size = self.source.frame_size()  # orientation.py reads the phone's shape from it
+                    wh = f"{size[0]}x{size[1]}" if size else "-"
+                    conn.sendall(f"ok live={int(self.source.live())} seq={self.seq} size={wh}\n".encode())
                 elif cmd == "settle":  # settle [SINCE|-] [QUIET] [CHANGE]
                     a = arg.split()
                     since = int(a[0]) if a and a[0] != "-" else None
