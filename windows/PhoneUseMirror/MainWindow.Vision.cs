@@ -272,7 +272,7 @@ public sealed partial class MainWindow
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Close,
         };
-        SettingsFlyout.Hide();
+        HideSettings();
         if (_ask != null) return;
         try { if (await confirm.ShowAsync() != ContentDialogResult.Primary) return; }
         catch (Exception) { return; }

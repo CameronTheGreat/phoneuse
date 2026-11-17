@@ -61,7 +61,7 @@ public sealed partial class MainWindow
     /// keyboard (the saved choice is cleared; a bridge that is set up still counts as chosen).</summary>
     async void SetupGuide_Click(object sender, RoutedEventArgs e)
     {
-        SettingsFlyout.Hide();
+        HideSettings();
         await _conn.PostAsync("api/setup/input", new { choice = (string?)null });
         ShowSetup();
     }

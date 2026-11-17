@@ -58,8 +58,9 @@ public sealed unsafe class VideoPipeline : IDisposable
     /// height in pixels, without the decoder's padding. Raised on the decoding thread.</summary>
     public event Action<int, int>? FrameSize;
 
-    // the panel's size in physical pixels, and its DPI scale (set from the UI thread)
+    // the panel's size in physical pixels, its DPI scale, and its corners' radius in pixels (set from the UI thread)
     volatile int _targetW, _targetH;
+    volatile float _cornerPx;
     float _scaleX = 1, _scaleY = 1;
     long _askedKeyframeAt = -10_000;
 
@@ -110,13 +111,15 @@ public sealed unsafe class VideoPipeline : IDisposable
     /// <summary>Show nothing until the next stream.</summary>
     public void Stop() => _in.Add(new Item(Kind.Stop));
 
-    /// <summary>The panel's size in DIPs and its composition scale (UI thread).</summary>
-    public void Resize(double width, double height, float scaleX, float scaleY)
+    /// <summary>The panel's size in DIPs, its composition scale, and the radius of the rounded corners the
+    /// picture is cut to, in DIPs (UI thread).</summary>
+    public void Resize(double width, double height, float scaleX, float scaleY, double corner)
     {
         _scaleX = scaleX <= 0 ? 1 : scaleX;
         _scaleY = scaleY <= 0 ? 1 : scaleY;
         _targetW = Math.Max(1, (int)Math.Round(width * _scaleX));
         _targetH = Math.Max(1, (int)Math.Round(height * _scaleY));
+        _cornerPx = (float)Math.Max(0, corner * Math.Min(_scaleX, _scaleY));
         _in.Add(new Item(Kind.Resize));
     }
 
@@ -499,7 +502,39 @@ public sealed unsafe class VideoPipeline : IDisposable
             var stream = new VideoProcessorStream { Enable = true, InputSurface = inView };
             _videoContext.VideoProcessorBlt(_vp!, outView, 0, 1, new[] { stream }).CheckError();
         }
+        CutCorners(back);
         _swap.Present(0, PresentFlags.None);
+    }
+
+    /// <summary>
+    /// Clear the picture's corners to transparent, outside a rounded rectangle of radius _cornerPx.
+    /// The panel's composition clip (MainWindow.ClipScreen) rounds everything else on the screen but not a
+    /// swap chain, whose square corners then showed past the phone's rounded ones. The edge is cut with
+    /// circular corners, a little wider than the screen's continuous ones (ContinuousCorner): the phone's
+    /// body, drawn over the picture, covers the difference and hides the edge's stair steps.
+    /// </summary>
+    void CutCorners(ID3D11Texture2D back)
+    {
+        float r = Math.Min(_cornerPx, Math.Min(_swapW, _swapH) / 2f);
+        if (r < 1) return;
+        var rects = new List<Vortice.RawRect>();
+        int rows = (int)Math.Ceiling(r);
+        for (int j = 0; j < rows; j++)
+        {
+            // how far in from the side the curve is on this row (pixel centres)
+            float dy = r - (j + 0.5f);
+            int cut = (int)Math.Floor(r - MathF.Sqrt(Math.Max(0, r * r - dy * dy)));
+            if (cut <= 0) continue;
+            int top = j, bottom = _swapH - 1 - j;
+            rects.Add(new Vortice.RawRect(0, top, cut, top + 1));
+            rects.Add(new Vortice.RawRect(_swapW - cut, top, _swapW, top + 1));
+            rects.Add(new Vortice.RawRect(0, bottom, cut, bottom + 1));
+            rects.Add(new Vortice.RawRect(_swapW - cut, bottom, _swapW, bottom + 1));
+        }
+        if (rects.Count == 0) return;
+        using var rtv = _device!.CreateRenderTargetView(back);
+        using var context1 = _context!.QueryInterface<ID3D11DeviceContext1>();
+        context1.ClearView(rtv, new Vortice.Mathematics.Color4(0, 0, 0, 0), rects.ToArray());
     }
 
     void EnsureProcessor(int inW, int inH, int outW, int outH)
@@ -527,6 +562,8 @@ public sealed unsafe class VideoPipeline : IDisposable
         _videoContext.VideoProcessorSetOutputColorSpace(_vp!, Unsafe.As<uint, VideoProcessorColorSpace>(ref output));
         _videoContext.VideoProcessorSetStreamFrameFormat(_vp!, 0, VideoFrameFormat.Progressive);
         _videoContext.VideoProcessorSetStreamAutoProcessingMode(_vp!, 0, false);  // no "enhancements": they cost time
+        // every pixel it writes opaque: the swap chain has an alpha channel now (CutCorners)
+        _videoContext.VideoProcessorSetOutputAlphaFillMode(_vp!, VideoProcessorAlphaFillMode.Opaque, 0);
         _vpInW = inW; _vpInH = inH; _vpOutW = outW; _vpOutH = outH;
     }
 
@@ -550,7 +587,7 @@ public sealed unsafe class VideoPipeline : IDisposable
                 BufferCount = 2,
                 Scaling = Scaling.Stretch,
                 SwapEffect = SwapEffect.FlipSequential,
-                AlphaMode = AlphaMode.Ignore,
+                AlphaMode = AlphaMode.Premultiplied,  // the corners are cut out (CutCorners)
             };
             _swap = factory.CreateSwapChainForComposition(_device, desc, null);
             _swapW = w; _swapH = h;
@@ -581,6 +618,7 @@ public sealed unsafe class VideoPipeline : IDisposable
         using var back = _swap!.GetBuffer<ID3D11Texture2D>(0);
         using var rtv = _device!.CreateRenderTargetView(back);
         _context!.ClearRenderTargetView(rtv, new Vortice.Mathematics.Color4(0, 0, 0, 1));
+        CutCorners(back);
         _swap.Present(0, PresentFlags.None);
     }
 

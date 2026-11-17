@@ -7,7 +7,7 @@ using Microsoft.UI.Xaml.Media;
 namespace PhoneUseMirror;
 
 /// <summary>
-/// The settings flyout: the browser mirror's settings panel, natively. Every setting
+/// The settings overlay: the browser mirror's settings panel, natively. Every setting
 /// goes through the same server routes the page uses:
 ///   keep awake     /api/awake        {on}
 ///   agent control  /api/session/ask  {mode | seconds}
@@ -18,28 +18,50 @@ public sealed partial class MainWindow
 {
     bool _settingUp;  // filling the controls from the server: their change events send nothing
 
-    async void Settings_Opening(object? sender, object e)
+    async void OpenSettings_Click(object sender, RoutedEventArgs e)
     {
+        if (SettingsVisible)
+        {
+            HideAbout();
+            return;
+        }
+        ShowOverlay(SettingsPage);
         _settingUp = true;
         AwakeSwitch.IsOn = _awake;
         StartupSwitch.IsOn = Startup.Enabled;
+        SnapSwitch.IsOn = _snapped;
         UpdateAuto.IsChecked = AppSettings.AutoUpdate;
         _settingUp = false;
+        FillGlowSettings();
+        FillFinishSettings();
         ShowUpdate();
         ShowVision();
         PasscodeBox.Password = "";
         await Task.WhenAll(LoadStartMode(), LoadPasscode(), LoadPaired(), LoadBridgeSwitch());
     }
 
+    bool SettingsVisible => AboutOverlay.Visibility == Visibility.Visible && SettingsPage.Visibility == Visibility.Visible;
+
+    void HideSettings()
+    {
+        if (SettingsVisible) HideAbout();
+    }
+
     // The (i) button next to Settings: opens About, or closes it again.
     void OpenAbout_Click(object sender, RoutedEventArgs e)
     {
-        if (AboutOverlay.Visibility == Visibility.Visible && ReferenceEquals(AboutHost.Content, _aboutView)) HideAbout();
+        if (AboutOverlay.Visibility == Visibility.Visible && !SettingsVisible && ReferenceEquals(AboutHost.Content, _aboutView)) HideAbout();
         else ShowAbout();
     }
 
     async void OpenBrowser_Click(object sender, RoutedEventArgs e) =>
         await Windows.System.Launcher.LaunchUriAsync(_conn.PageUri);
+
+    void Snap_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_settingUp || SnapSwitch.IsOn == _snapped) return;
+        SetSnapped(SnapSwitch.IsOn);
+    }
 
     // ---------------------------------------------------------------- keep awake
 

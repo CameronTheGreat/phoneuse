@@ -19,9 +19,11 @@ public sealed partial class MainWindow
     void InitTray(int port)
     {
         _tray = new TrayIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
+        _tray.Click += () => _ui.TryEnqueue(TrayClicked);
         _tray.Open += () => _ui.TryEnqueue(ShowFromTray);
+        _tray.SnapChanged += on => _ui.TryEnqueue(() => { SetSnapped(on); ShowWindow(); });
         _tray.Logs += () => _ui.TryEnqueue(ShowLog);
-        _tray.About += () => _ui.TryEnqueue(ShowAbout);
+        _tray.About += () => _ui.TryEnqueue(() => { ShowFromTray(); ShowAbout(); });
         _tray.Quit += () => _ui.TryEnqueue(QuitApp);
         _tick.Tick += (_, _) =>
             _tray?.SetTip("Phone Use" + (string.IsNullOrEmpty(StatusText.Text) ? "" : " · " + StatusText.Text));
@@ -46,6 +48,7 @@ public sealed partial class MainWindow
     void HideToTray()
     {
         if (_hidden) return;
+        SetSnapHint(false);
         _hidden = true;
         _conn.Send(new { t = "blur" });  // let go of anything held
         AppWindow.Hide();
@@ -59,10 +62,22 @@ public sealed partial class MainWindow
         }
     }
 
+    // Only a tray-icon reopen resets a hidden window to the default snap position.
     public void ShowFromTray()
     {
         if (_quitting) return;
+        if (_hidden) SetSnapped(true);
+        ShowWindow();
+    }
+
+    // A second launch (including the pinned taskbar icon) restores this process's position.
+    public void ShowFromTaskbar() => ShowWindow();
+
+    void ShowWindow()
+    {
+        if (_quitting) return;
         if (AppWindow.Presenter is OverlappedPresenter p && p.State == OverlappedPresenterState.Minimized) p.Restore();
+        PlaceSnapped();  // above the icon, wherever it is now
         AppWindow.Show(true);
         Activate();
         if (_hidden)
@@ -81,6 +96,7 @@ public sealed partial class MainWindow
     void HideAbout()
     {
         _bridgeView?.Stop();
+        if (_glow != null) _glow.Preview = false;
         AboutOverlay.Visibility = Visibility.Collapsed;
         Surface.Focus(FocusState.Programmatic);
     }

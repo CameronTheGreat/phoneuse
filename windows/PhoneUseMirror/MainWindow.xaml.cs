@@ -27,7 +27,11 @@ public sealed partial class MainWindow : Window
     bool _live, _mirroring, _stale, _awake;
     bool? _bluetooth;
     string _agent = "idle", _name = "Phone Use", _agentAction = "";
-    double _screenW = 402, _screenH = 874, _radius = 60.0 / 498;
+    double _screenW = 402, _screenH = 874;
+
+    /// <summary>The screen's corner radius in units of its short side: the model's (PhoneModel.CornerPt),
+    /// not the server's, which is the browser mirror's own approximation.</summary>
+    double _radius => _phone.CornerPt / Math.Max(1, Math.Min(_screenW, _screenH));
 
     bool _sideways;         // the window is shaped for a phone in landscape
     bool? _frameSideways;   // the decoded picture is wider than tall; null before a picture
@@ -50,6 +54,9 @@ public sealed partial class MainWindow : Window
         Video.SizeChanged += (_, _) => ResizeVideo();
         Video.CompositionScaleChanged += (_, _) => ResizeVideo();
         Frameless();
+        ApplyFinish(FrameFinish.Get(AppSettings.FrameFinish));
+        WatchDisplay();  // HDR: the finish drawn for it
+        InitGlow();
         SizeToPhone();
         // the minimum is in pixels: again when the window moves to a screen with other scaling
         Root.Loaded += (_, _) => Root.XamlRoot.Changed += (r, _) => LimitSize(r.RasterizationScale);
@@ -86,6 +93,7 @@ public sealed partial class MainWindow : Window
         _tick.Tick += (_, _) => UpdateNote();
         _tick.Start();
         InitTray(port);
+        InitSnap();
         InitUpdates();
         StartSetup();
 
@@ -131,11 +139,11 @@ public sealed partial class MainWindow : Window
                 if (_agent == "driving") AgentWhat.Text = _agentAction;
                 break;
             case "unlock-request":
-                ShowFromTray();
+                ShowWindow();
                 _ = ShowAsk((string?)m["id"], "unlock", null, null);
                 break;
             case "session-request":
-                ShowFromTray();
+                ShowWindow();
                 _ = ShowAsk((string?)m["id"], "session", (string?)m["action"], (double?)m["deadline"]);
                 break;
             case "unlock-done": HideAsk("unlock"); break;
@@ -158,7 +166,7 @@ public sealed partial class MainWindow : Window
             _screenW = (double?)s[0] ?? _screenW;
             _screenH = (double?)s[1] ?? _screenH;
         }
-        _radius = (double?)m["radius"] ?? _radius;
+        if (m.ContainsKey("model")) SetModel((string?)m["model"]);
         // The decoder hears of a turn first (OnFrameSize); the server's screen catches up up to a
         // second later and must not turn the phone back meanwhile.
         if (_frameSideways is bool side) FaceScreen(side);
@@ -228,19 +236,42 @@ public sealed partial class MainWindow : Window
     // ---------------------------------------------------------------- layout
 
     // The phone around the screen, in units of the screen's short side (so a sideways phone keeps
-    // them): a thin black border around the glass, the titanium band, and how far the side buttons
-    // stand out. Slimmer than the server's bezel, which the browser mirror uses: this is an iPhone 15/16 Pro.
-    const double Glass = 0.024, Band = 0.017, Knob = 0.009;
-    const double Frame = Glass + Band + Knob;
+    // them): a thin black border around the glass (the model's: PhoneModel.cs), the band, and how far
+    // the side buttons stand out. Slimmer than the server's bezel, which the browser mirror uses.
+    const double Band = 0.017, Knob = 0.009;
+    PhoneModel _phone = PhoneModel.Default;
+    double Glass => _phone.Glass;
+    double Frame => Glass + Band + Knob;
 
-    // Side buttons of an upright phone: (left side?, top, bottom) as fractions of the band's height.
-    static readonly (bool left, double top, double bottom)[] SideButtons =
+    // Side buttons of an upright phone, for the models Apple has no drawings of (the iPhone 11 and
+    // older): (left side?, top, bottom) as fractions of the band's height, estimated from photos.
+    static readonly (bool left, double top, double bottom)[] EstimatedSideButtons =
     {
-        (true, 0.150, 0.186),   // Action button
+        (true, 0.155, 0.180),   // ring/silent switch
         (true, 0.245, 0.316),   // volume up
         (true, 0.340, 0.411),   // volume down
         (false, 0.265, 0.385),  // side button
     };
+
+    /// <summary>This model's side buttons, where its drawing puts them (PhoneModel).</summary>
+    (bool left, double top, double bottom)[] SideButtons =>
+        _phone.Buttons is { } b ? b.Select(x => (x.Left, x.Top, x.Bottom)).ToArray() : EstimatedSideButtons;
+
+    /// <summary>Camera Control: lower on the right, where this model has it (PhoneModel), a sapphire
+    /// button barely standing out of the band.</summary>
+    (bool left, double top, double bottom)[] CameraButton =>
+        _phone.CameraControlAt is { } at ? new[] { (at.Left, at.Top, at.Bottom) } : Array.Empty<(bool, double, double)>();
+
+    /// <summary>The phone that's mirroring changed: its frame from now on.</summary>
+    void SetModel(string? identifier)
+    {
+        var phone = PhoneModel.For(identifier);
+        if (phone == _phone) return;
+        _phone = phone;
+        _bandDrawn = default;  // its material may differ
+        Layout();
+        if (SettingsVisible) FillFinishSettings();
+    }
 
     /// <summary>The screen and the whole phone (buttons included) in units of the screen's short side.</summary>
     (double w, double h, double dw, double dh) PhoneUnits()
@@ -250,30 +281,9 @@ public sealed partial class MainWindow : Window
         return (w, h, w + 2 * Frame, h + 2 * Frame);
     }
 
-    /// <summary>A w x h rectangle at (x, y) whose corners are superellipse quarters (|x|^3 + |y|^3 = 1)
-    /// of radius r: the continuous corners of the phone and its screen (as squircle() in the browser
-    /// mirror's page).</summary>
-    static PathGeometry Squircle(double x, double y, double w, double h, double r)
-    {
-        r = Math.Max(0, Math.Min(r, Math.Min(w, h) / 2));
-        const int steps = 24;
-        var points = new PointCollection();
-        double[,] centers = { { x + w - r, y + r }, { x + w - r, y + h - r }, { x + r, y + h - r }, { x + r, y + r } };
-        for (int q = 0; q < 4; q++)
-            for (int i = 0; i <= steps; i++)
-            {
-                double t = (q + (double)i / steps) * Math.PI / 2 - Math.PI / 2, c = Math.Cos(t), s = Math.Sin(t);
-                points.Add(new Windows.Foundation.Point(
-                    centers[q, 0] + r * Math.Sign(c) * Math.Pow(Math.Abs(c), 2.0 / 3),
-                    centers[q, 1] + r * Math.Sign(s) * Math.Pow(Math.Abs(s), 2.0 / 3)));
-            }
-        var figure = new PathFigure { StartPoint = points[0], IsClosed = true, IsFilled = true };
-        points.RemoveAt(0);
-        figure.Segments.Add(new PolyLineSegment { Points = points });
-        var g = new PathGeometry();
-        g.Figures.Add(figure);
-        return g;
-    }
+    /// <summary>A w x h rectangle at (x, y) with iOS's continuous corners of radius r: the corners of the
+    /// phone and its screen (ContinuousCorner.cs).</summary>
+    static PathGeometry Squircle(double x, double y, double w, double h, double r) => ContinuousCorner.Rect(x, y, w, h, r);
 
     void Stage_SizeChanged(object sender, SizeChangedEventArgs e) => Layout();
 
@@ -303,10 +313,15 @@ public sealed partial class MainWindow : Window
         ReshapeWindow();
     }
 
+    // the screen's corner radius in DIPs (Layout), which the video cuts its picture to
+    double _screenCorner;
+
     void ResizeVideo()
     {
+        // the panel reaches past the screen by its margin on every side: its corners are that much wider
         if (Video.ActualWidth > 0 && Video.ActualHeight > 0)
-            _video.Resize(Video.ActualWidth, Video.ActualHeight, Video.CompositionScaleX, Video.CompositionScaleY);
+            _video.Resize(Video.ActualWidth, Video.ActualHeight, Video.CompositionScaleX, Video.CompositionScaleY,
+                _screenCorner - Video.Margin.Left);
     }
 
     /// <summary>The phone body fits the window; the screen keeps the phone's shape.</summary>
@@ -315,7 +330,7 @@ public sealed partial class MainWindow : Window
         double W = Stage.ActualWidth, H = Stage.ActualHeight;
         if (W <= 0 || H <= 0) return;
         var (w, h, dw, dh) = PhoneUnits();
-        const double below = 4, above = 4;
+        const double below = PadBelow, above = PadAbove;
         double u = Math.Min((W - PadW) / dw, (H - below - above) / dh);  // px per screen short side
         if (u <= 10) return;
 
@@ -331,6 +346,12 @@ public sealed partial class MainWindow : Window
         DotLayer.Width = sw;
         DotLayer.Height = sh;
         PlaceScreenUi(o, sw, sh);
+        ClipScreen(sw, sh, sr);
+        if (Math.Abs(sr - _screenCorner) > 0.01)
+        {
+            _screenCorner = sr;
+            ResizeVideo();  // the same size can come with another corner (another model)
+        }
 
         // Drawn over the screen's square corners; each ring and the one inside it share an outline,
         // so the edges always meet.
@@ -346,26 +367,49 @@ public sealed partial class MainWindow : Window
             FillRule = FillRule.EvenOdd,
             Children = { Squircle(k + t, k + t, pw - 2 * (k + t), ph - 2 * (k + t), sr + g), Squircle(o, o, sw, sh, sr) },
         };
-        Buttons.Data = ButtonGeometry(pw, ph, k, t);
+        Buttons.Data = ButtonGeometry(SideButtons, pw, ph, k, t, 1);
+        CameraControl.Data = ButtonGeometry(CameraButton, pw, ph, k, t, 0.45);
+        // the glass catching the light where it meets the band
+        double e = k + t + 0.4;
+        GlassEdge.Data = Squircle(e, e, pw - 2 * e, ph - 2 * e, sr + g - 0.4);
+        ShadowShape.Width = pw;
+        ShadowShape.Height = ph;
+        ShadowShape.Data = Squircle(k, k, pw - 2 * k, ph - 2 * k, sr + g + t);
+        PlaceBand(pw, ph, k, t, sr + g + t, ButtonRects(SideButtons, pw, ph, k, t, 1));
+        PlaceShadow(pw, ph);
         Rim.Data = Squircle(o - 1, o - 1, sw + 2, sh + 2, sr + 1);  // the 2 px stroke sits just outside the screen
+        _glowShape = (k, pw - 2 * k, ph - 2 * k, sr + g + t, sw, sh, sr);  // the titanium band's outline, and the screen
+        PlaceBar(pw, k, sr + g + t);
+        PlaceFrameInteraction(pw, ph, k, o, sw, sh);
+        PlaceGlow();
     }
 
-    /// <summary>The side buttons, standing k out from the band and tucked under it. Sideways, the
+    /// <summary>Side buttons, standing out from the band by `stand` of k and tucked under it. Sideways, the
     /// phone is drawn turned to the left (its top at the left), so the volume buttons are below.</summary>
-    GeometryGroup ButtonGeometry(double pw, double ph, double k, double t)
+    GeometryGroup ButtonGeometry((bool left, double top, double bottom)[] buttons, double pw, double ph, double k, double t, double stand)
+    {
+        var group = new GeometryGroup();
+        foreach (var (x, y, w, h) in ButtonRects(buttons, pw, ph, k, t, stand))
+            group.Children.Add(Squircle(x, y, w, h, k * 0.9));
+        return group;
+    }
+
+    /// <summary>Where those buttons are (DIPs in the phone), as drawn: also for the lit band (MainWindow.Frame.cs).</summary>
+    List<(double x, double y, double w, double h)> ButtonRects((bool left, double top, double bottom)[] buttons,
+        double pw, double ph, double k, double t, double stand)
     {
         bool sideways = _screenW > _screenH;
         double uw = sideways ? ph : pw, uh = sideways ? pw : ph;  // the upright phone's size
         double bandH = uh - 2 * k;
-        var group = new GeometryGroup();
-        foreach (var (left, top, bottom) in SideButtons)
+        double room = k * (1 - stand);  // between the phone's edge and the button
+        var rects = new List<(double, double, double, double)>();
+        foreach (var (left, top, bottom) in buttons)
         {
-            double x = left ? 0 : uw - k - t, y = k + top * bandH, bw = k + t, bh = (bottom - top) * bandH;
+            double bw = k * stand + t, x = left ? room : uw - room - bw, y = k + top * bandH, bh = (bottom - top) * bandH;
             // upright (x, y) turned to the left: the top goes left, the left side goes down
-            var (rx, ry, rw, rh) = sideways ? (y, uw - x - bw, bh, bw) : (x, y, bw, bh);
-            group.Children.Add(Squircle(rx, ry, rw, rh, k * 0.9));
+            rects.Add(sideways ? (y, uw - x - bw, bh, bw) : (x, y, bw, bh));
         }
-        return group;
+        return rects;
     }
 
     /// <summary>The window's size for the phone's shape: about 85% of the work area's height,
@@ -415,10 +459,11 @@ public sealed partial class MainWindow : Window
         int x = Math.Clamp(cx - size.Width / 2, area.X, Math.Max(area.X, area.X + area.Width - size.Width));
         int y = Math.Clamp(cy - size.Height / 2, area.Y, Math.Max(area.Y, area.Y + area.Height - size.Height));
         AppWindow.MoveAndResize(new RectInt32(x, y, size.Width, size.Height));
+        PlaceSnapped();
     }
 
-    /// <summary>No smaller than a usable phone: 360 x 600 (at 100% scaling), turned sideways
-    /// with the phone, enough for the title bar's buttons, the Settings flyout (340 wide),
+    /// <summary>No smaller than a usable phone, turned sideways
+    /// with the phone, enough for the title bar's buttons, Settings,
     /// the setup checklist and a phone you can still tap on; never more than the screen allows.</summary>
     void LimitSize(double scale)
     {
@@ -539,7 +584,9 @@ public sealed partial class MainWindow : Window
     {
         bool driving = _agent == "driving";
         if (!driving) AgentDot.Visibility = Visibility.Collapsed;
-        Rim.Visibility = driving ? Visibility.Visible : Visibility.Collapsed;
+        _glow?.SetAgent(_agent);
+        // the glow says it (AgentGlow); the plain ring only when the glow is off or can't run
+        Rim.Visibility = driving && !GlowShowing ? Visibility.Visible : Visibility.Collapsed;
         AgentPanel.Visibility = _agent == "idle" ? Visibility.Collapsed : Visibility.Visible;
         TakeoverLabel.Text = driving ? "Agent in control" : _agent == "paused" ? "You took over" : "You're in control";
         TakeoverAction.Text = driving ? "Take over" : _agent == "paused" ? "Resume agent" : "";
@@ -557,6 +604,7 @@ public sealed partial class MainWindow : Window
         AgentDot.Fill = new SolidColorBrush(down
             ? Windows.UI.Color.FromArgb(200, 10, 132, 255) : Windows.UI.Color.FromArgb(100, 255, 255, 255));
         AgentDot.Visibility = Visibility.Visible;
+        GlowPointer(x, y, down);
     }
 
     async void Takeover_Click(object sender, RoutedEventArgs e)

@@ -42,7 +42,7 @@ public partial class App : Application
         var ui = window.DispatcherQueue;
         new Thread(() =>
         {
-            while (show.WaitOne()) ui.TryEnqueue(window.ShowFromTray);
+            while (show.WaitOne()) ui.TryEnqueue(window.ShowFromTaskbar);
         }) { IsBackground = true, Name = "show" }.Start();
     }
 }

@@ -5,7 +5,7 @@ namespace PhoneUseMirror;
 /// <summary>
 /// A notification-area icon (WinUI 3 has none of its own): Shell_NotifyIcon on a
 /// hidden window of the UI thread, whose messages WinUI's loop dispatches.
-/// Click: Open. Right-click: a menu with Open and Quit.
+/// Click: Click (the window shows, or hides when it's pinned above the icon). Right-click: a menu.
 /// </summary>
 public sealed class TrayIcon : IDisposable
 {
@@ -14,7 +14,7 @@ public sealed class TrayIcon : IDisposable
     const int NIN_BALLOONUSERCLICK = 0x0400 + 5;  // the notification was clicked
     const int NIM_ADD = 0, NIM_MODIFY = 1, NIM_DELETE = 2;
     const int NIF_MESSAGE = 1, NIF_ICON = 2, NIF_TIP = 4, NIF_INFO = 0x10;
-    const int CmdOpen = 1, CmdLogs = 2, CmdQuit = 3, CmdAbout = 4;
+    const int CmdOpen = 1, CmdLogs = 2, CmdQuit = 3, CmdAbout = 4, CmdSnap = 5;
 
     readonly IntPtr _hwnd, _icon;
     readonly WndProc _proc;   // kept alive: the window calls it
@@ -22,7 +22,12 @@ public sealed class TrayIcon : IDisposable
     readonly string _class = "PhoneUseTray" + Environment.ProcessId;
     string _tip = "Phone Use";
 
+    public event Action? Click;
     public event Action? Open;
+    public event Action<bool>? SnapChanged;
+
+    /// <summary>The window is pinned above the icon: the menu's "Keep above the tray icon" is ticked.</summary>
+    public bool Snapped { get; set; }
     public event Action? Logs;
     public event Action? About;
     public event Action? Quit;
@@ -89,8 +94,7 @@ public sealed class TrayIcon : IDisposable
         {
             switch ((int)l & 0xFFFF)
             {
-                case WM_LBUTTONUP:
-                case WM_LBUTTONDBLCLK:
+                case WM_LBUTTONUP: Click?.Invoke(); break;
                 case NIN_BALLOONUSERCLICK: Open?.Invoke(); break;
                 case WM_RBUTTONUP:
                 case WM_CONTEXTMENU: Menu(); break;
@@ -107,6 +111,7 @@ public sealed class TrayIcon : IDisposable
         AppendMenu(m, 0, CmdOpen, "Open Phone Use");
         AppendMenu(m, 0, CmdLogs, "Show phoneuse log");
         AppendMenu(m, 0, CmdAbout, "About Phone Use");
+        AppendMenu(m, Snapped ? 0x8 /*MF_CHECKED*/ : 0, CmdSnap, "Keep above the tray icon");
         AppendMenu(m, 0x800 /*MF_SEPARATOR*/, 0, null);
         AppendMenu(m, 0, CmdQuit, "Quit");
         SetMenuDefaultItem(m, CmdOpen, 0);
@@ -119,8 +124,17 @@ public sealed class TrayIcon : IDisposable
             case CmdOpen: Open?.Invoke(); break;
             case CmdLogs: Logs?.Invoke(); break;
             case CmdAbout: About?.Invoke(); break;
+            case CmdSnap: SnapChanged?.Invoke(!Snapped); break;
             case CmdQuit: Quit?.Invoke(); break;
         }
+    }
+
+    /// <summary>The icon's rectangle on screen (physical pixels); in the overflow, where it is there.</summary>
+    public Windows.Graphics.RectInt32? IconRect()
+    {
+        var id = new NOTIFYICONIDENTIFIER { cbSize = Marshal.SizeOf<NOTIFYICONIDENTIFIER>(), hWnd = _hwnd, uID = 1 };
+        if (Shell_NotifyIconGetRect(ref id, out var r) != 0 || r.Right <= r.Left) return null;
+        return new Windows.Graphics.RectInt32(r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top);
     }
 
     public void Dispose()
@@ -165,6 +179,20 @@ public sealed class TrayIcon : IDisposable
     }
 
     struct POINT { public int X, Y; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct NOTIFYICONIDENTIFIER
+    {
+        public int cbSize;
+        public IntPtr hWnd;
+        public int uID;
+        public Guid guidItem;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct RECT { public int Left, Top, Right, Bottom; }
+
+    [DllImport("shell32.dll")] static extern int Shell_NotifyIconGetRect(ref NOTIFYICONIDENTIFIER id, out RECT r);
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern bool Shell_NotifyIcon(int msg, ref NOTIFYICONDATA d);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern ushort RegisterClassEx(ref WNDCLASSEX wc);

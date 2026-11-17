@@ -90,7 +90,8 @@ decoder straight to a Direct3D swap chain).
 
 - **The window** is only the phone: no border, see-through around the frame. Point just
   above the phone for its bar (the mirroring status, About, Settings, minimize, close);
-  drag the bar to move the window, and Ctrl + wheel over the phone resizes it. Setup,
+  drag the bar or the top phone frame to move the window. Drag an edge or corner
+  to resize it with the phone's proportions preserved; Ctrl + wheel also resizes it. Setup,
   About and notices appear on the phone's screen.
 - **Input:** click to tap, drag to swipe, scroll with the wheel; a press on the bezel
   touches the nearest screen edge. Ctrl works as the phone's Cmd (the Windows key
@@ -100,7 +101,17 @@ decoder straight to a Direct3D swap chain).
   the phone. The tray icon opens it again; its menu shows phoneuse's log and quits.
   Quit stops the phoneuse the window started (not a `phoneuse up` in a terminal); the
   Bluetooth keyboard and mouse keep running, as after `phoneuse up`.
-- **Settings** (the gear): keep the screen awake, start with Windows (phoneuse starts
+- **Above the tray icon:** the window snaps to a default position centred above its tray
+  icon with an 8 DIP gap from the taskbar, kept within that monitor. Drag it away to float;
+  drop within the tray area to snap again. A cyan outline and a
+  *Release to snap to tray* badge preview the default destination. Snapping happens only
+  on release, so dragging across the tray area or onto another monitor stays free.
+  The tray menu and Settings switch use the same default position, including while resizing.
+  A full app restart always starts snapped. After closing to the tray, the tray icon
+  reopens at the default snap position; the pinned taskbar icon restores the position
+  and snap state from before closing. That position is retained only while the app runs.
+- **Settings** (the gear) opens over the phone, like About; use Back or Escape to return.
+  Keep the screen awake, start with Windows (phoneuse starts
   at sign-in with the window in the tray), agent control,
   the iPhone app's pairing, the Bluetooth bridge, screen reading (install or remove the
   models), and the passcode.

@@ -51,7 +51,7 @@ public sealed partial class MainWindow
 
     async void Pair_Click(object sender, RoutedEventArgs e)
     {
-        SettingsFlyout.Hide();
+        HideSettings();
         if (_ask != null) return;  // an unlock or agent request is up; one dialog at a time
         int before = Math.Max(0, await PairedCount());
 
@@ -134,7 +134,7 @@ public sealed partial class MainWindow
 
     async void Unpair_Click(object sender, RoutedEventArgs e)
     {
-        SettingsFlyout.Hide();
+        HideSettings();
         if (_ask != null) return;
         var confirm = new ContentDialog
         {

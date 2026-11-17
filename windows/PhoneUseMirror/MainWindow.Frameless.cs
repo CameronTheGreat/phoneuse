@@ -12,8 +12,7 @@ namespace PhoneUseMirror;
 /// <summary>
 /// The window is only the phone: no border, no window background, everything around the
 /// phone's frame see-through. Its bar (icon, mirroring status, About, Settings, minimize,
-/// close) fades in above the phone while the pointer is in the strip where it sits, and
-/// stays while Settings, About or the setup checklist is open. This window's own things
+/// close) fades in above the phone while the pointer is in the strip where it sits. This window's own things
 /// (notices, the agent's chip, setup, About) are drawn on the phone's screen (ScreenUi).
 /// Ctrl + mouse wheel over the phone resizes the window.
 /// </summary>
@@ -21,17 +20,22 @@ public sealed partial class MainWindow
 {
     bool _barShown = true;
     DispatcherQueueTimer? _hoverTimer;
-    static readonly Brush BarBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(0xF2, 0x1C, 0x1C, 0x1E));
+    static readonly Brush BarBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(0xFF, 0x1C, 0x1C, 0x1E));
 
-    /// <summary>Room beside the phone, and above and below it with the bar (48), in DIPs.</summary>
-    const double PadW = 8, PadH = 48 + 8;
+    /// <summary>Room above and below the phone (its shadow falls below it), in DIPs.</summary>
+    const double PadAbove = 4, PadBelow = 16;
+
+    /// <summary>Room beside the phone for its shadow, and above and below it with the bar (48), in DIPs.</summary>
+    const double PadW = 24, PadH = 48 + PadAbove + PadBelow;
 
     /// <summary>The smallest window (DIPs) across and along the phone.</summary>
     const int MinShort = 300, MinLong = 500;
 
     void Frameless()
     {
-        AppTitleBar.Background = BarBrush;
+        InitFrameGrips();
+        BarBacking.Background = BarBrush;
+        AppTitleBar.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
         SystemBackdrop = new ClearBackdrop();
 
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
@@ -39,7 +43,7 @@ public sealed partial class MainWindow
         {
             p.SetBorderAndTitleBar(false, false);
             p.IsMaximizable = false;
-            p.IsResizable = false;  // Ctrl + wheel instead (ResizeBy)
+            p.IsResizable = false;  // custom grips avoid the native resize frame
         }
         // the presenter leaves a dialog frame (a 1 px line around the window): off with it
         const int WS_CAPTION = 0x00C00000;  // WS_BORDER | WS_DLGFRAME
@@ -64,6 +68,13 @@ public sealed partial class MainWindow
             if (!e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Control)) e.Handled = true;
         };
 
+        Surface.LayoutUpdated += (_, _) =>
+        {
+            if (_glowShape.w > 0)
+                PlaceFrameInteraction(Surface.ActualWidth, Surface.ActualHeight, _glowShape.inset,
+                    Screen.Margin.Left, Screen.Width, Screen.Height);
+        };
+
         _hoverTimer = _ui.CreateTimer();
         _hoverTimer.Interval = TimeSpan.FromMilliseconds(120);
         _hoverTimer.Tick += (_, _) => UpdateBar();
@@ -86,7 +97,18 @@ public sealed partial class MainWindow
         SetupResume.Margin = new Thickness(0, top, 0, 0);
         AgentPanel.Margin = new Thickness(0, 0, 0, bottom);
         SetupOverlay.Padding = new Thickness(side, top, side, 0);
-        AboutOverlay.Padding = new Thickness(side, top, side, 0);
+        // App pages replace the video, so they do not need the phone's island safe area.
+        AboutOverlay.Padding = new Thickness(0, 8, 0, 0);
+    }
+
+    /// <summary>Match the cap to the titanium frame and fill down to where its top corners become straight.</summary>
+    void PlaceBar(double phoneWidth, double frameInset, double cornerRadius)
+    {
+        double width = phoneWidth - 2 * frameInset;
+        AppTitleBar.Width = width;
+        BarBacking.Width = width;
+        double barHeight = AppTitleBar.ActualHeight > 0 ? AppTitleBar.ActualHeight : 48;
+        BarBacking.Height = barHeight + Surface.Margin.Top + frameInset + cornerRadius;
     }
 
     /// <summary>The bar keeps room on its right for the system caption buttons the window doesn't
@@ -106,6 +128,11 @@ public sealed partial class MainWindow
     /// <summary>The bar's status, and who has the phone.</summary>
     void ShowStatus()
     {
+        if (_snapHint)
+        {
+            StatusText.Text = "Let go to keep it above the tray";
+            return;
+        }
         var status = !_live ? (_mirroring ? "Starting" : "Not mirroring") : _stale ? "Picture is old" : "Live";
         if (_agent == "driving") status += " · Agent in control";
         else if (_agent == "paused") status += " · Agent paused";
@@ -132,13 +159,14 @@ public sealed partial class MainWindow
         int x = Math.Clamp(cx - size.Width / 2, area.X, Math.Max(area.X, area.X + area.Width - size.Width));
         int y = Math.Clamp(AppWindow.Position.Y, area.Y, Math.Max(area.Y, area.Y + area.Height - size.Height));
         AppWindow.MoveAndResize(new RectInt32(x, y, size.Width, size.Height));
+        PlaceSnapped();  // pinned above the tray: it grows and shrinks from the taskbar
     }
 
     // ---------------------------------------------------------------- the bar on hover
 
     /// <summary>Shown while the pointer is in the strip above the phone where the bar sits (the cursor,
     /// not XAML's pointer events: over the drag region those go to the non-client area), or while
-    /// Settings, About or the setup checklist is open.</summary>
+    /// dragging the window.</summary>
     void UpdateBar()
     {
         bool over = false;
@@ -150,7 +178,7 @@ public sealed partial class MainWindow
             int bottom = pos.Y + (int)(strip * WindowScale());
             over = c.X >= pos.X && c.X < pos.X + size.Width && c.Y >= pos.Y && c.Y < bottom;
         }
-        ShowBar(over || SettingsFlyout.IsOpen || Covered);
+        ShowBar(over || _moving);
     }
 
     void ShowBar(bool on)
@@ -158,11 +186,11 @@ public sealed partial class MainWindow
         if (on == _barShown) return;
         _barShown = on;
         AppTitleBar.OpacityTransition ??= new ScalarTransition { Duration = TimeSpan.FromMilliseconds(150) };
+        BarBacking.OpacityTransition ??= new ScalarTransition { Duration = TimeSpan.FromMilliseconds(150) };
         AppTitleBar.Opacity = on ? 1 : 0;
+        BarBacking.Opacity = on ? 1 : 0;
         AppTitleBar.IsHitTestVisible = on;
     }
-
-    void Settings_Closed(object? sender, object e) => UpdateBar();
 
     void BarMinimize_Click(object sender, RoutedEventArgs e)
     {

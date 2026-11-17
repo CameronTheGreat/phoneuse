@@ -57,7 +57,7 @@ public sealed partial class MainWindow
 
     void BridgeSettings_Click(object sender, RoutedEventArgs e)
     {
-        SettingsFlyout.Hide();
+        HideSettings();
         if (_bridgeView == null)
         {
             _bridgeView = new BridgeView(_conn);
@@ -70,8 +70,13 @@ public sealed partial class MainWindow
     /// <summary>A page over the phone, inside this window (About, Bridge Settings).</summary>
     void ShowOverlay(UIElement page)
     {
-        ShowFromTray();
-        if (!ReferenceEquals(AboutHost.Content, page))
+        ShowWindow();
+        bool settings = ReferenceEquals(page, SettingsPage);
+        if (_glow != null) _glow.Preview = false;
+        SettingsPage.Visibility = settings ? Visibility.Visible : Visibility.Collapsed;
+        AboutHost.Visibility = settings ? Visibility.Collapsed : Visibility.Visible;
+        if (settings) _bridgeView?.Stop();
+        if (!settings && !ReferenceEquals(AboutHost.Content, page))
         {
             if (ReferenceEquals(AboutHost.Content, _bridgeView)) _bridgeView?.Stop();
             AboutHost.Content = page;
