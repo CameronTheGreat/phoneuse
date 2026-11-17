@@ -1,12 +1,9 @@
-using System.Numerics;
 using System.Text.Json.Nodes;
-using Microsoft.UI.Composition;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.Graphics;
@@ -36,7 +33,6 @@ public sealed partial class MainWindow : Window
     bool _playing;          // a frame of the current stream is on screen
     bool _pressed;          // the left button went down over the phone
     long _troubleSince;     // when the current no-picture problem started (ticks), 0 = none
-    CompositionRoundedRectangleGeometry? _clipGeometry;
 
     public MainWindow(int port)
     {
@@ -51,7 +47,6 @@ public sealed partial class MainWindow : Window
         _video = new VideoPipeline(Video, _ui);
         Video.SizeChanged += (_, _) => ResizeVideo();
         Video.CompositionScaleChanged += (_, _) => ResizeVideo();
-        SetupClip();
         SizeToPhone();
         // the minimum is in pixels: again when the window moves to a screen with other scaling
         Root.Loaded += (_, _) => Root.XamlRoot.Changed += (r, _) => LimitSize(r.RasterizationScale);
@@ -226,12 +221,38 @@ public sealed partial class MainWindow : Window
 
     // ---------------------------------------------------------------- layout
 
-    void SetupClip()
+    /// <summary>The screen and the whole phone in units of the screen's short side: the bezel and
+    /// the corner radius are fractions of it, so a sideways phone keeps the same bezel and corners.</summary>
+    (double w, double h, double dw, double dh) PhoneUnits()
     {
-        var visual = ElementCompositionPreview.GetElementVisual(Screen);
-        var comp = visual.Compositor;
-        _clipGeometry = comp.CreateRoundedRectangleGeometry();
-        visual.Clip = comp.CreateGeometricClip(_clipGeometry);
+        double s = Math.Max(1, Math.Min(_screenW, _screenH));
+        double w = _screenW / s, h = _screenH / s;
+        return (w, h, w + 2 * _bezel, h + 2 * _bezel);
+    }
+
+    /// <summary>A w x h rectangle at (x, y) whose corners are superellipse quarters (|x|^3 + |y|^3 = 1)
+    /// of radius r: the continuous corners of the phone and its screen (as squircle() in the browser
+    /// mirror's page).</summary>
+    static PathGeometry Squircle(double x, double y, double w, double h, double r)
+    {
+        r = Math.Max(0, Math.Min(r, Math.Min(w, h) / 2));
+        const int steps = 24;
+        var points = new PointCollection();
+        double[,] centers = { { x + w - r, y + r }, { x + w - r, y + h - r }, { x + r, y + h - r }, { x + r, y + r } };
+        for (int q = 0; q < 4; q++)
+            for (int i = 0; i <= steps; i++)
+            {
+                double t = (q + (double)i / steps) * Math.PI / 2 - Math.PI / 2, c = Math.Cos(t), s = Math.Sin(t);
+                points.Add(new Windows.Foundation.Point(
+                    centers[q, 0] + r * Math.Sign(c) * Math.Pow(Math.Abs(c), 2.0 / 3),
+                    centers[q, 1] + r * Math.Sign(s) * Math.Pow(Math.Abs(s), 2.0 / 3)));
+            }
+        var figure = new PathFigure { StartPoint = points[0], IsClosed = true, IsFilled = true };
+        points.RemoveAt(0);
+        figure.Segments.Add(new PolyLineSegment { Points = points });
+        var g = new PathGeometry();
+        g.Figures.Add(figure);
+        return g;
     }
 
     void Stage_SizeChanged(object sender, SizeChangedEventArgs e) => Layout();
@@ -247,41 +268,37 @@ public sealed partial class MainWindow : Window
     {
         double W = Stage.ActualWidth, H = Stage.ActualHeight;
         if (W <= 0 || H <= 0) return;
-        double aspect = _screenW / _screenH;
-        double dw = 1 + 2 * _bezel, dh = 1 / aspect + 2 * _bezel;
+        var (w, h, dw, dh) = PhoneUnits();
         const double below = 64, above = 8;  // room for the agent button below
-        double u = Math.Min((W - 24) / dw, (H - below - above) / dh);
+        double u = Math.Min((W - 24) / dw, (H - below - above) / dh);  // px per screen short side
         if (u <= 10) return;
 
-        double pw = dw * u, ph = dh * u, b = _bezel * u, sw = u, sh = u / aspect, sr = _radius * u;
+        double pw = dw * u, ph = dh * u, b = _bezel * u, sw = w * u, sh = h * u, sr = _radius * u;
         Surface.Width = pw;
         Surface.Height = ph;
         Surface.Margin = new Thickness(0, Math.Max(above, (H - below - ph) / 2), 0, 0);
-        Body.CornerRadius = new CornerRadius((_radius + _bezel) * u);
 
         Screen.Margin = new Thickness(b, b, 0, 0);
         Screen.Width = sw;
         Screen.Height = sh;
         DotLayer.Width = sw;
         DotLayer.Height = sh;
-        if (_clipGeometry != null)
-        {
-            _clipGeometry.Size = new Vector2((float)sw, (float)sh);
-            _clipGeometry.CornerRadius = new Vector2((float)sr, (float)sr);
-        }
 
-        Rim.Margin = new Thickness(b - 2, b - 2, 0, 0);
-        Rim.Width = sw + 4;
-        Rim.Height = sh + 4;
-        Rim.CornerRadius = new CornerRadius(sr + 2);
+        // the body covers the screen's square corners: it and its hole share one outline
+        Body.Data = new GeometryGroup
+        {
+            FillRule = FillRule.EvenOdd,
+            Children = { Squircle(0, 0, pw, ph, sr + b), Squircle(b, b, sw, sh, sr) },
+        };
+        BodyEdge.Data = Squircle(0.5, 0.5, pw - 1, ph - 1, sr + b - 0.5);
+        Rim.Data = Squircle(b - 1, b - 1, sw + 2, sh + 2, sr + 1);  // the 2 px stroke sits just outside the screen
     }
 
     /// <summary>The window's size for the phone's shape: about 85% of the work area's height,
     /// as wide as the phone needs, and never beyond 95% of the work area either way.</summary>
     SizeInt32 PhoneWindowSize(RectInt32 area, double scale)
     {
-        double aspect = _screenW / _screenH;
-        double dw = 1 + 2 * _bezel, dh = 1 / aspect + 2 * _bezel;
+        var (_, _, dw, dh) = PhoneUnits();
         double chrome = (48 + 72) * scale;  // title bar + room below the phone
         double h = area.Height * 0.85;
         double w = (h - chrome) * dw / dh + 24 * scale;

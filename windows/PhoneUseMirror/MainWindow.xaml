@@ -145,11 +145,10 @@
         <Grid x:Name="Stage" Grid.Row="2" SizeChanged="Stage_SizeChanged">
             <local:InputSurface x:Name="Surface" HorizontalAlignment="Center" VerticalAlignment="Top">
                 <Grid x:Name="Phone">
-                    <!-- the phone's body: a dark bezel around the screen -->
-                    <Border x:Name="Body" Background="#FF18181C" BorderBrush="#33FFFFFF" BorderThickness="1" />
-                    <!-- the screen -->
+                    <!-- the screen: a plain rectangle; the body drawn over it gives it its corners -->
                     <Grid x:Name="Screen" Background="Black" HorizontalAlignment="Left" VerticalAlignment="Top">
-                        <SwapChainPanel x:Name="Video" IsHitTestVisible="False" />
+                        <!-- a pixel past the screen on every side, under the body: no sliver of background at any size -->
+                        <SwapChainPanel x:Name="Video" Margin="-1" IsHitTestVisible="False" />
                         <Canvas x:Name="DotLayer" IsHitTestVisible="False">
                             <Ellipse x:Name="AgentDot" Width="22" Height="22" Visibility="Collapsed"
                                      Fill="#66FFFFFF" Stroke="White" StrokeThickness="2" />
@@ -161,10 +160,17 @@
                                        Foreground="#EBEBF5" FontSize="14" LineHeight="20" />
                         </Border>
                     </Grid>
+                    <!-- the phone's body over the screen's edges: a squircle with the screen's squircle cut
+                         out (Layout). One shape for both edges, so they always meet. -->
+                    <Path x:Name="Body" Fill="#FF18181C" HorizontalAlignment="Left" VerticalAlignment="Top"
+                          IsHitTestVisible="False" />
+                    <!-- the body's outer edge, a hairline against the window -->
+                    <Path x:Name="BodyEdge" Stroke="#33FFFFFF" StrokeThickness="1" HorizontalAlignment="Left"
+                          VerticalAlignment="Top" IsHitTestVisible="False" />
                     <!-- a ring around the screen while an agent drives -->
-                    <Border x:Name="Rim" HorizontalAlignment="Left" VerticalAlignment="Top" BorderThickness="2"
-                            BorderBrush="{ThemeResource AccentFillColorDefaultBrush}" Visibility="Collapsed"
-                            IsHitTestVisible="False" />
+                    <Path x:Name="Rim" Stroke="{ThemeResource AccentFillColorDefaultBrush}" StrokeThickness="2"
+                          HorizontalAlignment="Left" VerticalAlignment="Top" Visibility="Collapsed"
+                          IsHitTestVisible="False" />
                 </Grid>
             </local:InputSurface>
 
