@@ -3,6 +3,8 @@
 #   PhoneUse-<version>-win-x64-setup.exe      per-user installer (no admin), Start menu, uninstaller
 #
 #   powershell -ExecutionPolicy Bypass -File windows\scripts\package.ps1 [-Version 0.1.5.42] [-Out windows\build\release]
+#     -NoZip: the installer only (no portable zip); -NoInstaller: the zip only.
+#   To try a change to the window on an installed Phone Use, update-installed.ps1 is much quicker.
 #
 # Layout (both):
 #   PhoneUseMirror.exe + the .NET and Windows App SDK runtime (self-contained)
@@ -19,7 +21,8 @@ param(
     [string]$Msys = $(if ($env:PHONEUSE_MSYS2) { $env:PHONEUSE_MSYS2 } else { "C:\msys64" }),
     # The audio-only FFmpeg (windows/scripts/build-ffmpeg-audio.sh); without it, MSYS2's full one (~150 MB more)
     [string]$FFmpegAudio = $env:PHONEUSE_FFMPEG_AUDIO,
-    [switch]$NoInstaller
+    [switch]$NoInstaller,
+    [switch]$NoZip
 )
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Invoke-WebRequest is many times slower with its progress bar
@@ -188,18 +191,21 @@ Write-Step "Staged $Stage ($mb MB)"
 
 # 5. Portable zip: the same files plus the "portable" marker
 $name = "PhoneUse-$Version-win-x64"
-$Portable = Join-Path $Work "portable\PhoneUse"
-if (Test-Path (Split-Path $Portable)) { Remove-Item -Recurse -Force (Split-Path $Portable) }
-New-Item -ItemType Directory -Force (Split-Path $Portable) | Out-Null
-Copy-Item -Recurse $Stage $Portable
-"Phone Use keeps its settings in data\ next to this file instead of in AppData. Delete this file to use AppData." |
-    Set-Content "$Portable\portable"
-New-Item -ItemType Directory -Force "$Portable\data" | Out-Null
-$zip = Join-Path $Out "$name-portable.zip"
-Remove-Item $zip -ErrorAction SilentlyContinue
-tar -a -cf $zip -C (Split-Path $Portable) PhoneUse  # Windows' bsdtar: much faster than Compress-Archive
-if ($LASTEXITCODE -ne 0) { throw "couldn't make the zip" }
-Write-Step "Built $zip"
+if ($NoZip) { Write-Host "    No zip (-NoZip)" }
+else {
+    $Portable = Join-Path $Work "portable\PhoneUse"
+    if (Test-Path (Split-Path $Portable)) { Remove-Item -Recurse -Force (Split-Path $Portable) }
+    New-Item -ItemType Directory -Force (Split-Path $Portable) | Out-Null
+    Copy-Item -Recurse $Stage $Portable
+    "Phone Use keeps its settings in data\ next to this file instead of in AppData. Delete this file to use AppData." |
+        Set-Content "$Portable\portable"
+    New-Item -ItemType Directory -Force "$Portable\data" | Out-Null
+    $zip = Join-Path $Out "$name-portable.zip"
+    Remove-Item $zip -ErrorAction SilentlyContinue
+    tar -a -cf $zip -C (Split-Path $Portable) PhoneUse  # Windows' bsdtar: much faster than Compress-Archive
+    if ($LASTEXITCODE -ne 0) { throw "couldn't make the zip" }
+    Write-Step "Built $zip"
+}
 
 # 6. Installer
 if ($NoInstaller) { return }
@@ -208,7 +214,11 @@ if (-not $iscc) {
     $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
               "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
 }
-if (-not $iscc) { Write-Warning "Inno Setup 6 isn't installed: made the zip only (winget install JRSoftware.InnoSetup)"; return }
+if (-not $iscc) {
+    $made = if ($NoZip) { "made nothing" } else { "made the zip only" }
+    Write-Warning "Inno Setup 6 isn't installed: $made (winget install JRSoftware.InnoSetup)"
+    return
+}
 & $iscc /Q "/DAppVersion=$Version" "/DStage=$Stage" "/DOutDir=$Out" "/DOutName=$name-setup" "$PSScriptRoot\PhoneUse.iss"
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
 Write-Step "Built $(Join-Path $Out "$name-setup.exe")"
