@@ -14,8 +14,11 @@ jobs:
       - name: Homebrew dependencies
         run: |  # current kegs, so they match the macOS 15 bottles bundle_core.py copies
           brew update --quiet
-          brew install gstreamer pygobject3 libplist openssl@3 cmake pkgconf
-          brew upgrade --quiet
+          deps="gstreamer pygobject3 libplist openssl@3 cmake pkgconf"
+          brew install $deps
+          # Only these and what they depend on: a bare upgrade also takes the runner's own tools
+          # (Ruby, browsers), and one of those failing to link failed the job
+          brew upgrade --quiet $deps
       - name: UxPlay for macOS 15
         run: |
           git clone --depth 1 https://github.com/FDH2/UxPlay ~/code/UxPlay
