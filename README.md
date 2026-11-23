@@ -48,6 +48,12 @@ ways to flash it and how it works.
 - [The iPhone app and its API](docs/COMPANION.md)
 - [The website](site/README.md) · [Privacy policy](docs/PRIVACY.md)
 
+## Contributors
+
+<a href="https://github.com/lxe/phoneuse/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=lxe/phoneuse" alt="Phone Use contributors">
+</a>
+
 ## License
 
 MIT
