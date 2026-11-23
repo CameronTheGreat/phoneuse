@@ -16,9 +16,10 @@ jobs:
           brew update --quiet
           deps="gstreamer pygobject3 libplist openssl@3 cmake pkgconf"
           brew install $deps
-          # Only these and what they depend on: a bare upgrade also takes the runner's own tools
-          # (Ruby, browsers), and one of those failing to link failed the job
-          brew upgrade --quiet $deps
+          # Only these and everything they depend on, named one by one (upgrading a formula that is
+          # current leaves its outdated dependencies alone). A bare upgrade also takes the runner's
+          # own tools (Ruby, browsers), and one of those failing to link failed the job.
+          brew upgrade --quiet $deps $(brew deps --union $deps)
       - name: UxPlay for macOS 15
         run: |
           # UxPlay 1.74, the last commit before fairplay_v2 (Nov 16), whose library doesn't get
