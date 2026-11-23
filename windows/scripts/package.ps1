@@ -48,6 +48,8 @@ if (-not $Version) {
 }
 # As the Mac app's (mac/build/release): windows\build\, ignored by windows\.gitignore
 if (-not $Out) { $Out = Join-Path $Root "windows\build\release" }
+# Absolute: Inno Setup reads a relative OutputDir against the .iss file's folder, not ours
+$Out = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Out)
 $Work = Join-Path $Root "windows\build\stage"
 $Stage = Join-Path $Work "PhoneUse"
 $Core = Join-Path $Stage "core"
