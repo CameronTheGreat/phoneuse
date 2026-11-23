@@ -74,6 +74,7 @@ public sealed partial class MainWindow
         bool settings = ReferenceEquals(page, SettingsPage);
         if (_glow != null) _glow.Preview = false;
         SettingsPage.Visibility = settings ? Visibility.Visible : Visibility.Collapsed;
+        SettingsChip.Visibility = SettingsPage.Visibility;
         AboutHost.Visibility = settings ? Visibility.Collapsed : Visibility.Visible;
         if (settings) _bridgeView?.Stop();
         if (!settings && !ReferenceEquals(AboutHost.Content, page))

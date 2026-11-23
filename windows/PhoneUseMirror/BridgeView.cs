@@ -472,7 +472,7 @@ public sealed class BridgeView : UserControl
             foreach (var (label, kind, fn) in actions)
             {
                 var b = new Button { Content = label, Width = 240, HorizontalAlignment = HorizontalAlignment.Center };
-                if (kind == 1) b.Style = BridgeView.ThemeStyle("AccentButtonStyle");
+                if (kind == 1) b.Style = BridgeView.ThemeStyle("BrandAccentButtonStyle");
                 if (kind == 2) b.Foreground = Red;
                 b.Click += (_, _) => fn();
                 _box.Children.Add(b);
@@ -536,8 +536,8 @@ public sealed class BridgeView : UserControl
         }
     }
 
-    static readonly Brush Red = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0x45, 0x3A));
-    static readonly Brush Orange = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0x9F, 0x0A));
+    static Brush Red => (Brush)Application.Current.Resources["BrandBrickBrush"];
+    static Brush Orange => (Brush)Application.Current.Resources["BrandAmberTextBrush"];
 
     static Style ThemeStyle(string key) => (Style)Application.Current.Resources[key];
 
@@ -549,7 +549,7 @@ public sealed class BridgeView : UserControl
     static Button Btn(string label, Action fn, bool accent = false, bool enabled = true)
     {
         var b = new Button { Content = label, IsEnabled = enabled, VerticalAlignment = VerticalAlignment.Center };
-        if (accent) b.Style = ThemeStyle("AccentButtonStyle");
+        if (accent) b.Style = ThemeStyle("BrandAccentButtonStyle");
         b.Click += (_, _) => fn();
         return b;
     }
@@ -571,8 +571,8 @@ public sealed class BridgeView : UserControl
         return new Border
         {
             Child = g, Padding = new Thickness(16, 12, 16, 12), CornerRadius = new CornerRadius(8),
-            Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
-            BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
+            Background = (Brush)Application.Current.Resources["BrandCardBrush"],
+            BorderBrush = (Brush)Application.Current.Resources["BrandLineBrush"],
             BorderThickness = new Thickness(1),
         };
     }

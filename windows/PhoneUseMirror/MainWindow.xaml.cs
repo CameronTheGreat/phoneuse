@@ -595,8 +595,8 @@ public sealed partial class MainWindow : Window
         TakeoverAction.Text = driving ? "Take over" : _agent == "paused" ? "Resume agent" : "";
         TakeoverAction.Visibility = _agent == "idle" ? Visibility.Collapsed : Visibility.Visible;
         AgentLight.Fill = new SolidColorBrush(driving
-            ? Windows.UI.Color.FromArgb(255, 10, 132, 255)
-            : _agent == "paused" ? Windows.UI.Color.FromArgb(255, 255, 159, 10) : Windows.UI.Color.FromArgb(255, 48, 209, 88));
+            ? Windows.UI.Color.FromArgb(255, 0xE3, 0x9C, 0xBE)   // Brand.xaml: plum light, amber, green
+            : _agent == "paused" ? Windows.UI.Color.FromArgb(255, 0xFD, 0xA5, 0x5E) : Windows.UI.Color.FromArgb(255, 0x3E, 0x9B, 0x6B));
         AgentWhat.Text = driving ? _agentAction : "";
     }
 
@@ -605,7 +605,7 @@ public sealed partial class MainWindow : Window
         Canvas.SetLeft(AgentDot, x * Screen.ActualWidth - AgentDot.Width / 2);
         Canvas.SetTop(AgentDot, y * Screen.ActualHeight - AgentDot.Height / 2);
         AgentDot.Fill = new SolidColorBrush(down
-            ? Windows.UI.Color.FromArgb(200, 10, 132, 255) : Windows.UI.Color.FromArgb(100, 255, 255, 255));
+            ? Windows.UI.Color.FromArgb(200, 0xE3, 0x9C, 0xBE) : Windows.UI.Color.FromArgb(100, 255, 255, 255));
         AgentDot.Visibility = Visibility.Visible;
         GlowPointer(x, y, down);
     }

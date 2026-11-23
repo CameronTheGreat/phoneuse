@@ -19,6 +19,15 @@ public sealed class AboutView : UserControl
         string pc = Environment.MachineName;
         var version = typeof(AboutView).Assembly.GetName().Version?.ToString(3) ?? "";
 
+        // the site's mascot (site/src/img/hero.webp), on its own cream
+        var mascot = Path.Combine(AppContext.BaseDirectory, "Assets", "Mascot.png");
+        if (File.Exists(mascot))
+            _body.Children.Add(new Image
+            {
+                Source = new BitmapImage(new Uri(mascot)), Stretch = Stretch.Uniform, MaxHeight = 180,
+                HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 4),
+            });
+
         // header
         var head = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 14, Margin = new Thickness(0, 0, 0, 6) };
         var png = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.png");
@@ -127,12 +136,12 @@ public sealed class AboutView : UserControl
         var badge = new Border
         {
             Width = 24, Height = 24, CornerRadius = new CornerRadius(12), VerticalAlignment = VerticalAlignment.Top,
-            Background = (Brush)Application.Current.Resources["AccentFillColorDefaultBrush"],
+            Background = (Brush)Application.Current.Resources["BrandPlumBrush"],
             Child = new TextBlock
             {
                 Text = n.ToString(), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                 HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-                Foreground = new SolidColorBrush(Microsoft.UI.Colors.Black),
+                Foreground = (Brush)Application.Current.Resources["BrandBgBrush"],
             },
         };
         g.Children.Add(badge);

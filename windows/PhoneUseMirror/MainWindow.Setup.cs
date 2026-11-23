@@ -22,7 +22,7 @@ public sealed partial class MainWindow
     string? _setupBusy, _setupError;  // the step whose action runs; what went wrong with it
     bool _setupLoading;
 
-    static readonly Brush SetupGreen = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x30, 0xD1, 0x58));
+    static Brush SetupGreen => Res<Brush>("BrandGreenBrush");
 
     /// <summary>At launch: the checklist, until setup is finished or skipped.</summary>
     void StartSetup()
@@ -136,7 +136,7 @@ public sealed partial class MainWindow
 
         if (items.Count > 0 && current == null)
         {
-            var finish = new Button { Content = "Done", Style = Res<Style>("AccentButtonStyle"), HorizontalAlignment = HorizontalAlignment.Stretch };
+            var finish = new Button { Content = "Done", Style = Res<Style>("BrandAccentButtonStyle"), HorizontalAlignment = HorizontalAlignment.Stretch };
             finish.Click += (_, _) => { AppSettings.SetupDone = true; HideSetup(resume: false); };
             body.Children.Add(Para("Phone Use is ready. Agents can use the phone, and you can watch and take over here.", 0.8));
             body.Children.Add(finish);
@@ -189,15 +189,15 @@ public sealed partial class MainWindow
             var action = id == "input" ? InputChoice(choice, done) : StepAction(id, (string?)item["action"], done);
             if (action != null) col.Children.Add(action);
             if (_setupError != null && _setupBusy == null && id == _setupErrorStep)
-                col.Children.Add(new TextBlock { Text = _setupError, Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0x45, 0x3A)), TextWrapping = TextWrapping.Wrap });
+                col.Children.Add(new TextBlock { Text = _setupError, Foreground = Res<Brush>("BrandBrickBrush"), TextWrapping = TextWrapping.Wrap });
         }
         Grid.SetColumn(col, 1);
         g.Children.Add(col);
         return new Border
         {
             Child = g, Padding = new Thickness(14, 12, 14, 12), CornerRadius = new CornerRadius(8),
-            Background = Res<Brush>(current ? "CardBackgroundFillColorSecondaryBrush" : "CardBackgroundFillColorDefaultBrush"),
-            BorderBrush = current ? Res<Brush>("AccentFillColorDefaultBrush") : Res<Brush>("CardStrokeColorDefaultBrush"),
+            Background = Res<Brush>(current ? "BrandCreamBrush" : "BrandCardBrush"),
+            BorderBrush = current ? Res<Brush>("BrandPlumBrush") : Res<Brush>("BrandLineBrush"),
             BorderThickness = new Thickness(current ? 1.5 : 1),
         };
     }
@@ -213,7 +213,7 @@ public sealed partial class MainWindow
         if (choice == "bridge")
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
-            var set = new Button { Content = "Set Up Bridge…", Style = Res<Style>("AccentButtonStyle") };
+            var set = new Button { Content = "Set Up Bridge…", Style = Res<Style>("BrandAccentButtonStyle") };
             set.Click += (_, _) => OpenBridgeSetup();
             row.Children.Add(set);
             var pc = new HyperlinkButton { Content = "Use this PC's Bluetooth instead", Padding = new Thickness(0) };
@@ -244,8 +244,8 @@ public sealed partial class MainWindow
             head.Children.Add(new Border
             {
                 CornerRadius = new CornerRadius(4), Padding = new Thickness(6, 1, 6, 1), VerticalAlignment = VerticalAlignment.Center,
-                Background = Res<Brush>("AccentFillColorDefaultBrush"),
-                Child = new TextBlock { Text = tag, FontSize = 11, Foreground = new SolidColorBrush(Microsoft.UI.Colors.Black) },
+                Background = Res<Brush>("BrandPlumBrush"),
+                Child = new TextBlock { Text = tag, FontSize = 11, Foreground = Res<Brush>("BrandBgBrush") },
             });
         col.Children.Add(head);
         col.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Opacity = 0.75, FontSize = 13 });
@@ -291,12 +291,12 @@ public sealed partial class MainWindow
             var pr = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
             if (!AppSettings.AssistiveTouchDone)
             {
-                var ok = new Button { Content = "Done", Style = Res<Style>("AccentButtonStyle") };
+                var ok = new Button { Content = "Done", Style = Res<Style>("BrandAccentButtonStyle") };
                 ok.Click += async (_, _) => { AppSettings.AssistiveTouchDone = true; await LoadSetup(); };
                 pr.Children.Add(ok);
             }
             var cal = new Button { Content = CalState == "failed" ? "Calibrate again…" : "Calibrate…" };
-            if (AppSettings.AssistiveTouchDone) cal.Style = Res<Style>("AccentButtonStyle");
+            if (AppSettings.AssistiveTouchDone) cal.Style = Res<Style>("BrandAccentButtonStyle");
             cal.Click += (_, _) => ShowCalibrationFlow();
             pr.Children.Add(cal);
             return pr;
@@ -306,8 +306,8 @@ public sealed partial class MainWindow
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
         Button? b = action switch
         {
-            "allow_firewall" => new Button { Content = busy ? "Waiting for Windows…" : "Allow", Style = Res<Style>("AccentButtonStyle") },
-            "pair_app" => new Button { Content = "Show Pairing Code", Style = Res<Style>("AccentButtonStyle") },
+            "allow_firewall" => new Button { Content = busy ? "Waiting for Windows…" : "Allow", Style = Res<Style>("BrandAccentButtonStyle") },
+            "pair_app" => new Button { Content = "Show Pairing Code", Style = Res<Style>("BrandAccentButtonStyle") },
             "claude" => new Button { Content = busy ? "Connecting…" : "Connect" },
             _ => null,
         };
@@ -403,16 +403,16 @@ public sealed partial class MainWindow
         var circle = new Border
         {
             Width = 24, Height = 24, CornerRadius = new CornerRadius(12), VerticalAlignment = VerticalAlignment.Top,
-            Background = done ? SetupGreen : current ? Res<Brush>("AccentFillColorDefaultBrush") : new SolidColorBrush(Windows.UI.Color.FromArgb(0x33, 255, 255, 255)),
+            Background = done ? SetupGreen : current ? Res<Brush>("BrandPlumBrush") : Res<Brush>("BrandCreamBrush"),
         };
         circle.Child = done
-            ? new FontIcon { Glyph = "", FontSize = 12, Foreground = new SolidColorBrush(Microsoft.UI.Colors.Black) }
+            ? new FontIcon { Glyph = "", FontSize = 12, Foreground = Res<Brush>("BrandBgBrush") }
             : number > 0
                 ? new TextBlock
                 {
                     Text = number.ToString(), FontWeight = FontWeights.SemiBold, FontSize = 12,
                     HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-                    Foreground = new SolidColorBrush(current ? Microsoft.UI.Colors.Black : Microsoft.UI.Colors.White),
+                    Foreground = Res<Brush>(current ? "BrandBgBrush" : "BrandInk2Brush"),
                 }
                 : new FontIcon { Glyph = "", FontSize = 11 };  // an extra: a plus
         return circle;

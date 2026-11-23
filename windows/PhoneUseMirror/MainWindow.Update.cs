@@ -1,6 +1,7 @@
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 
 namespace PhoneUseMirror;
 
@@ -80,6 +81,13 @@ public sealed partial class MainWindow
         UpdateNoticeButton.IsEnabled = !busy;
 
         var current = "This is version " + Updater.CurrentText + ".";
+        UpdateTitle.Text = "Phone Use " + Updater.CurrentText;
+        // a chip beside the version: up to date (green), or a newer one (plum)
+        bool latest = !busy && _update == null && _updateChecked && _updateError == null;
+        UpdateChip.Visibility = latest || (_update != null && !_updateInstalling) ? Visibility.Visible : Visibility.Collapsed;
+        UpdateChipText.Text = latest ? "Up to date" : "Update";
+        UpdateChip.Background = (Brush)Application.Current.Resources[latest ? "BrandGreenTintBrush" : "BrandPlumTintBrush"];
+        UpdateChipText.Foreground = (Brush)Application.Current.Resources[latest ? "BrandGreenTextBrush" : "BrandPlumBrush"];
         if (_updateInstalling)
         {
             UpdateText.Text = _updateProgress < 1
@@ -90,7 +98,7 @@ public sealed partial class MainWindow
         else if (_update != null)
         {
             bool install = Updater.CanInstall(_update);
-            UpdateText.Text = $"Phone Use {VersionText(_update)} is available. {current}" +
+            UpdateText.Text = $"Phone Use {VersionText(_update)} is available." +
                 (install ? " Installing it restarts Phone Use; agents lose the phone for a moment." : "");
             UpdateButton.Content = install ? "Install and restart" : "Download";
             UpdateNoticeButton.Content = install ? "Install" : "Download";
@@ -100,7 +108,7 @@ public sealed partial class MainWindow
         else
         {
             UpdateText.Text = _updateError ?? (_updateChecking ? "Checking for updates…"
-                : _updateChecked ? current + " It's the latest." : current);
+                : _updateChecked ? "You're on the latest version." : "Not checked yet.");
             UpdateButton.Content = "Check for updates";
         }
         if (_updateError != null && _update != null) UpdateText.Text = _updateError;
@@ -145,7 +153,7 @@ public sealed partial class MainWindow
         QuitApp();
     }
 
-    void UpdateAuto_Click(object sender, RoutedEventArgs e) => AppSettings.AutoUpdate = UpdateAuto.IsChecked == true;
+    void UpdateAuto_Toggled(object sender, RoutedEventArgs e) => AppSettings.AutoUpdate = UpdateAuto.IsOn;
 
     void UpdateNotice_Closed(InfoBar sender, InfoBarClosedEventArgs e)
     {

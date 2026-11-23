@@ -176,7 +176,7 @@ public sealed partial class MainWindow
         });
         head.Children.Add(titles);
         var back = new Button { Content = st == "done" ? "Done" : "Show the phone", VerticalAlignment = VerticalAlignment.Top };
-        if (st == "done") back.Style = Res<Style>("AccentButtonStyle");
+        if (st == "done") back.Style = Res<Style>("BrandAccentButtonStyle");
         back.Click += (_, _) => HideCalibrationFlow();
         Grid.SetColumn(back, 1);
         head.Children.Add(back);
@@ -192,7 +192,7 @@ public sealed partial class MainWindow
                              + "iOS ignores a mouse without it.", 0.85));
         if (!atOn)
         {
-            var ok = new Button { Content = "It's on", Style = Res<Style>("AccentButtonStyle") };
+            var ok = new Button { Content = "It's on", Style = Res<Style>("BrandAccentButtonStyle") };
             ok.Click += (_, _) => { AppSettings.AssistiveTouchDone = true; _calibrationDrawn = null; DrawCalibrationFlow(); };
             at.Children.Add(ok);
         }
@@ -205,7 +205,7 @@ public sealed partial class MainWindow
         {
             Glyph = "", FontSize = 44, HorizontalAlignment = HorizontalAlignment.Left,
             RenderTransform = turn, RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5),
-            Foreground = upright ? SetupGreen : Res<Brush>("AccentFillColorDefaultBrush"),
+            Foreground = upright ? SetupGreen : Res<Brush>("BrandPlumBrush"),
         };
         up.Children.Add(icon);
         up.Children.Add(Para(upright
@@ -253,7 +253,7 @@ public sealed partial class MainWindow
             var go = new Button
             {
                 Content = _calibrationStarting ? "Starting…" : st == "failed" ? "Try again" : "Calibrate",
-                Style = Res<Style>("AccentButtonStyle"), IsEnabled = atOn && !_calibrationStarting && _live,
+                Style = Res<Style>("BrandAccentButtonStyle"), IsEnabled = atOn && !_calibrationStarting && _live,
             };
             go.Click += async (_, _) => await StartCalibration();
             row.Children.Add(go);
@@ -279,8 +279,8 @@ public sealed partial class MainWindow
         return new Border
         {
             Child = g, Padding = new Thickness(14, 12, 14, 12), CornerRadius = new CornerRadius(8),
-            Background = Res<Brush>(current ? "CardBackgroundFillColorSecondaryBrush" : "CardBackgroundFillColorDefaultBrush"),
-            BorderBrush = current ? Res<Brush>("AccentFillColorDefaultBrush") : Res<Brush>("CardStrokeColorDefaultBrush"),
+            Background = Res<Brush>(current ? "BrandCreamBrush" : "BrandCardBrush"),
+            BorderBrush = current ? Res<Brush>("BrandPlumBrush") : Res<Brush>("BrandLineBrush"),
             BorderThickness = new Thickness(current ? 1.5 : 1),
         };
     }
@@ -288,7 +288,7 @@ public sealed partial class MainWindow
     static TextBlock ErrorText(string text) => new()
     {
         Text = text, TextWrapping = TextWrapping.Wrap,
-        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0x45, 0x3A)),
+        Foreground = Res<Brush>("BrandBrickBrush"),
     };
 
     /// <summary>A phone turning from sideways to upright, over and over.</summary>

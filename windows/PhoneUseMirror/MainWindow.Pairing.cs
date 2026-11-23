@@ -35,13 +35,19 @@ public sealed partial class MainWindow
     void ShowPaired(int n)
     {
         _paired = n;
+        PairedTitle.Text = n switch
+        {
+            < 0 => "phoneuse isn't answering",
+            0 => "iPhone app not paired",
+            1 => "1 iPhone paired",
+            _ => $"{n} iPhones paired",
+        };
         PairedText.Text = n switch
         {
-            < 0 => "phoneuse isn't answering.",
-            0 => "Not paired. Agents can't use the phone until you pair the Phone Use app (App Store) on the iPhone: " +
-                 "it's where you allow and stop them.",
-            1 => "1 iPhone paired. Agents can use the phone; you allow and stop them in the app.",
-            _ => $"{n} iPhones paired. Agents can use the phone; you allow and stop them in the app.",
+            < 0 => "Pairing shows here once it's back.",
+            0 => "Agents can't use the phone until you pair the Phone Use app (App Store) on the iPhone. " +
+                 "It's where you allow and stop them.",
+            _ => "Agents can use the phone; you allow and stop them in the app.",
         };
         PairButton.Content = n > 0 ? "Pair another" : "Pair iPhone";
         PairButton.IsEnabled = n >= 0;

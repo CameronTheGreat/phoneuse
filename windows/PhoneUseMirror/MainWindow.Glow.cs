@@ -79,19 +79,31 @@ public sealed partial class MainWindow
         GlowIntensity.Value = look.Intensity;
         GlowSpeed.Value = look.Speed;
         GlowSize.Value = look.Size;
-        GlowBleed.IsChecked = look.Bleed;
+        GlowBleed.IsOn = look.Bleed;
         GlowOptions.Visibility = GlowSwitch.IsOn ? Visibility.Visible : Visibility.Collapsed;
         GlowUnavailable.Visibility = _glow is { Available: true } ? Visibility.Collapsed : Visibility.Visible;
         _glowFilling = false;
         UpdateGlowPreview();
     }
 
-    void SettingsTab_Changed(object sender, SelectionChangedEventArgs e) => UpdateGlowPreview();
+    /// <summary>Settings' tabs: one pane at a time.</summary>
+    void SettingsTab_Changed(object sender, RoutedEventArgs e)
+    {
+        if (PaneGeneral == null) return;  // the first tab's check, while the page is still being built
+        PaneGeneral.Visibility = TabGeneral.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        PaneAgent.Visibility = AgentControlTab.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        PaneLook.Visibility = TabLook.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        PaneBluetooth.Visibility = TabBluetooth.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        UpdateGlowPreview();
+    }
+
+    /// <summary>A slider's value as the Settings page says it.</summary>
+    string Pct(double v) => $"{Math.Round(v * 100)}%";
 
     void UpdateGlowPreview()
     {
         if (_glow != null)
-            _glow.Preview = SettingsVisible && ReferenceEquals(SettingsTabs.SelectedItem, AgentControlTab);
+            _glow.Preview = SettingsVisible && AgentControlTab.IsChecked == true;
     }
 
     void Glow_Toggled(object sender, RoutedEventArgs e)
@@ -107,7 +119,7 @@ public sealed partial class MainWindow
     {
         if (_glowFilling) return;
         var look = new GlowLook((float)GlowIntensity.Value, (float)GlowSpeed.Value,
-            (float)GlowSize.Value, GlowBleed.IsChecked == true);
+            (float)GlowSize.Value, GlowBleed.IsOn);
         AppSettings.GlowLook = look;
         if (_glow != null) _glow.Look = look;
     }

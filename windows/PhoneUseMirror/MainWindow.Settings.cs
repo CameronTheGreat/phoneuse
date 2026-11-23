@@ -30,7 +30,7 @@ public sealed partial class MainWindow
         AwakeSwitch.IsOn = _awake;
         StartupSwitch.IsOn = Startup.Enabled;
         SnapSwitch.IsOn = _snapped;
-        UpdateAuto.IsChecked = AppSettings.AutoUpdate;
+        UpdateAuto.IsOn = AppSettings.AutoUpdate;
         _settingUp = false;
         FillGlowSettings();
         FillFinishSettings();
@@ -98,24 +98,24 @@ public sealed partial class MainWindow
         _settingUp = true;
         var mode = (string?)st["mode"] ?? "auto";
         var secs = (int?)(double?)st["seconds"] ?? 10;
-        StartMode.SelectedItem = StartMode.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == mode);
+        foreach (var r in new[] { ModeAuto, ModeCountdown, ModeAsk }) r.IsChecked = (string)r.Tag == mode;
         if (secs is not (5 or 10 or 15 or 30)) secs = 10;
-        StartSeconds.SelectedItem = StartSeconds.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == secs.ToString());
+        foreach (var c in new[] { Delay5, Delay10, Delay15, Delay30 }) c.IsChecked = (string)c.Tag == secs.ToString();
         StartSeconds.Visibility = mode == "countdown" ? Visibility.Visible : Visibility.Collapsed;
         _settingUp = false;
     }
 
-    async void StartMode_Changed(object sender, SelectionChangedEventArgs e)
+    async void StartMode_Changed(object sender, RoutedEventArgs e)
     {
-        if (_settingUp || StartMode.SelectedItem is not ComboBoxItem item) return;
-        var r = await _conn.PostAsync("api/session/ask", new { mode = (string)item.Tag });
+        if (_settingUp || _conn == null || sender is not RadioButton { Tag: string mode }) return;
+        var r = await _conn.PostAsync("api/session/ask", new { mode });
         if (r != null && r["mode"] != null) ShowStartMode(r);
     }
 
-    async void StartSeconds_Changed(object sender, SelectionChangedEventArgs e)
+    async void StartSeconds_Changed(object sender, RoutedEventArgs e)
     {
-        if (_settingUp || StartSeconds.SelectedItem is not ComboBoxItem item) return;
-        var r = await _conn.PostAsync("api/session/ask", new { seconds = int.Parse((string)item.Tag) });
+        if (_settingUp || _conn == null || sender is not RadioButton { Tag: string secs }) return;
+        var r = await _conn.PostAsync("api/session/ask", new { seconds = int.Parse(secs) });
         if (r != null && r["mode"] != null) ShowStartMode(r);
     }
 
