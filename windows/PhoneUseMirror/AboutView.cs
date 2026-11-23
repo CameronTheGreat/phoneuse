@@ -17,7 +17,7 @@ public sealed class AboutView : UserControl
     public AboutView()
     {
         string pc = Environment.MachineName;
-        var version = typeof(AboutView).Assembly.GetName().Version?.ToString(3) ?? "";
+        var version = Updater.CurrentText;  // as Settings and the updater say it (0.1.7, or 0.1.7.42 from CI)
 
         // the site's mascot (site/src/img/hero.webp), on its own cream
         var mascot = Path.Combine(AppContext.BaseDirectory, "Assets", "Mascot.png");
