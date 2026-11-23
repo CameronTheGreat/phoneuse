@@ -1,12 +1,12 @@
 # Phone Use for Windows: the portable zip and the installer (windows/scripts/package.ps1).
-# Every push to main builds both and keeps them as the run's artifacts; a v* tag also attaches them
+# Every push to master builds both and keeps them as the run's artifacts; a v* tag also attaches them
 # to that tag's GitHub release. Pull requests that touch the Windows app build them too, so a PR
 # shows whether it still packages before it's merged.
 name: windows app
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [master]
     tags: ["v*"]
   pull_request:
     paths: [windows/**, phoneuse/**, bin/phoneuse, skill/**, pyproject.toml, .github/workflows/windows-app.yml]

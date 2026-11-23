@@ -134,9 +134,9 @@ def main():
             colors = len(img.resize((64, 128)).getcolors(64 * 128) or [])
             check(colors > 50, f"screenshot shows the test picture ({colors} colours in a thumbnail)")
 
-        seq0 = int(screen.frames_request("status")[0].split("seq=")[1])
+        seq0 = int(screen.frames_request("status")[0].split("seq=")[1].split()[0])
         time.sleep(1.0)
-        seq1 = int(screen.frames_request("status")[0].split("seq=")[1])
+        seq1 = int(screen.frames_request("status")[0].split("seq=")[1].split()[0])
         check(seq1 > seq0, f"moving picture counts changes ({seq0} -> {seq1})")
         t = time.time()
         line, _ = screen.frames_request("settle", timeout=6)
@@ -167,9 +167,9 @@ def main():
         took = time.time() - t
         check(line.startswith("ok") and "still=1" in line and took < 0.5,
               f"settle on a still picture returns at once ({took:.2f} s: {line})")
-        seq_a = int(screen.frames_request("status")[0].split("seq=")[1])
+        seq_a = int(screen.frames_request("status")[0].split("seq=")[1].split()[0])
         time.sleep(1.0)
-        seq_b = int(screen.frames_request("status")[0].split("seq=")[1])
+        seq_b = int(screen.frames_request("status")[0].split("seq=")[1].split()[0])
         check(seq_b == seq_a, f"still picture counts no changes ({seq_a} -> {seq_b})")
 
         st = screen.hub_request("status")[0]
