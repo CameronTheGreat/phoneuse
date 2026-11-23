@@ -14,9 +14,11 @@ on:
 permissions:
   contents: write  # attach to the release, on tags only
 
+# A newer push to the same branch or PR cancels the older run instead of queueing behind it; a tag's
+# run always finishes, since it attaches the release.
 concurrency:
   group: windows-app-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 jobs:
   package:
@@ -27,7 +29,30 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with: {dotnet-version: 10.0.x}
 
+      # The window's NuGet packages (the Windows App SDK above all), so the build doesn't download them
+      # every run. Keyed on the csproj, where every package version is pinned.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('windows/PhoneUseMirror/PhoneUseMirror.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      # The packaged UxPlay bundle (UxPlay, GStreamer, FFmpeg and their DLLs): the newest one saved for
+      # these scripts, if MSYS2 still has every package it was made from at the same version (it lists
+      # them). Then MSYS2 and the UxPlay build are skipped (~2.5 min); else they make it again, and it's
+      # saved after Package. Each save gets a key of its own; restore-keys finds the newest.
+      - uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/uxplay-bundle
+          key: uxplay-bundle-${{ hashFiles('windows/scripts/build-uxplay.sh', 'windows/scripts/build-ffmpeg-audio.sh', 'windows/scripts/package.ps1') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: uxplay-bundle-${{ hashFiles('windows/scripts/build-uxplay.sh', 'windows/scripts/build-ffmpeg-audio.sh', 'windows/scripts/package.ps1') }}-
+      - name: Is the saved UxPlay bundle current?
+        id: uxcheck
+        shell: powershell
+        run: windows\scripts\uxplay-bundle-check.ps1 "${{ runner.temp }}\uxplay-bundle"
+
       - name: MSYS2 (UCRT64) with UxPlay's build tools and GStreamer
+        if: steps.uxcheck.outputs.current != 'true'
         id: msys2
         uses: msys2/setup-msys2@v2
         with:
@@ -42,16 +67,19 @@ jobs:
             mingw-w64-ucrt-x86_64-gst-libav
 
       - name: Build UxPlay
+        if: steps.uxcheck.outputs.current != 'true'
         shell: msys2 {0}
         run: bash windows/scripts/build-uxplay.sh
 
       # FFmpeg with only the audio decoders UxPlay uses, in place of MSYS2's (~150 MB smaller). The
       # script rebuilds when MSYS2's FFmpeg version moves past the cached one.
       - uses: actions/cache@v4
+        if: steps.uxcheck.outputs.current != 'true'
         with:
           path: ${{ runner.temp }}/ffmpeg-audio
           key: ffmpeg-audio-${{ hashFiles('windows/scripts/build-ffmpeg-audio.sh') }}
       - name: Build the audio-only FFmpeg
+        if: steps.uxcheck.outputs.current != 'true'
         shell: msys2 {0}
         run: bash windows/scripts/build-ffmpeg-audio.sh "$(cygpath -u '${{ runner.temp }}')/ffmpeg-audio"
 
@@ -75,7 +103,16 @@ jobs:
           # setup-msys2 installs into the runner's temp folder, not C:\msys64
           PHONEUSE_MSYS2: ${{ steps.msys2.outputs.msys2-location }}
           PHONEUSE_FFMPEG_AUDIO: ${{ runner.temp }}\ffmpeg-audio
+          # Reused when the cache restored it; else package.ps1 makes it from MSYS2 and saves it here
+          PHONEUSE_UXPLAY_BUNDLE: ${{ runner.temp }}\uxplay-bundle
         run: windows\scripts\package.ps1 -Version ${{ steps.version.outputs.version }} -Out windows\build\release
+
+      # Only a bundle that passed Package's UxPlay checks gets here
+      - uses: actions/cache/save@v4
+        if: steps.uxcheck.outputs.current != 'true'
+        with:
+          path: ${{ runner.temp }}/uxplay-bundle
+          key: uxplay-bundle-${{ hashFiles('windows/scripts/build-uxplay.sh', 'windows/scripts/build-ffmpeg-audio.sh', 'windows/scripts/package.ps1') }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Smoke test the portable app's phoneuse
         shell: pwsh

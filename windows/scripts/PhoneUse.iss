@@ -38,6 +38,10 @@ UninstallDisplayIcon={app}\PhoneUseMirror.exe
 UninstallDisplayName=Phone Use
 Compression=lzma2/max
 SolidCompression=yes
+; LZMA2 on several threads (CI's runner has 4 cores): ~95s down to well under a minute, the
+; installer a little larger
+LZMAUseSeparateProcess=yes
+LZMANumBlockThreads=4
 WizardStyle=modern
 CloseApplications=force
 RestartApplications=no
