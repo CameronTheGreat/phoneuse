@@ -78,11 +78,15 @@ DEFAULTS = {
     "uxplay": "auto",
     "audio": True,
     "app_window": True,
+    # Windows: "auto" uses the native mirror window (windows/dist) when it's built, "browser" the Edge/Chrome one
+    "window": "auto",
     "service_port": 47810,
 }
 
 
 def config_dir():
+    if os.environ.get("PHONEUSE_CONFIG_DIR"):  # the portable Windows app keeps its settings beside it
+        return os.environ["PHONEUSE_CONFIG_DIR"]
     if IS_WINDOWS:
         return os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "phoneuse")
     base = os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
