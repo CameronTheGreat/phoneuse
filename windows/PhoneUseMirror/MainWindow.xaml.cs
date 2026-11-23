@@ -347,7 +347,7 @@ public sealed partial class MainWindow : Window
         Screen.Height = sh;
         DotLayer.Width = sw;
         DotLayer.Height = sh;
-        PlaceScreenUi(o, sw, sh);
+        PlaceScreenUi(o, sw, sh, sr);
         ClipScreen(sw, sh, sr);
         if (Math.Abs(sr - _screenCorner) > 0.01)
         {

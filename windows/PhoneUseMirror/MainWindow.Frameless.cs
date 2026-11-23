@@ -85,7 +85,7 @@ public sealed partial class MainWindow
 
     /// <summary>ScreenUi exactly over the screen; notices and buttons clear of the Dynamic Island
     /// and the home indicator.</summary>
-    void PlaceScreenUi(double o, double sw, double sh)
+    void PlaceScreenUi(double o, double sw, double sh, double sr)
     {
         ScreenUi.Margin = new Thickness(o, o, 0, 0);
         ScreenUi.Width = sw;
@@ -98,8 +98,23 @@ public sealed partial class MainWindow
         AgentPanel.Margin = new Thickness(0, 0, 0, bottom);
         SetupOverlay.Padding = new Thickness(side, top, side, 0);
         CalibrationOverlay.Padding = new Thickness(side, top, side, 0);  // the calibration flow, like the checklist
-        // App pages replace the video, so they do not need the phone's island safe area.
-        AboutOverlay.Padding = new Thickness(0, 8, 0, 0);
+        // App pages replace the video, so they do not need the phone's island safe area,
+        // but their header's pills sit in the top corners and must clear the rounding.
+        AboutOverlay.Padding = new Thickness(0, CornerClear(sr), 0, 0);
+    }
+
+    /// <summary>How far down a page's header goes so its pills (40 high, round ends, 20 in from
+    /// the side: the About/Settings header) stay clear of the screen's rounded top corners.
+    /// The corner is a squircle, which bends in sooner than a circle of its radius, so this
+    /// treats it as a circle a quarter larger, and keeps a small gap from the edge.</summary>
+    static double CornerClear(double sr)
+    {
+        const double side = 20, half = 20, gap = 4;  // the header's margin; half the pill's height
+        double r = sr * 1.25, c = side + half;      // the pill's end: a circle of radius half at (c, top + half)
+        double reach = r - half - gap;
+        if (reach <= 0 || c >= r) return 8;
+        double down = r - half - Math.Sqrt(Math.Max(0, reach * reach - (r - c) * (r - c)));
+        return Math.Max(8, Math.Ceiling(down));
     }
 
     /// <summary>Match the cap to the titanium frame and fill down to where its top corners become straight.</summary>
