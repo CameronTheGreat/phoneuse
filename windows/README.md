@@ -6,7 +6,8 @@ nothing answers on the mirror's port (`Backend.cs`); the Windows-only Python is 
 
 - `PhoneUseMirror/`: the app (C#, .NET 10, Windows App SDK; unpackaged and self-contained)
 - `scripts/`: setting up a checkout (`install.ps1`, `build-winui.ps1`, `build-uxplay.sh`, `firewall.ps1`,
-  `setup-vision.ps1`, `update-installed.ps1`) and packaging the app (`package.ps1`, `PhoneUse.iss`, `build-ffmpeg-audio.sh`)
+  `setup-vision.ps1`, `update-installed.ps1`) and packaging the app (`package.ps1`, `PhoneUse.iss`, `build-ffmpeg-audio.sh`,
+  `uxplay-bundle-check.ps1`)
 
 ## Develop
 
@@ -30,8 +31,14 @@ powershell -ExecutionPolicy Bypass -File windows\scripts\package.ps1
 ```
 
 This makes `windows\build\release\PhoneUse-<version>-win-x64-portable.zip` and `...-setup.exe` (with Inno Setup 6),
-the same as `.github/workflows/windows-app.yml` does on every push to main. Both hold the window with the core in
+the same as `.github/workflows/windows-app.yml` does on every push to master. Both hold the window with the core in
 `core\`: phoneuse, a standalone CPython with its packages, and UxPlay with the GStreamer plugins it uses and an
 FFmpeg that only decodes audio. The installer is per-user (no admin except for the optional firewall rule) and
 can use a compatible Python already on the PC instead of the bundled one. In the zip, a `portable` file next to
 the exe keeps settings in `data\`. `-NoZip` makes only the installer, `-NoInstaller` only the zip.
+
+`-UxPlayBundle <folder>` saves the finished UxPlay bundle there, with the MSYS2 packages (and versions) it was
+made from in `packages.txt`, and later runs reuse it without MSYS2. CI caches that folder: each build first runs
+`uxplay-bundle-check.ps1`, which compares those versions with MSYS2's package index and throws the bundle out
+when any has moved on, so MSYS2 and UxPlay are only set up and built when something in the bundle changed. A
+change to `build-uxplay.sh`, `build-ffmpeg-audio.sh` or `package.ps1` also starts a fresh bundle.

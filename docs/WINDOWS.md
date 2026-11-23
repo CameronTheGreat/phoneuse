@@ -19,7 +19,7 @@ app isn't built.
 
 ## Install the app
 
-Each release, and each build of `main`, has two downloads (the GitHub workflow
+Each release, and each build of `master`, has two downloads (the GitHub workflow
 `.github/workflows/windows-app.yml` makes them with `windows/scripts/package.ps1`):
 
 - **`PhoneUse-<version>-win-x64-setup.exe`**, an installer for your account only (no admin
