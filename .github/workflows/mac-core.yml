@@ -21,7 +21,10 @@ jobs:
           brew upgrade --quiet $deps
       - name: UxPlay for macOS 15
         run: |
-          git clone --depth 1 https://github.com/FDH2/UxPlay ~/code/UxPlay
+          # UxPlay 1.74, the last commit before fairplay_v2 (Nov 16), whose library doesn't get
+          # OpenSSL's include folder on macOS and fails to build
+          git clone --quiet https://github.com/FDH2/UxPlay ~/code/UxPlay
+          git -C ~/code/UxPlay checkout --quiet 05b0275cb1b726592700e47a6e0307544b3d3a52
           cmake -S ~/code/UxPlay -B ~/code/UxPlay/build -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0
           cmake --build ~/code/UxPlay/build -j 4
       - name: Bundle the core
