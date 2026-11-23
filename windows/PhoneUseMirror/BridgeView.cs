@@ -65,7 +65,7 @@ public sealed class BridgeView : UserControl
 
     void Header(string? sub)
     {
-        _body.Children.Add(new TextBlock { Text = "Bluetooth Bridge", Style = Style("TitleTextBlockStyle") });
+        _body.Children.Add(new TextBlock { Text = "Bluetooth Bridge", Style = ThemeStyle("TitleTextBlockStyle") });
         _body.Children.Add(Caption(sub ?? "A LilyGO T-Display can be the iPhone's keyboard and mouse instead of this PC: " +
             "over Bluetooth Classic, as on Linux, so the pointer is quicker than over this PC's Bluetooth LE. " +
             "This PC sends it input over Wi-Fi."));
@@ -472,7 +472,7 @@ public sealed class BridgeView : UserControl
             foreach (var (label, kind, fn) in actions)
             {
                 var b = new Button { Content = label, Width = 240, HorizontalAlignment = HorizontalAlignment.Center };
-                if (kind == 1) b.Style = BridgeView.Style("AccentButtonStyle");
+                if (kind == 1) b.Style = BridgeView.ThemeStyle("AccentButtonStyle");
                 if (kind == 2) b.Foreground = Red;
                 b.Click += (_, _) => fn();
                 _box.Children.Add(b);
@@ -492,7 +492,7 @@ public sealed class BridgeView : UserControl
             if (big != null)
                 _box.Children.Add(new TextBlock
                 {
-                    Text = big, Style = BridgeView.Style("TitleLargeTextBlockStyle"), HorizontalAlignment = HorizontalAlignment.Center,
+                    Text = big, Style = BridgeView.ThemeStyle("TitleLargeTextBlockStyle"), HorizontalAlignment = HorizontalAlignment.Center,
                 });
             if (spinner) _box.Children.Add(new ProgressRing { IsActive = true, Width = 32, Height = 32 });
             if (bar != null) _box.Children.Add(bar);
@@ -539,17 +539,17 @@ public sealed class BridgeView : UserControl
     static readonly Brush Red = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0x45, 0x3A));
     static readonly Brush Orange = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0x9F, 0x0A));
 
-    static Style Style(string key) => (Style)Application.Current.Resources[key];
+    static Style ThemeStyle(string key) => (Style)Application.Current.Resources[key];
 
     static TextBlock Caption(string text) => new()
     {
-        Text = text, TextWrapping = TextWrapping.Wrap, Opacity = 0.7, Style = Style("CaptionTextBlockStyle"),
+        Text = text, TextWrapping = TextWrapping.Wrap, Opacity = 0.7, Style = ThemeStyle("CaptionTextBlockStyle"),
     };
 
     static Button Btn(string label, Action fn, bool accent = false, bool enabled = true)
     {
         var b = new Button { Content = label, IsEnabled = enabled, VerticalAlignment = VerticalAlignment.Center };
-        if (accent) b.Style = Style("AccentButtonStyle");
+        if (accent) b.Style = ThemeStyle("AccentButtonStyle");
         b.Click += (_, _) => fn();
         return b;
     }
@@ -561,9 +561,9 @@ public sealed class BridgeView : UserControl
         g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var col = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
-        col.Children.Add(new TextBlock { Text = title, Style = Style("BodyStrongTextBlockStyle") });
+        col.Children.Add(new TextBlock { Text = title, Style = ThemeStyle("BodyStrongTextBlockStyle") });
         if (sub.Length > 0)
-            col.Children.Add(new TextBlock { Text = sub, TextWrapping = TextWrapping.Wrap, Opacity = 0.7, Style = Style("CaptionTextBlockStyle") });
+            col.Children.Add(new TextBlock { Text = sub, TextWrapping = TextWrapping.Wrap, Opacity = 0.7, Style = ThemeStyle("CaptionTextBlockStyle") });
         g.Children.Add(col);
         right.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(right, 1);

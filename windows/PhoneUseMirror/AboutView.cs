@@ -24,7 +24,7 @@ public sealed class AboutView : UserControl
         var png = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.png");
         if (File.Exists(png)) head.Children.Add(new Image { Source = new BitmapImage(new Uri(png)), Width = 56, Height = 56 });
         var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        titles.Children.Add(new TextBlock { Text = "Phone Use", Style = Style("TitleTextBlockStyle") });
+        titles.Children.Add(new TextBlock { Text = "Phone Use", Style = ThemeStyle("TitleTextBlockStyle") });
         titles.Children.Add(new TextBlock { Text = "Version " + version, Opacity = 0.6 });
         head.Children.Add(titles);
         _body.Children.Add(head);
@@ -90,12 +90,12 @@ public sealed class AboutView : UserControl
         Content = new ScrollViewer { Content = _body };
     }
 
-    static Style Style(string key) => (Style)Application.Current.Resources[key];
+    static Style ThemeStyle(string key) => (Style)Application.Current.Resources[key];
 
     void Heading(string text) => _body.Children.Add(new TextBlock
     {
         Text = text,
-        Style = Style("SubtitleTextBlockStyle"),
+        Style = ThemeStyle("SubtitleTextBlockStyle"),
         Margin = new Thickness(0, 18, 0, 2),
     });
 
@@ -137,7 +137,7 @@ public sealed class AboutView : UserControl
         };
         g.Children.Add(badge);
         var col = new StackPanel { Spacing = 2 };
-        col.Children.Add(new TextBlock { Text = title, Style = Style("BodyStrongTextBlockStyle") });
+        col.Children.Add(new TextBlock { Text = title, Style = ThemeStyle("BodyStrongTextBlockStyle") });
         col.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Opacity = 0.85, IsTextSelectionEnabled = true });
         Grid.SetColumn(col, 1);
         g.Children.Add(col);

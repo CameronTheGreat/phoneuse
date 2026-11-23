@@ -185,7 +185,8 @@ class Mirror:
         c = calibrate.status()
         if not c:
             return None
-        return {k: c.get(k) for k in ("state", "phone", "step", "steps", "attempt", "message")} |             {"age": round(time.time() - float(c.get("at") or 0), 1)}
+        return {k: c.get(k) for k in ("state", "phone", "step", "steps", "attempt", "message")} | \
+            {"age": round(time.time() - float(c.get("at") or 0), 1)}
 
     def start_calibration(self):
         """The owner asked to measure the pointer (the page or the Windows app): measure
@@ -410,7 +411,8 @@ class Mirror:
             cal = await loop.run_in_executor(None, self.calibration_state)
             was = self.calibration
             self.calibration = cal
-            cal_changed = (cal or {}).get("state") != (was or {}).get("state") or                 (cal or {}).get("step") != (was or {}).get("step")
+            cal_changed = (cal or {}).get("state") != (was or {}).get("state") or \
+                (cal or {}).get("step") != (was or {}).get("step")
             changed = mirroring != self.mirroring or bt != self.bluetooth or turned or cal_changed
             if bt and not self.bluetooth:  # (re)connected: rest the pointer where it touches nothing
                 self.hover_at = PARK
@@ -490,7 +492,8 @@ class Tab:
         # While an agent drives, the page's mouse and keyboard don't reach the phone
         # (mixing in input would confuse the agent); the user takes over first.
         # Nor while the pointer is being measured: a move would spoil the measurement.
-        if t == "blur" or not (self.playing and self.mirror.live()) or self.mirror.agent() == "driving"                 or self.mirror.calibrating():
+        if t == "blur" or not (self.playing and self.mirror.live()) or self.mirror.agent() == "driving" \
+                or self.mirror.calibrating():
             self.pointer.release()
             self.keys.release_all()
             return
