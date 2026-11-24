@@ -25,7 +25,7 @@ PASSCODE_FILE = os.path.join(config_dir(), "passcode.dpapi" if IS_WINDOWS else "
 # would move from this PC to the bridge). While it's off, purge() deletes a passcode saved earlier.
 ENABLED = False
 OFF = ("Unlocking with a saved passcode is turned off. Ask the user to unlock the iPhone "
-       "themselves, then continue.")
+       "themselves, then call wait_for_unlock once and wait for the result.")
 
 
 def purge():
@@ -116,6 +116,16 @@ def locked(screen_text):
     clock = [y for x, y, t in lines if re.fullmatch(r"\d{1,2}:\d{2}", t.strip()) and 0.1 < y < 0.32 and 0.3 < x < 0.7]
     date = [y for x, y, t in lines if re.match(r"(mon|tue|wed|thu|fri|sat|sun)", t.strip().lower()) and y < 0.2]
     return bool(clock and date and min(date) < max(clock))
+
+
+def shows_unlocked(lines):
+    """Require an app or Home Screen status-bar clock and readable content."""
+    if locked(lambda: lines):
+        return False
+    clock = any(0.06 < x < 0.27 and 0.015 < y < 0.075 and re.fullmatch(r"\d{1,2}[:.]\d{2}", text.strip())
+                for x, y, text in lines)
+    content = any(0.12 < y < 0.94 and sum(char.isalpha() for char in text) >= 2 for _, y, text in lines)
+    return clock and content
 
 
 def unlock(screen_text):

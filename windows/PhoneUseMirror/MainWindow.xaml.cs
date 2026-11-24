@@ -54,9 +54,11 @@ public sealed partial class MainWindow : Window
         Video.SizeChanged += (_, _) => ResizeVideo();
         Video.CompositionScaleChanged += (_, _) => ResizeVideo();
         Frameless();
+        ApplyAppearance(AppSettings.DarkMode);
         ApplyFinish(FrameFinish.Get(AppSettings.FrameFinish));
         WatchDisplay();  // HDR: the finish drawn for it
         InitGlow();
+        InitActivity();
         SizeToPhone();
         // the minimum is in pixels: again when the window moves to a screen with other scaling
         Root.Loaded += (_, _) => Root.XamlRoot.Changed += (r, _) => LimitSize(r.RasterizationScale);
@@ -138,6 +140,7 @@ public sealed partial class MainWindow : Window
                 _agentAction = (string?)m["action"] ?? "";
                 if (_agent == "driving") AgentWhat.Text = _agentAction;
                 break;
+            case "activity": OnActivity(m); break;
             case "unlock-request":
                 ShowWindow();
                 _ = ShowAsk((string?)m["id"], "unlock", null, null);
@@ -238,25 +241,15 @@ public sealed partial class MainWindow : Window
 
     // The phone around the screen, in units of the screen's short side (so a sideways phone keeps
     // them): a thin black border around the glass (the model's: PhoneModel.cs), the band, and how far
-    // the side buttons stand out. Slimmer than the server's bezel, which the browser mirror uses.
-    const double Band = 0.017, Knob = 0.009;
+    // the side buttons stand out (phoneuse/web/phones.json: the browser mirror draws the same frame).
+    static readonly double Band = Phones.Num(Phones.Json["frame"]!["band"]), Knob = Phones.Num(Phones.Json["frame"]!["knob"]);
     PhoneModel _phone = PhoneModel.Default;
     double Glass => _phone.Glass;
     double Frame => Glass + Band + Knob;
 
-    // Side buttons of an upright phone, for the models Apple has no drawings of (the iPhone 11 and
-    // older): (left side?, top, bottom) as fractions of the band's height, estimated from photos.
-    static readonly (bool left, double top, double bottom)[] EstimatedSideButtons =
-    {
-        (true, 0.155, 0.180),   // ring/silent switch
-        (true, 0.245, 0.316),   // volume up
-        (true, 0.340, 0.411),   // volume down
-        (false, 0.265, 0.385),  // side button
-    };
-
     /// <summary>This model's side buttons, where its drawing puts them (PhoneModel).</summary>
     (bool left, double top, double bottom)[] SideButtons =>
-        _phone.Buttons is { } b ? b.Select(x => (x.Left, x.Top, x.Bottom)).ToArray() : EstimatedSideButtons;
+        _phone.Buttons is { } b ? b.Select(x => (x.Left, x.Top, x.Bottom)).ToArray() : PhoneModel.EstimatedButtons;
 
     /// <summary>Camera Control: lower on the right, where this model has it (PhoneModel), a sapphire
     /// button barely standing out of the band.</summary>
@@ -347,7 +340,7 @@ public sealed partial class MainWindow : Window
         Screen.Height = sh;
         DotLayer.Width = sw;
         DotLayer.Height = sh;
-        PlaceScreenUi(o, sw, sh);
+        PlaceScreenUi(o, sw, sh, sr);
         ClipScreen(sw, sh, sr);
         if (Math.Abs(sr - _screenCorner) > 0.01)
         {
@@ -588,15 +581,14 @@ public sealed partial class MainWindow : Window
         bool driving = _agent == "driving";
         if (!driving) AgentDot.Visibility = Visibility.Collapsed;
         _glow?.SetAgent(_agent);
+        ActivityAgentChanged(_agent);
         // the glow says it (AgentGlow); the plain ring only when the glow is off or can't run
         Rim.Visibility = driving && !GlowShowing ? Visibility.Visible : Visibility.Collapsed;
         AgentPanel.Visibility = _agent == "idle" ? Visibility.Collapsed : Visibility.Visible;
         TakeoverLabel.Text = driving ? "Agent in control" : _agent == "paused" ? "You took over" : "You're in control";
         TakeoverAction.Text = driving ? "Take over" : _agent == "paused" ? "Resume agent" : "";
         TakeoverAction.Visibility = _agent == "idle" ? Visibility.Collapsed : Visibility.Visible;
-        AgentLight.Fill = new SolidColorBrush(driving
-            ? Windows.UI.Color.FromArgb(255, 10, 132, 255)
-            : _agent == "paused" ? Windows.UI.Color.FromArgb(255, 255, 159, 10) : Windows.UI.Color.FromArgb(255, 48, 209, 88));
+        AgentLight.Fill = driving ? Brand.PlumLight : _agent == "paused" ? Brand.Amber : Brand.Green;
         AgentWhat.Text = driving ? _agentAction : "";
     }
 
@@ -605,7 +597,7 @@ public sealed partial class MainWindow : Window
         Canvas.SetLeft(AgentDot, x * Screen.ActualWidth - AgentDot.Width / 2);
         Canvas.SetTop(AgentDot, y * Screen.ActualHeight - AgentDot.Height / 2);
         AgentDot.Fill = new SolidColorBrush(down
-            ? Windows.UI.Color.FromArgb(200, 10, 132, 255) : Windows.UI.Color.FromArgb(100, 255, 255, 255));
+            ? Windows.UI.Color.FromArgb(200, 0xE3, 0x9C, 0xBE) : Windows.UI.Color.FromArgb(100, 255, 255, 255));
         AgentDot.Visibility = Visibility.Visible;
         GlowPointer(x, y, down);
     }

@@ -27,7 +27,7 @@ sealed class SnapPreview : IDisposable
                 cbSize = (uint)Marshal.SizeOf<WNDCLASSEX>(),
                 lpfnWndProc = Marshal.GetFunctionPointerForDelegate(Proc),
                 hInstance = instance,
-                hbrBackground = CreateSolidBrush(0x00FFD060), // RGB(96, 208, 255)
+                hbrBackground = CreateSolidBrush(0x005EA5FD), // RGB(253, 165, 94): Brand.xaml's BrandAmber, as the "Release to snap" pill's ring
                 lpszClassName = ClassName,
             };
             _registered = RegisterClassEx(ref wc) != 0;

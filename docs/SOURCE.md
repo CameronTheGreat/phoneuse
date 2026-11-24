@@ -110,9 +110,9 @@ phoneuse screenshot shot.png
 phoneuse done                 # hand the phone back to you
 ```
 
-[skill/SKILL.md](../skill/SKILL.md) is a skill for Claude Code that teaches agents these
-commands. Agents use the phone through the `phoneuse` command; there is no MCP server. To
-use the skill, link it into `~/.claude/skills/phoneuse`:
+[skill/SKILL.md](../skill/SKILL.md) directs agents to the [Phone Use MCP
+server](MCP.md). On Linux, clients can launch it with `phoneuse mcp`. To
+install the skill, link it into `~/.claude/skills/phoneuse`:
 
 ```sh
 ln -s ~/phoneuse/skill ~/.claude/skills/phoneuse

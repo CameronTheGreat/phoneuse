@@ -38,6 +38,10 @@ UninstallDisplayIcon={app}\PhoneUseMirror.exe
 UninstallDisplayName=Phone Use
 Compression=lzma2/max
 SolidCompression=yes
+; LZMA2 on several threads (CI's runner has 4 cores): ~95s down to well under a minute, the
+; installer a little larger
+LZMAUseSeparateProcess=yes
+LZMANumBlockThreads=4
 WizardStyle=modern
 CloseApplications=force
 RestartApplications=no
@@ -78,7 +82,8 @@ Filename: "{app}\PhoneUseMirror.exe"; Parameters: "{code:RelaunchArgs}"; Flags: 
 ; Stop the Bluetooth HID service the way `phoneuse down` does (it outlives the rest on purpose), then the
 ; window and the phoneuse it started (python.exe and uxplay.exe from this folder)
 Filename: "{app}\core\bin\phoneuse.cmd"; Parameters: "down"; Flags: runhidden waituntilterminated skipifdoesntexist; RunOnceId: "PhoneUseDown"
-Filename: "powershell.exe"; Parameters: "-NoProfile -Command ""Get-Process | Where-Object {{ $_.Path -like '{app}\*' } | Stop-Process -Force"""; Flags: runhidden waituntilterminated; RunOnceId: "StopPhoneUse"
+; and the children of those, such as the interpreter a core\.venv launcher starts from the system Python (StopCore)
+Filename: "powershell.exe"; Parameters: "-NoProfile -Command ""$p = Get-CimInstance Win32_Process; $ids = @($p | Where-Object {{ $_.ExecutablePath -like '{app}\*' } | ForEach-Object {{ $_.ProcessId }); $p | Where-Object {{ $ids -contains $_.ProcessId -or $ids -contains $_.ParentProcessId } | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"""; Flags: runhidden waituntilterminated; RunOnceId: "StopPhoneUse"
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\core\windows\scripts\firewall.ps1"" -Program ""{app}\core\uxplay\bin\uxplay.exe"" -Remove"; Verb: runas; Flags: shellexec runhidden waituntilterminated; RunOnceId: "RemoveFirewall"; Tasks: firewall
 
 [UninstallDelete]
@@ -135,6 +140,29 @@ begin
   RegWriteExpandStringValue(HKCU, EnvKey, 'Path', Paths);
 end;
 
+{ Stop the installed phoneuse before its files change. The Bluetooth HID service outlives the rest on
+  purpose, so CloseApplications can leave it running from core\.venv: DelTree then removed pyvenv.cfg but
+  not the python.exe the service held open, and the window, which picks core\.venv by its python.exe,
+  couldn't start phoneuse again (measured on an update, 2026-11-23). `phoneuse down` stops the
+  service the way the uninstaller does; anything still running from core\ (the OCR, UxPlay) goes after it.
+  A venv's python.exe is only a launcher: the interpreter runs as its child from the system Python's own
+  folder, outside the app's folder. Stopping by path killed the launcher and left that child holding
+  core\.venv open, so the delete again stopped after pyvenv.cfg (an update, 2026-11-24).
+  Children of anything in the app's folder are stopped with it. (No braces in here: they end the comment.) }
+procedure StopCore;
+var
+  Code: Integer;
+begin
+  if FileExists(ExpandConstant('{app}\core\bin\phoneuse.cmd')) then
+    Exec(ExpandConstant('{app}\core\bin\phoneuse.cmd'), 'down', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Exec('powershell.exe', '-NoProfile -Command "$p = Get-CimInstance Win32_Process; ' +
+       '$ids = @($p | Where-Object { $_.ExecutablePath -like ''' + ExpandConstant('{app}') + '\*'' } | ' +
+       'ForEach-Object { $_.ProcessId }); ' +
+       '$p | Where-Object { $ids -contains $_.ProcessId -or $ids -contains $_.ParentProcessId } | ' +
+       'ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"',
+       '', SW_HIDE, ewWaitUntilTerminated, Code);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   Code: Integer;
@@ -142,6 +170,7 @@ var
 begin
   if CurStep = ssInstall then
   begin
+    StopCore;
     SystemPythonOK := False;
     if WizardIsTaskSelected('systempython') then
     begin
@@ -159,9 +188,12 @@ begin
     end;
     { An earlier install's other Python would otherwise stay: Backend.cs prefers core\.venv }
     if SystemPythonOK then
-      DelTree(ExpandConstant('{app}\core\python'), True, True, True)
-    else
-      DelTree(ExpandConstant('{app}\core\.venv'), True, True, True);
+    begin
+      if not DelTree(ExpandConstant('{app}\core\python'), True, True, True) then
+        Log('Could not remove all of core\python');
+    end
+    else if not DelTree(ExpandConstant('{app}\core\.venv'), True, True, True) then
+      Log('Could not remove all of core\.venv (a file still in use?)');
   end;
   if (CurStep = ssPostInstall) and WizardIsTaskSelected('path') then
     EnvAddPath(ExpandConstant('{app}\core\bin'));

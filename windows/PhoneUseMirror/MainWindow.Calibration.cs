@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
+using static PhoneUseMirror.Ui;
 
 namespace PhoneUseMirror;
 
@@ -23,6 +24,7 @@ public sealed partial class MainWindow
     string? _calibrationError;  // the server refused to start (not mirroring, no Bluetooth)
     bool _calibrationStarting;
     Storyboard? _cardTurn, _flowTurn;
+    Microsoft.UI.Dispatching.DispatcherQueueTimer? _calibrationDoneTimer;  // hides the "Pointer calibrated" card
 
     string? CalState => (string?)_calibration?["state"];
 
@@ -79,11 +81,16 @@ public sealed partial class MainWindow
         else { _cardTurn.Stop(); CalibrationTurn.Angle = 0; }
         if (CalState == "done")  // the card goes by itself
         {
-            var t = _ui.CreateTimer();
-            t.Interval = TimeSpan.FromSeconds(Math.Max(0.1, 8.1 - CalAge));
-            t.IsRepeating = false;
-            t.Tick += (_, _) => ShowCalibration();
-            t.Start();
+            // Kept in a field: a DispatcherQueueTimer nothing references can be collected before it
+            // fires, and after "done" no state change comes to hide the card (it stayed up).
+            if (_calibrationDoneTimer == null)
+            {
+                _calibrationDoneTimer = _ui.CreateTimer();
+                _calibrationDoneTimer.IsRepeating = false;
+                _calibrationDoneTimer.Tick += (_, _) => ShowCalibration();
+            }
+            _calibrationDoneTimer.Interval = TimeSpan.FromSeconds(Math.Max(0.1, 8.1 - CalAge));
+            _calibrationDoneTimer.Start();
         }
     }
 
@@ -164,22 +171,20 @@ public sealed partial class MainWindow
         var body = CalibrationBody;
         body.Children.Clear();
 
-        var head = new Grid { Margin = new Thickness(0, 4, 0, 4) };
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var head = Columns(0, "*", "auto");
+        head.Margin = new Thickness(0, 4, 0, 4);
         var titles = new StackPanel { Spacing = 2 };
-        titles.Children.Add(new TextBlock { Text = "Calibrate the pointer", Style = Res<Style>("SubtitleTextBlockStyle") });
+        titles.Children.Add(new TextBlock { Text = "Calibrate the pointer", Style = Brand.Subtitle });
         titles.Children.Add(new TextBlock
         {
             Text = "So drags and swipes go the right distance on this phone.",
-            Opacity = 0.7, Style = Res<Style>("CaptionTextBlockStyle"), TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.7, Style = Brand.Caption, TextWrapping = TextWrapping.Wrap,
         });
         head.Children.Add(titles);
         var back = new Button { Content = st == "done" ? "Done" : "Show the phone", VerticalAlignment = VerticalAlignment.Top };
-        if (st == "done") back.Style = Res<Style>("AccentButtonStyle");
+        if (st == "done") back.Style = Brand.AccentButton;
         back.Click += (_, _) => HideCalibrationFlow();
-        Grid.SetColumn(back, 1);
-        head.Children.Add(back);
+        back.AddTo(head, 1);
         body.Children.Add(head);
 
         bool measuring = st is "running" or "waiting_upright" or "waiting_link" or "waiting_pointer" or "waiting_unlock";
@@ -192,7 +197,7 @@ public sealed partial class MainWindow
                              + "iOS ignores a mouse without it.", 0.85));
         if (!atOn)
         {
-            var ok = new Button { Content = "It's on", Style = Res<Style>("AccentButtonStyle") };
+            var ok = new Button { Content = "It's on", Style = Brand.AccentButton };
             ok.Click += (_, _) => { AppSettings.AssistiveTouchDone = true; _calibrationDrawn = null; DrawCalibrationFlow(); };
             at.Children.Add(ok);
         }
@@ -205,7 +210,7 @@ public sealed partial class MainWindow
         {
             Glyph = "", FontSize = 44, HorizontalAlignment = HorizontalAlignment.Left,
             RenderTransform = turn, RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5),
-            Foreground = upright ? SetupGreen : Res<Brush>("AccentFillColorDefaultBrush"),
+            Foreground = upright ? Brand.Green : Brand.Plum,
         };
         up.Children.Add(icon);
         up.Children.Add(Para(upright
@@ -224,8 +229,23 @@ public sealed partial class MainWindow
         // 3. measure
         var me = new StackPanel { Spacing = 8 };
         if (done)
+        {
             me.Children.Add(Para($"{(string?)_calibration?["phone"] ?? "The iPhone"}'s pointer is calibrated. "
                                  + "Drags and swipes now go the right distance on it.", 0.85));
+            // Settings › Calibrate the pointer leads here: measuring again replaces the stored
+            // gain, for when drags land short or long (the server restarts it from "done").
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+            var again = new Button
+            {
+                Content = _calibrationStarting ? "Starting…" : "Calibrate again",
+                IsEnabled = !_calibrationStarting && _live,
+            };
+            again.Click += async (_, _) => await StartCalibration();
+            row.Children.Add(again);
+            if (_calibrationStarting) row.Children.Add(new ProgressRing { IsActive = true, Width = 18, Height = 18 });
+            me.Children.Add(row);
+            if (!_live) me.Children.Add(Para("Start Screen Mirroring first: the iPhone isn't mirroring to this PC.", 0.7));
+        }
         else if (st == "running")
         {
             int steps = (int?)_calibration?["steps"] ?? 7;
@@ -253,7 +273,7 @@ public sealed partial class MainWindow
             var go = new Button
             {
                 Content = _calibrationStarting ? "Starting…" : st == "failed" ? "Try again" : "Calibrate",
-                Style = Res<Style>("AccentButtonStyle"), IsEnabled = atOn && !_calibrationStarting && _live,
+                Style = Brand.AccentButton, IsEnabled = atOn && !_calibrationStarting && _live,
             };
             go.Click += async (_, _) => await StartCalibration();
             row.Children.Add(go);
@@ -265,31 +285,15 @@ public sealed partial class MainWindow
         body.Children.Add(FlowCard(3, "Measure", me, done, atOn && !done && (upright || !measuring)));
     }
 
-    Border FlowCard(int number, string title, FrameworkElement content, bool done, bool current)
+    static Border FlowCard(int number, string title, FrameworkElement content, bool done, bool current)
     {
-        var g = new Grid { ColumnSpacing = 12 };
-        g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        g.Children.Add(Badge(number, done, current));
         var col = new StackPanel { Spacing = 6 };
-        col.Children.Add(new TextBlock { Text = title, Style = Res<Style>("BodyStrongTextBlockStyle"), TextWrapping = TextWrapping.Wrap });
+        col.Children.Add(new TextBlock { Text = title, Style = Brand.BodyStrong, TextWrapping = TextWrapping.Wrap });
         col.Children.Add(content);
-        Grid.SetColumn(col, 1);
-        g.Children.Add(col);
-        return new Border
-        {
-            Child = g, Padding = new Thickness(14, 12, 14, 12), CornerRadius = new CornerRadius(8),
-            Background = Res<Brush>(current ? "CardBackgroundFillColorSecondaryBrush" : "CardBackgroundFillColorDefaultBrush"),
-            BorderBrush = current ? Res<Brush>("AccentFillColorDefaultBrush") : Res<Brush>("CardStrokeColorDefaultBrush"),
-            BorderThickness = new Thickness(current ? 1.5 : 1),
-        };
+        return Ui.StepCard(Badge(number, done, current), col, new Thickness(14, 12, 14, 12), 8, current);
     }
 
-    static TextBlock ErrorText(string text) => new()
-    {
-        Text = text, TextWrapping = TextWrapping.Wrap,
-        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0x45, 0x3A)),
-    };
+    static TextBlock ErrorText(string text) => new() { Text = text, TextWrapping = TextWrapping.Wrap, Foreground = Brand.Brick };
 
     /// <summary>A phone turning from sideways to upright, over and over.</summary>
     static Storyboard TurnAnimation(RotateTransform t)

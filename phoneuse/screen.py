@@ -207,8 +207,9 @@ def grab_png():
         line, png = frames_request("shot")
         if line.startswith("ok"):
             return png
-    except OSError:
-        pass
+    except OSError as e:
+        if IS_WINDOWS:
+            raise RuntimeError("could not read from the frames service") from e
     if IS_WINDOWS:
         raise RuntimeError("no picture of the phone (is `phoneuse up` running, and the phone mirroring?)")
     x, y, w, h = picture_rect(*mirror_window())

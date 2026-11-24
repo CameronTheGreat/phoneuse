@@ -5,12 +5,17 @@ using Windows.Graphics;
 namespace PhoneUseMirror;
 
 /// <summary>
-/// The window lives above its tray icon, as the clock's and the network's flyouts do, and stays
-/// on top of other windows while it's there. Dragging it away by its bar takes it off the tray:
-/// it becomes an ordinary window that stays where it's dropped. Dropped near the tray icon again,
-/// it returns to one default spot: centred above the icon with an 8 DIP gap from the taskbar,
-/// kept inside that monitor's work area. The preview, tray menu, Settings, and live resizing
-/// all use the same destination.
+/// Two independent settings, both on by default and both saved:
+///
+/// Always on top (tray menu and Settings): the window stays above other apps' windows. It is
+/// applied with SetWindowPos as well as the presenter, and again every time the window is shown,
+/// because a hide/show cycle can leave the presenter reporting topmost while the window isn't.
+///
+/// Keep above the tray icon (Settings): the window opens pinned above the tray icon. Dragging it
+/// away by its bar floats it where it's dropped; the setting stays on. Dropped near the icon again,
+/// it returns to one default spot: centred above the icon with an 8 DIP gap from the taskbar, kept
+/// inside that monitor's work area. Reopening from the tray icon pins it again. With the setting
+/// off there is no snapping at all: no drop zone, no preview, and it stays wherever it's put.
 /// </summary>
 public sealed partial class MainWindow
 {
@@ -23,7 +28,9 @@ public sealed partial class MainWindow
     /// taskbar, the taskbar's inner edge (Line), all in physical pixels.</summary>
     readonly record struct Anchor(Edge Edge, int Along, int Line, RectInt32 Work, double Scale);
 
-    bool _snapped;
+    bool _alwaysOnTop;   // the setting
+    bool _snapEnabled;   // the setting: Keep above the tray icon
+    bool _snapped;       // right now pinned above the icon (only ever true while _snapEnabled)
     bool _moving, _moved, _snapHint;
     SnapPreview? _snapPreview;
     Anchor? _dragAnchor;
@@ -38,31 +45,65 @@ public sealed partial class MainWindow
         _subclass = WindowMessage;
         SetWindowSubclass(WinRT.Interop.WindowNative.GetWindowHandle(this), _subclass, 1, 0);
 
-        // Floating is temporary: every app launch starts at the tray's default position.
+        _alwaysOnTop = AppSettings.AlwaysOnTop;
+        if (_tray != null) _tray.AlwaysOnTop = _alwaysOnTop;
+        ApplyTopmost();
+
+        // Floating is temporary: with the setting on, every app launch starts at the tray's default position.
+        _snapEnabled = AppSettings.KeepAboveTray;
         SetSnapped(true);
         // the icon moves when other icons come and go, and the taskbar can move: follow it
         _tick.Tick += (_, _) => { if (_snapped && !_moving && !_hidden) PlaceSnapped(); };
     }
 
-    /// <summary>Pin the window above the tray icon (at its default spot), or let it go where it is.</summary>
-    void SetSnapped(bool on)
+    // ---------------------------------------------------------------- always on top
+
+    void SetAlwaysOnTop(bool on)
     {
-        _snapped = on;
-        if (_tray != null) _tray.Snapped = on;
-        if (SnapSwitch.IsOn != on)
-        {
-            bool filling = _settingUp;
-            _settingUp = true;
-            SnapSwitch.IsOn = on;
-            _settingUp = filling;
-        }
-        if (on) PlaceSnapped();
-        SetOnTop(on);
+        _alwaysOnTop = on;
+        AppSettings.AlwaysOnTop = on;
+        if (_tray != null) _tray.AlwaysOnTop = on;
+        SetSwitch(TopmostSwitch, on);
+        ApplyTopmost();
     }
 
-    void SetOnTop(bool on)
+    /// <summary>Make the window (and its activity sidebar) topmost or not, as the setting says.</summary>
+    void ApplyTopmost()
     {
-        if (AppWindow.Presenter is OverlappedPresenter p && p.IsAlwaysOnTop != on) p.IsAlwaysOnTop = on;
+        if (AppWindow.Presenter is OverlappedPresenter p) p.IsAlwaysOnTop = _alwaysOnTop;
+        // The presenter skips a value it thinks it already has; SetWindowPos always takes effect.
+        SetWindowPos(WinRT.Interop.WindowNative.GetWindowHandle(this), _alwaysOnTop ? HWND_TOPMOST : HWND_NOTOPMOST,
+            0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
+        _activity?.SetTopmost(_alwaysOnTop);
+    }
+
+    // ---------------------------------------------------------------- keep above the tray icon
+
+    void SetSnapEnabled(bool on)
+    {
+        _snapEnabled = on;
+        AppSettings.KeepAboveTray = on;
+        SetSwitch(SnapSwitch, on);
+        if (!on) SetSnapHint(false);
+        SetSnapped(on);  // on: go to the tray now; off: stay where it is
+    }
+
+    /// <summary>Pin the window above the tray icon (at its default spot), or let it go where it is.
+    /// Pinning does nothing while Keep above the tray icon is off.</summary>
+    void SetSnapped(bool on)
+    {
+        _snapped = on && _snapEnabled;
+        if (_snapped) PlaceSnapped();
+    }
+
+    /// <summary>Show a setting's state on its switch without sending it back as a change.</summary>
+    void SetSwitch(Microsoft.UI.Xaml.Controls.ToggleSwitch toggle, bool on)
+    {
+        if (toggle.IsOn == on) return;
+        bool filling = _settingUp;
+        _settingUp = true;
+        toggle.IsOn = on;
+        _settingUp = filling;
     }
 
     bool Minimized => AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized };
@@ -136,7 +177,7 @@ public sealed partial class MainWindow
     /// <summary>While dragging, preview snapping without changing the proposed window position.</summary>
     void Moving(RECT r)
     {
-        if (_dragAnchor is not { } a) return;
+        if (!_snapEnabled || _dragAnchor is not { } a) return;
         var size = new SizeInt32(r.Right - r.Left, r.Bottom - r.Top);
         var (along, gap) = Measure(a, new PointInt32(r.Left, r.Top), size);
         bool zone = InsideWork(a.Work, new PointInt32(r.Left, r.Top), size) && InZone(a, size, along, gap);
@@ -156,7 +197,7 @@ public sealed partial class MainWindow
     {
         SetSnapHint(false);
         var size = AppWindow.Size;
-        if (_dragAnchor is { } a)
+        if (_snapEnabled && _dragAnchor is { } a)
         {
             var (along, gap) = Measure(a, AppWindow.Position, size);
             // A nearby drop on a different monitor belongs to that monitor, not the tray.
@@ -271,6 +312,8 @@ public sealed partial class MainWindow
     const uint WM_SETTINGCHANGE = 0x001A, WM_DISPLAYCHANGE = 0x007E, WM_MOVING = 0x0216,
                WM_ENTERSIZEMOVE = 0x0231, WM_EXITSIZEMOVE = 0x0232;
     const uint ABM_GETTASKBARPOS = 5;
+    const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOACTIVATE = 0x0010;
+    static readonly IntPtr HWND_TOPMOST = new(-1), HWND_NOTOPMOST = new(-2);
 
     delegate IntPtr SubclassProc(IntPtr hwnd, uint msg, IntPtr w, IntPtr l, UIntPtr id, UIntPtr data);
 

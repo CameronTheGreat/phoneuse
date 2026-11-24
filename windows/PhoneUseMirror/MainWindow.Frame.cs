@@ -324,15 +324,19 @@ public sealed partial class MainWindow
 
     void UpdateHdr()
     {
-        bool hdr;
+        bool hdr = false; float white = 80, peak = 80;
         try
         {
-            hdr = _display?.GetAdvancedColorInfo().CurrentAdvancedColorKind
-                  == Microsoft.Graphics.Display.DisplayAdvancedColorKind.HighDynamicRange;
+            var info = _display?.GetAdvancedColorInfo();
+            hdr = info?.CurrentAdvancedColorKind == Microsoft.Graphics.Display.DisplayAdvancedColorKind.HighDynamicRange;
+            if (hdr) (white, peak) = ((float)info!.SdrWhiteLevelInNits, (float)info.MaxLuminanceInNits);
         }
         catch (Exception) { hdr = false; }
+        // The glow also follows the SDR white slider (it changes without the kind changing).
+        _glow?.SetDisplay(hdr, white, peak);
         if (hdr == _hdr) return;
         _hdr = hdr;
+        if (SettingsVisible) FillGlowSettings();
         ApplyFinish(_finish);  // redraws the band, with the buttons
         if (SettingsVisible) FillFinishSettings();
     }

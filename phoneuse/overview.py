@@ -156,8 +156,8 @@ def checklist(s, name):
     claude = s.get("claude") or {}
     if claude.get("claude"):  # Claude Code is installed
         add("claude", "Connect Claude Code",
-            "Lets Claude Code use the phone: links the phoneuse skill and puts the phoneuse command where "
-            "Claude Code finds it.", done=claude.get("skill") and claude.get("command"), optional=True,
+            "Connects Claude Code to the Phone Use MCP server and links the Phone Use skill.",
+            done=claude.get("skill") and claude.get("command") and claude.get("mcp"), optional=True,
             action="claude")
     return items
 

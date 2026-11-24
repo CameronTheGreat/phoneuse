@@ -12,7 +12,8 @@ using Vortice.Mathematics;
 namespace PhoneUseMirror;
 
 /// <summary>How the glow looks (Settings › Agent glow): the same knobs as windows/GlowSamples.</summary>
-public readonly record struct GlowLook(float Intensity, float Speed, float Size, bool Bleed);
+/// <param name="HdrPeak">On an HDR display: how far above SDR white the inner rim may reach (a multiple; capped by the display's peak).</param>
+public readonly record struct GlowLook(float Intensity, float Speed, float Size, bool Bleed, float HdrPeak = 2.5f);
 
 /// <summary>
 /// The light around the phone while an agent drives it: a pixel shader (HLSL below, the GLSL of
@@ -64,6 +65,20 @@ public sealed unsafe class AgentGlow : IDisposable
     {
         get { lock (_lock) return _look; }
         set { lock (_lock) _look = value; Place(); _wake.Set(); }
+    }
+
+    // The display the mirror is on (MainWindow.UpdateHdr): in HDR mode the glow is drawn into an FP16
+    // scRGB surface, where 1.0 is 80 nits and the SDR white the person chose is sdrWhite / 80.
+    bool _hdr; float _sdrWhite = 80, _maxNits = 80;
+
+    public void SetDisplay(bool hdr, float sdrWhiteNits, float maxNits)
+    {
+        lock (_lock)
+        {
+            if (hdr == _hdr && sdrWhiteNits == _sdrWhite && maxNits == _maxNits) return;
+            (_hdr, _sdrWhite, _maxNits) = (hdr, Math.Max(80, sdrWhiteNits), Math.Max(80, maxNits));
+        }
+        _wake.Set();
     }
 
     public bool Enabled
@@ -183,11 +198,12 @@ public sealed unsafe class AgentGlow : IDisposable
         Span<Vector4> tp = stackalloc Vector4[4];
         while (!_quit)
         {
-            GlowLook look; string agent; bool on, preview; Vector4[] taps;
-            double ow, oh, or, sw, sh, sr, offX, offY; int ww, wh;
+            GlowLook look; string agent; bool on, preview, hdr; Vector4[] taps;
+            double ow, oh, or, sw, sh, sr, offX, offY; int ww, wh; float sdrWhite, maxNits;
             lock (_lock)
             {
                 look = _look; agent = _agent; preview = _preview;
+                (hdr, sdrWhite, maxNits) = (_hdr, _sdrWhite, _maxNits);
                 on = _enabled && _hostVisible && _haveShape && (agent != "idle" || preview);
                 (ow, oh, or, sw, sh, sr) = (_ow, _oh, _or, _sw, _sh, _sr);
                 offX = _ox - _winX; offY = _oy - _winY;  // the phone's corner in the window
@@ -241,6 +257,10 @@ public sealed unsafe class AgentGlow : IDisposable
                 Size = look.Size,
                 Bleed = look.Bleed ? 1 : 0,
                 Margin = (float)margin,
+                Hdr = hdr ? 1 : 0,
+                // 1.0 in the surface = 80 nits; the rim's peak is capped at what the panel can show.
+                HdrScale = sdrWhite / 80f,
+                HdrPeak = Math.Clamp(Math.Min(look.HdrPeak, maxNits / sdrWhite), 1f, 8f),
             };
             // taps: fractions of the screen → units from the phone's centre (y up)
             for (int i = 0; i < 4; i++)
@@ -254,7 +274,7 @@ public sealed unsafe class AgentGlow : IDisposable
             try
             {
                 // Buffer creation/resizing can fail too; keep it inside the recovery path.
-                EnsureSwapChain(ww, wh);
+                EnsureSwapChain(ww, wh, hdr);
                 c.Res = new Vector2(_swapW, _swapH);
                 Draw(ref c);
                 if (!shown) { ShowWindowAsync(_hwnd, 4 /*SW_SHOWNOACTIVATE*/); shown = true; }
@@ -294,8 +314,14 @@ public sealed unsafe class AgentGlow : IDisposable
     static byte[] Compile(string entry, string profile) =>
         Compiler.Compile(ContinuousCorner.Hlsl() + Hlsl, entry, "AgentGlow.hlsl", profile, ShaderFlags.OptimizationLevel3).ToArray();
 
-    void EnsureSwapChain(int w, int h)
+    bool _swapHdr;
+
+    void EnsureSwapChain(int w, int h, bool hdr)
     {
+        // The pixel format differs between the paths, so a display change recreates the swap chain
+        // (rare: moving the window to another display, or switching Windows HDR).
+        if (_swap != null && hdr != _swapHdr) ReleaseSwapChain();
+        var format = hdr ? Format.R16G16B16A16_Float : Format.B8G8R8A8_UNorm;
         if (_swap == null)
         {
             using var dxgi = _device!.QueryInterface<IDXGIDevice>();
@@ -305,7 +331,7 @@ public sealed unsafe class AgentGlow : IDisposable
             {
                 Width = (uint)w,
                 Height = (uint)h,
-                Format = Format.B8G8R8A8_UNorm,
+                Format = format,
                 SampleDescription = new SampleDescription(1, 0),
                 BufferUsage = Usage.RenderTargetOutput,
                 BufferCount = 2,
@@ -313,6 +339,13 @@ public sealed unsafe class AgentGlow : IDisposable
                 SwapEffect = SwapEffect.FlipSequential,
                 AlphaMode = AlphaMode.Premultiplied,  // see-through wherever the shader writes 0
             }, null);
+            if (hdr)
+            {
+                // Linear, Rec.709 primaries (scRGB): DWM adds it to the desktop above SDR white.
+                using var sc3 = _swap.QueryInterface<IDXGISwapChain3>();
+                sc3.SetColorSpace1(ColorSpaceType.RgbFullG10NoneP709);
+            }
+            _swapHdr = hdr;
             _visual!.SetContent(_swap);
             _dcomp!.Commit();
             _swapW = w; _swapH = h;
@@ -322,7 +355,7 @@ public sealed unsafe class AgentGlow : IDisposable
             // The immediate context retains its own reference to the last bound view.
             // Disposing the managed view alone doesn't release the back buffer for resizing.
             _context!.ClearState();
-            _swap.ResizeBuffers(2, (uint)w, (uint)h, Format.B8G8R8A8_UNorm, SwapChainFlags.None).CheckError();
+            _swap.ResizeBuffers(2, (uint)w, (uint)h, format, SwapChainFlags.None).CheckError();
             _swapW = w; _swapH = h;
         }
     }
@@ -357,10 +390,10 @@ public sealed unsafe class AgentGlow : IDisposable
     {
         public Vector2 C; public float Px, R;
         public Vector2 Half, SHalf;
-        public float SR, Time, Reserved, Level;
+        public float SR, Time, Hdr, Level;
         public float Ignite, Paused, Intensity, Speed;
         public float Size, Bleed; public Vector2 Res;
-        public float Margin, Pad0, Pad1, Pad2;
+        public float Margin, HdrScale, HdrPeak, Pad;
         public Vector4 Tap0, Tap1, Tap2, Tap3;
     }
 
@@ -371,10 +404,10 @@ cbuffer Glow : register(b0)
 {
     float2 C; float Px; float R;         // phone centre (window px, y down), px per unit, outer corner radius
     float2 Half; float2 SHalf;           // outer and screen half sizes (units: 300 across the short side)
-    float SR; float Time; float Reserved; float Level;
+    float SR; float Time; float Hdr; float Level;
     float Ignite; float Paused; float Intensity; float Speed;
     float Size; float Bleed; float2 Res;
-    float Margin; float3 Pad;
+    float Margin; float HdrScale; float HdrPeak; float Pad;
     float4 Taps[4];                      // x, y (units from the centre, y up), start time, strength
 };
 
@@ -481,9 +514,11 @@ float4 PS(float4 pos : SV_Position) : SV_Target
     float rim = exp(-abs(d + 0.9) / 0.9);
     if (d > 0)
     {
-        float w1 = 3 * Size * (0.5 + amp);
-        float w2 = 20 * Size * (0.35 + amp);
-        I = exp(-d / w1) * 0.85 + 0.6 / (1 + (d / w2) * (d / w2));
+        // Two Gaussians summed: a tight one hugging the rim and a wide, soft bloom. (One exponential
+        // plus a Lorentzian tail came out as a single smear with a cusp at the rim.)
+        float w1 = 4 * Size * (0.5 + amp);
+        float w2 = 36 * Size * (0.35 + amp);
+        I = exp(-square(d / w1)) * 0.75 + exp(-square(d / w2)) * 0.6;
         I *= smoothstep(0, 1.2, d) * 0.6 + 0.4;
         // fade out before the window's edge
         float edge = min(min(pos.x, pos.y), min(Res.x - pos.x, Res.y - pos.y));
@@ -494,7 +529,13 @@ float4 PS(float4 pos : SV_Position) : SV_Target
     if (ds < 0) I += (exp(glowDs / (9 * Size * (0.4 + amp))) * 0.6 + exp(ds / 1.6) * 0.35) * Bleed;
     I *= E;
 
-    float3 c = lerp(col, 1, clamp(0.55 * rim + 0.2 * exp(-max(d, 0) / 1.5), 0, 0.9));
+    // More saturated the farther out it is, so the bloom stays pink/violet/amber instead of greying;
+    // a thin, nearly white core at the rim.
+    float dOut = max(d, 0);
+    float3 colS = col;
+    { float l = dot(col, float3(0.299, 0.587, 0.114));
+      colS = saturate(lerp(l, col, 1 + 0.6 * smoothstep(1, 25, dOut))); }
+    float3 c = lerp(colS, 1, clamp(0.75 * rim + 0.35 * exp(-square(dOut / 1.6)), 0, 0.95));
 
     float onScreen = 1 - smoothstep(-1, 0, ds);
     float tapI = (ring * 0.55 + dt * 0.5) * onScreen * Level * (1 - Paused) * Intensity;
@@ -502,8 +543,21 @@ float4 PS(float4 pos : SV_Position) : SV_Target
     c = (c * I + lerp(tapCol, 1, 0.35) * tapI) / max(I + tapI, 1e-4);
     I += tapI;
 
-    float a = saturate(I);
-    return float4(min(c * min(I, 1.4), 1), a);  // premultiplied
+    // A shoulder instead of a clamp: 1.4 comes out at 0.91, so the core never flattens into a band.
+    float v = 1 - exp(-1.7 * I);
+    float3 enc = c * v;  // light as a gamma 2.2 monitor shows it, 0..1, brightest point below 1
+    // Premultiplied with alpha well under the colour: DWM adds the glow to what is behind it
+    // (out = src + dst * (1 - a)), a screen-like blend that brightens the phone's edge instead of covering it.
+    float a = v * 0.5;
+    if (Hdr < 0.5) return float4(enc, a);
+
+    // HDR: the same look as linear scRGB (1.0 = 80 nits, the SDR white level is HdrScale), and the
+    // rim runs up to HdrPeak times SDR white, falling to 1x over ~12 units. Only this layer goes
+    // above SDR white; the mirror picture and the UI under it aren't touched.
+    float hd = abs(d + 0.5);
+    float hot = saturate(0.7 * exp(-square(hd / 2.5)) + 0.3 * exp(-square(hd / 12)));
+    float3 lin = pow(max(enc, 0), 2.2) * (1 + (HdrPeak - 1) * hot) * HdrScale;
+    return float4(lin, a);
 }
 """;
 

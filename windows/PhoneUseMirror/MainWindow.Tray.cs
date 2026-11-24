@@ -7,8 +7,8 @@ namespace PhoneUseMirror;
 /// <summary>
 /// The window and phoneuse's lifetime: opening the window starts phoneuse when it
 /// isn't running (Backend); closing the window only hides it to the tray, so
-/// agents keep the phone; the tray's Quit stops the phoneuse this window started
-/// and exits. An unlock or agent-start request brings the window back.
+/// agents keep the phone. The tray's Quit stops MCP and the phoneuse backend the
+/// window started. An unlock or agent-start request brings the window back.
 /// </summary>
 public sealed partial class MainWindow
 {
@@ -21,7 +21,7 @@ public sealed partial class MainWindow
         _tray = new TrayIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
         _tray.Click += () => _ui.TryEnqueue(TrayClicked);
         _tray.Open += () => _ui.TryEnqueue(ShowFromTray);
-        _tray.SnapChanged += on => _ui.TryEnqueue(() => { SetSnapped(on); ShowWindow(); });
+        _tray.AlwaysOnTopChanged += on => _ui.TryEnqueue(() => SetAlwaysOnTop(on));
         _tray.Logs += () => _ui.TryEnqueue(ShowLog);
         _tray.About += () => _ui.TryEnqueue(() => { ShowFromTray(); ShowAbout(); });
         _tray.Quit += () => _ui.TryEnqueue(QuitApp);
@@ -62,7 +62,7 @@ public sealed partial class MainWindow
         }
     }
 
-    // Only a tray-icon reopen resets a hidden window to the default snap position.
+    // Only a tray-icon reopen resets a hidden window to the default snap position (when Keep above the tray icon is on).
     public void ShowFromTray()
     {
         if (_quitting) return;
@@ -79,6 +79,7 @@ public sealed partial class MainWindow
         if (AppWindow.Presenter is OverlappedPresenter p && p.State == OverlappedPresenterState.Minimized) p.Restore();
         PlaceSnapped();  // above the icon, wherever it is now
         AppWindow.Show(true);
+        ApplyTopmost();  // a hidden window can come back without its topmost state
         Activate();
         if (_hidden)
         {
@@ -90,7 +91,7 @@ public sealed partial class MainWindow
     LogWindow? _log;
     public void ShowAbout()
     {
-        ShowOverlay(_aboutView ??= new AboutView());
+        ShowOverlay(_aboutView ??= new AboutView(_darkMode));
     }
 
     void HideAbout()
@@ -126,6 +127,7 @@ public sealed partial class MainWindow
         _log?.Close();
         _tray?.Dispose();
         _tray = null;
+        Backend.StopMcp();
         Backend.Stop();
         Close();
         Microsoft.UI.Xaml.Application.Current.Exit();

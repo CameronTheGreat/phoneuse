@@ -55,15 +55,20 @@ def native_window():
     return next((p for p in NATIVE if os.path.exists(p)), None)
 
 
-def open_window(url=None):
-    """Open the mirror window: the native one when it's built (windows\\scripts\\build-winui.ps1),
-    else the browser mirror in an Edge/Chrome app window. Returns False when neither is
-    available (the caller then opens the page in the default browser)."""
+def open_native_window():
+    """Start WinUI, or let its single-instance handler restore the running window."""
     exe = native_window()
-    if exe:
-        subprocess.Popen([exe, "--port", str(CFG["web_port"])],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                         creationflags=0x00000008 | 0x00000200)  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+    if not exe:
+        return False
+    subprocess.Popen([exe, "--port", str(CFG["web_port"])],
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     creationflags=0x00000008 | 0x00000200)  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+    return True
+
+
+def open_window(url=None):
+    """Show WinUI when available, otherwise use an Edge/Chrome app window."""
+    if open_native_window():
         return True
     url = url or f"http://localhost:{CFG['web_port']}/"
     exe = browser()

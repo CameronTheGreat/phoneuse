@@ -44,5 +44,6 @@ public partial class App : Application
         {
             while (show.WaitOne()) ui.TryEnqueue(window.ShowFromTaskbar);
         }) { IsBackground = true, Name = "show" }.Start();
+        Backend.StartMcp();
     }
 }

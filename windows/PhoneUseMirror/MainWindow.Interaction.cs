@@ -35,13 +35,18 @@ public sealed partial class MainWindow
         var canvas = new Canvas(); // empty canvas areas pass input through to the phone
         Grid.SetRowSpan(canvas, 2);
         Root.Children.Add(canvas);
-        for (int edge = 0; edge <= 8; edge++)
+        // Grips 9-12 are the second leg of each L-shaped corner (along the top or bottom bezel). There is no
+        // bottom-edge grip: a home swipe starts at the bottom middle, and a grip there resized the window.
+        int[] edges = { 0, 1, 2, 3, 4, 5, 7, 8, 4, 5, 7, 8 };
+        int[] ids = { 0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12 };
+        for (int i = 0; i < ids.Length; i++)
         {
+            int edge = edges[i];
             var cursor = edge switch
             {
                 0 => InputSystemCursorShape.SizeAll,
                 1 or 2 => InputSystemCursorShape.SizeWestEast,
-                3 or 6 => InputSystemCursorShape.SizeNorthSouth,
+                3 => InputSystemCursorShape.SizeNorthSouth,
                 4 or 8 => InputSystemCursorShape.SizeNorthwestSoutheast,
                 _ => InputSystemCursorShape.SizeNortheastSouthwest,
             };
@@ -51,15 +56,17 @@ public sealed partial class MainWindow
                 0 => "Move phone window",
                 1 => "Resize left edge", 2 => "Resize right edge", 3 => "Resize top edge",
                 4 => "Resize top left corner", 5 => "Resize top right corner",
-                6 => "Resize bottom edge", 7 => "Resize bottom left corner", _ => "Resize bottom right corner",
+                7 => "Resize bottom left corner", _ => "Resize bottom right corner",
             };
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(grip, label);
+            if (ids[i] > 8) Microsoft.UI.Xaml.Automation.AutomationProperties.SetAccessibilityView(grip,
+                Microsoft.UI.Xaml.Automation.Peers.AccessibilityView.Raw);
             grip.PointerPressed += FrameGrip_Pressed;
             grip.PointerMoved += FrameGrip_Moved;
             grip.PointerReleased += FrameGrip_Released;
             grip.PointerCanceled += FrameGrip_Released;
             grip.PointerCaptureLost += FrameGrip_Released;
-            _frameGrips.Add(edge, grip);
+            _frameGrips.Add(ids[i], grip);
             canvas.Children.Add(grip);
         }
     }
@@ -165,24 +172,34 @@ public sealed partial class MainWindow
         double screenX = _screenBounds.X / scale, screenY = _screenBounds.Y / scale;
         double screenRight = (_screenBounds.X + _screenBounds.Width) / scale;
         double screenBottom = (_screenBounds.Y + _screenBounds.Height) / scale;
-        const double corner = 18;
-        void Place(int edge, double left, double top, double width, double height)
+        // Each corner zone covers the band's curve: a leg down the side bezel and a leg along the top or
+        // bottom bezel. An 18 px zone left most of the curve to the side and top grips, so the cursor
+        // showed a straight arrow on a diagonal corner.
+        double corner = Math.Clamp(_glowShape.r * 0.8, 18, Math.Min(right - x, bottom - y) / 3);
+        void Place(int id, double left, double top, double width, double height)
         {
-            var grip = _frameGrips[edge];
+            var grip = _frameGrips[id];
             Canvas.SetLeft(grip, Math.Max(0, left));
             Canvas.SetTop(grip, Math.Max(0, top));
             grip.Width = Math.Max(1, width);
             grip.Height = Math.Max(1, height);
         }
-        Place(0, x + corner, y - 4, right - x - 2 * corner, screenY - y + 4);
-        Place(1, x - 4, y + corner, screenX - x + 4, bottom - y - 2 * corner);
-        Place(2, screenRight, y + corner, right - screenRight + 4, bottom - y - 2 * corner);
+        double leftW = screenX - x + 4, rightW = right - screenRight + 4;
+        double topH = screenY - y + 4, bottomH = bottom - screenBottom + 4;
+        Place(0, x + corner, y - 4, right - x - 2 * corner, topH);
+        Place(1, x - 4, y + corner, leftW, bottom - y - 2 * corner);
+        Place(2, screenRight, y + corner, rightW, bottom - y - 2 * corner);
         Place(3, x + corner, 0, right - x - 2 * corner, 5);
-        Place(4, x - 4, y - 4, screenX - x + 4, corner + 4);
-        Place(5, screenRight, y - 4, right - screenRight + 4, corner + 4);
-        Place(6, x + corner, screenBottom, right - x - 2 * corner, bottom - screenBottom + 4);
-        Place(7, x - 4, bottom - corner, screenX - x + 4, corner + 4);
-        Place(8, screenRight, bottom - corner, right - screenRight + 4, corner + 4);
+        // side legs
+        Place(4, x - 4, y - 4, leftW, corner + 4);
+        Place(5, screenRight, y - 4, rightW, corner + 4);
+        Place(7, x - 4, bottom - corner, leftW, corner + 4);
+        Place(8, screenRight, bottom - corner, rightW, corner + 4);
+        // top and bottom legs, between the side bezel and the end of the curve
+        Place(9, screenX, y - 4, x + corner - screenX, topH);
+        Place(10, right - corner, y - 4, screenRight - (right - corner), topH);
+        Place(11, screenX, screenBottom, x + corner - screenX, bottomH);
+        Place(12, right - corner, screenBottom, screenRight - (right - corner), bottomH);
     }
 
     RECT ResizedBounds(int edge, RECT r)

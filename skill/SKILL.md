@@ -1,251 +1,107 @@
 ---
 name: phoneuse
-description: See and operate the user's iPhone from this PC (Linux or Windows) with the `phoneuse` CLI (AirPlay mirror for the screen, Bluetooth mouse/keyboard for input). Use when a task needs the iPhone: open or use an app, read what is on the phone screen, tap, type, swipe, check a notification, change a phone setting, or test something on the device. Also use when the mirror or the Bluetooth link needs starting or fixing.
+description: Use the Phone Use MCP tools (or the phoneuse CLI) to view and operate the owner's iPhone from this computer, and ask Apple Intelligence on it. Explains every tool and when to use it.
 ---
 
-# Operating the iPhone with Phone Use
+# Phone Use
 
-The `phoneuse` command drives a real, unmodified iPhone. Its screen arrives over
-AirPlay as a mirror window on this PC and as a live page at
-http://localhost:8777, and input goes in as a Bluetooth mouse and keyboard.
-Everything an agent does is a `phoneuse` subcommand; run `phoneuse --help` for
-the full list.
+Phone Use shows the owner's iPhone on this PC (AirPlay Screen Mirroring) and
+sends touches and keys to it as a Bluetooth keyboard and pointer. Nothing runs
+on the phone for control. Every MCP tool is also a `phoneuse` CLI command
+(`phoneuse commands` lists them). Run the CLI from a shell when MCP isn't
+connected.
 
-## Before acting
+## Start, stop and recover
 
-1. Run `phoneuse status`. You need `iPhone app: 1 paired` (or more), `HID service:
-   active`, `connected=True`, and `Mirror window: ... showing the phone` (Windows:
-   `Mirror: showing the phone`). "not paired": stop and ask the user to pair the Phone
-   Use app (Pair iPhone in the Phone Use window); every action is refused until they
-   do. If something is off and you don't see why, `phoneuse doctor` checks the whole
-   setup and prints the fix for each problem.
-2. No mirror window: check whether `phoneuse up` is running. If it isn't, start it
-   somewhere the user can see it (a terminal or tmux window they use), not hidden in
-   the background. "not mirroring" (or no window): ask the user to start Screen
-   Mirroring to this PC's receiver ("Phone Use on <computer>"; `phoneuse status`
-   names it) from the iPhone's Control Center. You can't start
-   mirroring from the PC, and every input command refuses until it runs.
-3. **Show the user the phone** before your first action, so they can watch what
-   you do: open http://localhost:8777 (`phoneuse view --print` prints the address).
-   Unless the user asks for another place, open it in your harness's own browser,
-   such as the Claude desktop app's browser pane, without asking first. Only when
-   you have no browser of your own, run `phoneuse view`, which opens it in the
-   user's default browser. Do this once per task; if the page is already open,
-   leave it. The page is for the user to watch: act through `phoneuse` commands,
-   never by clicking in the page.
-4. `connected=False`: run `phoneuse status` again after a few seconds (the daemon
-   reconnects), then ask the user to tap "Phone Use" in the iPhone's Bluetooth settings
-   (Windows: the PC's name, which `phoneuse status` shows as `name=`).
-5. HID service not active: on Linux `phoneuse install` (needs sudo) sets it up; on
-   Windows `phoneuse up` starts it (it keeps running after `up` stops).
+Call `status` and `show_mirror` before operating the phone. Follow the
+recovery steps in `status` if the connection drops. Call `end_session` when
+you are finished.
 
-## Notes in results
+- **Phone is locked.** Use `request_unlock`. For a manual unlock, ask the
+  owner, then call `wait_for_unlock` once and make no other tool calls until it
+  returns. Resume only on `unlocked`. On a timeout, wait for the owner before
+  retrying.
+- **The owner's part.** The owner handles approvals, passcodes and takeover.
+  Never ask for or enter a passcode. Never tap Allow on a permission prompt.
+- **MCP server unavailable on Windows.** Open **Phone Use** from Start, or run
+  `windows/dist/PhoneUseMirror.exe` from a checkout. Opening the app starts
+  the server. Closing the window keeps it running in the tray, and **Quit** in
+  the tray menu stops it. After reopening Phone Use, reconnect the MCP client
+  or start a new chat if the tools are still unavailable.
 
-Every action waits (up to 3 s) for the phone's first visible change and prints
-`ok`, then any notes. When a note says no change showed, the action may have done
-nothing or the phone is slow: look before repeating it, never just repeat. When a
-note says the phone is slow, leave time between actions.
+## The tools
 
-## The loop
+Coordinates are fractions of the screen from 0 to 1, from the top-left
+corner. Take positions from a recent `look` or `inspect_region`. If the screen
+moved since then, look again.
 
-Look, decide, act, look again. Look with text first; it costs a few hundred
-tokens, where a screenshot image costs about 1,300.
+**Session and connection**
 
-```bash
-phoneuse text                         # every text line on screen: "x y  text"
-phoneuse tap-on "Wi-Fi"               # tap a text label (exact position from OCR)
-phoneuse tap 0.5 0.35 --text          # any action + --text: act, then print the screen
-```
+| Tool | CLI | Use it to |
+|---|---|---|
+| `status` | `status` | Check the mirror, Bluetooth and owner takeover. The first call, and again after anything goes wrong. |
+| `show_mirror` | `view` | Show the owner the mirror before you act. |
+| `reconnect_bluetooth` | `reconnect` | Reconnect a paired phone after `status` shows Bluetooth down. Try it once. |
+| `request_unlock` | `unlock` | Ask the owner to approve a saved-passcode unlock. |
+| `wait_for_unlock` | `wait-for-unlock` | Wait, without sending input, while the owner unlocks by hand. |
+| `end_session` | `done` | Give control back to the owner. Always call it at the end. |
 
-End actions with `--text` to read the result in the same call; it waits until
-the screen stops changing (apps launching, pages sliding in) before reading.
-`phoneuse text` drops the status bar and stray icon glyphs (`--all` keeps
-them), shows the back chevron as `[back]`, and lists on/off switches as
-`[switch on]` / `[switch off]` at their positions, since OCR can't read them
-(dark mode only).
+**Seeing the screen**
 
-`tap-on` looks for the words among the screen's text and taps that line exactly.
-Words that aren't on screen are refused, so scroll first. It is also refused when
-that part of the screen changed since your last look (you decided from an older
-picture): look again. Icons and pictures have no text: take a screenshot and tap
-them by position. OCR runs locally through a service that starts on first use
-(the first call takes a few seconds).
+| Tool | CLI | Use it to |
+|---|---|---|
+| `look` | `text` | Read the visible text with positions (OCR). Cheap, so use it first. |
+| `inspect_region` | `inspect-region` | Get a crop image plus OCR for icons, images, or text that `look` misreads. |
+| `wait_for` | `wait-for` | Wait for a label to appear, without touching anything. |
+| `find_in_scroll` | `find-in-scroll` | Scroll a list until a label shows up, then return its position. |
 
-Take a real screenshot when text isn't enough: pictures, icon-only screens,
-checking a layout.
+**Acting**
 
-```bash
-phoneuse screenshot $SCRATCH/s1.png   # then look at the image with the Read tool
-phoneuse tap 0.5 0.35                 # fractions of the screenshot (x, y)
-phoneuse screenshot $SCRATCH/s2.png   # waits until the screen has settled
-```
+| Tool | CLI | Use it to |
+|---|---|---|
+| `open_app` | `open` | Open an app by its name (through search). |
+| `tap_on` | `tap-on` | Tap a unique label. Use `near` or `region` to narrow it, and `expect` to check that the next screen came. This is the preferred tap. |
+| `tap` | `tap` | Tap a position, when the target has no readable label. |
+| `long_press` | `longpress` | Press and hold, for context menus. |
+| `swipe` | `swipe` | Drag, for carousels, sliders and dismissing sheets. |
+| `scroll_by` | `scroll-by` | Scroll by part of a screen. A positive value shows what is below. |
+| `type_text` | `type` | Replace the focused field's text. |
+| `press_key` | `key` | Press a key or a key combination: return, esc, tab, cmd+a, cmd+space. |
+| `toggle_keyboard` | `keyboard` | Show or hide the on-screen keyboard. |
+| `back` | `back` | Go back in the current app. |
+| `navigate` | `recipe` | Use a system gesture: home, switcher, control-center, notifications or dismiss. |
+| `run_steps` | (MCP only) | Run several steps you already know will work in one call, such as `open_app`, then `tap_on` with `expect`, then `type_text`. It stops at the first failure. |
 
-Write screenshots into your own scratch directory with a new name each time,
-so you never read a stale image. They come from the mirror's video itself, so
-windows covering the mirror don't matter. The grey AssistiveTouch button near the lower right stays on screen
-and can hide what is under it; scroll a little if you need that spot.
+If a result says input "was sent" or "may have been sent", look at the screen
+before you retry, so nothing happens twice. Avoid tapping the Dynamic Island,
+because that can stop Screen Mirroring.
 
-Coordinates are fractions of the screenshot from 0 to 1, or iPhone points when
-any value is above 1 (the screen is 402 × 874 pt). To tap something, read its
-centre off the screenshot and divide by the image size. Taps land exactly; one
-try is enough.
+## Asking Apple Intelligence: `siriai`
 
-## Working fast
+`siriai` types a prompt on the phone and returns the visible reply. You must
+choose a model. Without one, the tool refuses and lists the choices.
 
-Every round trip with the phone costs you a turn, so make each one count.
+| `model` (MCP) / flag (CLI) | What answers | Sees | Use for |
+|---|---|---|---|
+| `siri-plus-context` / `--siri-plus-context` | Siri, typed to in the Siri app | The owner's personal context (messages, mail, calendar, what's on screen), plus app intents, so it can act in apps | Questions about the owner's own data, or getting something done on the phone |
+| `on-device` / `--on-device` | The on-device model, through the **PhoneUse On-Device** shortcut | Only the prompt | Quick, private text work: rewrite, summarize, classify |
+| `cloud` / `--cloud` | Private Cloud Compute, through **PhoneUse Cloud** | Only the prompt, and it may also look things up on the web | Harder questions that should stay private |
+| `cloud-pro` / `--cloud-pro` | Apple's largest cloud model, through **PhoneUse Cloud Pro** | Only the prompt | Hard reasoning. It is slower and has tight daily limits. |
 
-- **Never `sleep`.** `--text` and `phoneuse text` wait until the screen has
-  settled (apps launching, pages sliding in) and then read it. A fixed sleep is
-  either too short or wasted time.
-- **Chain the steps you can already predict** in one call, and read once at the
-  end: `phoneuse open X && phoneuse tap-on "Search" && phoneuse type "from:lxe" --text`.
-  Stop chaining where the next step depends on what appears.
-- **Read with text, not images.** `--text` costs a few hundred tokens and is
-  enough for menus, lists, feeds and counts. Take a screenshot only for
-  pictures, icon-only screens, or when text lands somewhere surprising.
-- **Feeds you act on (X, Instagram home, lists): `scroll`, then look, then tap.**
-  `phoneuse scroll down 0.6` moves the content without momentum, so it stops where
-  the finger lifts and your next screenshot stays true. A flick keeps the feed
-  gliding after your screenshot, and a tap from that picture hits the wrong post.
-- **Flicks only for snap feeds**: `phoneuse gesture down 0.5 0.75 move 0.5 0.25 0.2 up` moves
-  Reels, TikTok or Shorts to the next item.
-- **Taps by position are checked**: `tap` and `gesture` (at its first `down`) refuse when the
-  area around the point changed since your last look (screenshot, `--text`, or an
-  gesture's film), because the position then belongs to something else. Look
-  again and tap. `--force` taps anyway, for fixed controls like
-  a tab bar right after a page change.
-- **Repeat cheap actions in one call** when you know the layout, e.g. three
-  flicks with a text read after each:
-  `for i in 1 2 3; do phoneuse gesture down 0.5 0.75 move 0.5 0.25 0.2 up --text | head -8; done`.
+- Shortcut models can't read the owner's data or run app actions. If you need
+  either, use `siri-plus-context`, and put any text the model needs
+  inside the prompt.
+- Siri can send, buy and change things. Get the owner's OK before any prompt
+  that would do so.
+- Prompts are one line, at most a few sentences, using US-keyboard characters
+  only.
+- **If a model's shortcut is missing,** `siriai` says so and gives the exact
+  steps to build it. Ask the owner whether they want to make it or want you to
+  make it with the tools above. Then follow the steps exactly: the shortcut
+  name, the input prompt `phoneuse model prompt` and the alert title
+  `phoneuse model answer` must match character for character.
 
-## Gestures: every touch
+## More
 
-Any touch other than a plain tap is a **gesture**: steps for one finger, in order.
-
-```
-down X Y      touch down at X Y (the pointer moves there and settles first)
-move X Y [S]  slide to X Y over S seconds (default 0.3), finger still down
-hold S        stay still S seconds (finger down or up)
-up            lift (a gesture ends lifted anyway)
-```
-
-```bash
-phoneuse gesture down 0.5 0.4 hold 0.8 up                           # long press
-phoneuse gesture down 0.5 0.8 move 0.5 0.2 0.3 up                   # swipe up
-phoneuse gesture down 0.2 0.3 hold 1.0 move 0.7 0.6 1.0 hold 0.5 up # press, then drag (move an icon)
-phoneuse gesture down 0.5 0.4 up hold 0.1 down 0.5 0.4 up           # double tap
-```
-
-**Every gesture comes back as a film**: one image with a frame at the end of each
-move, at the end of each hold while the finger is down, just before a long press
-lifts, and 0.3 and 0.8 s after the lift (frames that didn't change are merged).
-Each frame is labelled with its step, and a ring marks the finger (orange with a
-dot while down, white once up). The command saves it and prints `film: PATH`
-(`--film PATH` picks the file): Read it when the gesture's middle matters. Use
-it to see what the phone did before the finger lifted (icons shifting aside, a
-folder forming, a menu opening) and to fix the next gesture from that.
-
-Build what the task needs out of
-these steps: hold longer, drag slower, pause over a target, drag on, hold at a
-screen edge to change pages. Slow moves (0.6-1.5 s across most of the screen) are
-the steadiest. A fast move right before `up` flings scrolling content; for content,
-use `scroll` or `scroll-by`, which stop exactly.
-
-**Recipes** are gestures with names: `phoneuse recipe back`.
-Built in: `back`, `switcher`, `control-center`, `notifications`, `dismiss`, `home`
-(the Home key) and `long-press X Y [S]`. `phoneuse recipe list`
-shows each one's steps. When a gesture works for something you'll do again, save it
-for this and later sessions, with `$1`, `$2`... for values given when it runs:
-
-```bash
-phoneuse recipe save move-icon down $1 $2 hold 1.0 move $3 $4 1.0 hold 0.5 up -- drag a home screen icon
-phoneuse recipe move-icon 0.2 0.3 0.7 0.6
-```
-
-[RECIPES.md](RECIPES.md), next to this file,
-has the gesture table and how each recipe was measured; read it before a gesture
-you haven't done before.
-
-## Other commands (verified on the device)
-
-| Goal | Command |
-|---|---|
-| Open an app | `phoneuse open Settings` (Cmd+H, Cmd+Space, type the name, Enter) |
-| Tap | `phoneuse tap X Y` |
-| Scroll | `phoneuse scroll down [N]` · `phoneuse scroll up [N]` (N half-screens; stops where the drag ends, no fling) |
-| Scroll an exact amount | `phoneuse scroll-by DY` (screen fraction or points; positive shows what is below) |
-| Home, back, overlays | `phoneuse home` · `back` · `switcher` · `control-center` · `notifications` · `dismiss` (the recipes; Cmd+H does not close overlays) |
-| Type text / keys | `phoneuse type "hello\n"` · `phoneuse key cmd+space` |
-| Show / hide the iPhone keyboard | `phoneuse keyboard` (Eject; it hides while Phone Use's keyboard is connected) |
-| Keep the screen from locking | `phoneuse awake on` / `off` (a few-pixel pointer nudge each second while nobody uses the phone; also the page's settings) |
-| Does the pointer work? | `phoneuse cursor` (on / off / unknown). Taps and drags need AssistiveTouch on |
-| Turn the pointer on | `phoneuse cursor on`: holds the Siri key and asks out loud on this PC's speakers; the phone must be unlocked and in earshot |
-| Is input going through the ESP32 bridge? | `phoneuse bridge status` (address, phone, round trip). Setup is in the browser mirror's settings; docs/BRIDGE.md |
-| Drags or scrolls fall short | `phoneuse calibrate` (~13 s of hovering, nothing tapped): measures this phone's pointer speed for drags. Runs by itself the first time a phone's pointer is on; rerun after changing Tracking Speed |
-| Where is the pointer | `phoneuse where` |
-
-## Ending a session
-
-Your actions start an agent session by themselves (the user's view glows and
-their mouse and keyboard pause). When your task is done, run `phoneuse done`
-to hand the phone back at once.
-
-## When the user takes over
-
-If an action fails with "The user took over the phone", or a result starts with
-PAUSED, stop and wait. Continue only when the user tells you to. A note that the
-picture is old means the phone's screen is off or mirroring stalled: ask the user.
-
-To see notifications, use `phoneuse notifications-read`:
-it opens Notification Center, reads it and closes it. They are private: use only
-what the task needs.
-
-## Typing
-
-Typing replaces what the focused field already holds (fields often keep earlier
-text, such as a previous search or prompt); add `--append` to add to it
-instead.
-
-The phone applies autocorrect to typed text (a test typed "phoneuse" and sent
-"phone use"). Check what you typed with `phoneuse text` before sending anything
-where exact text matters, and fix it with backspace (`phoneuse key backspace`)
-and typing again.
-
-## Apps reopen where they were left
-
-`phoneuse open` brings an app back in whatever state it was last in: a detail
-sheet, a settings sub-page, a half-scrolled list. Check the first screenshot
-before trusting what it shows. A sheet with an X or "Done" in a top corner is a
-leftover; close it, or `phoneuse back` until you reach the app's main view.
-
-## Rules
-
-- **Lock screen:** stop and ask the user to unlock the phone, then continue. Phone
-  Use doesn't save or type the passcode. Never type a passcode yourself and never
-  guess one.
-- **Don't tap the top centre** (the Dynamic Island, roughly x 0.35–0.65, y < 0.06):
-  it opens the Screen Mirroring popup, whose Stop Mirroring button cuts the screen
-  feed.
-- **This is the user's personal phone.** Messages, notifications, badges and photos on
-  it are private. Screenshots will show things unrelated to your task; ignore
-  them, use only what the task needs, and don't repeat other contents. Ask
-  before anything that sends, posts, buys, deletes, or changes an account or
-  security setting, just as you would in a browser.
-- **Permission prompts** ("Allow notifications?" and the like) belong to the user.
-  Leave them, or ask, unless the task is about that permission.
-- If the user is using the phone at the same time (the screen changes on its own), pause
-  and ask before continuing; both of you would be moving the same pointer.
-
-## When something misbehaves
-
-- A tap or swipe seems to miss: take a fresh screenshot first. The mirror trails
-  the phone slightly, so an earlier screenshot may be stale.
-- You never need to locate the pointer to act: taps and drags start from exact
-  positions. `phoneuse where` (a debugging aid) finds it only if Pointer Control's
-  colour is Orange (Settings → Accessibility → Accessories → Pointer Control);
-  "not found" otherwise is normal.
-- An action seems to do nothing: the screen was probably still changing (an app
-  launching, a sheet animating). Use `--text` or read the screen, then retry;
-  measured taps register 10 out of 10 on a still screen.
-- Taps happen on their own wherever the pointer rests: Dwell Control is on. Ask
-  the user to turn it off (Accessibility → Touch → AssistiveTouch → Dwell Control).
+`RECIPES.md` covers gestures and saved recipes in depth (CLI `gesture`,
+`recipe save`, `--exact` drags).

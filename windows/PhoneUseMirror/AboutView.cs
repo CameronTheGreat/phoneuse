@@ -14,17 +14,29 @@ public sealed class AboutView : UserControl
 {
     readonly StackPanel _body = new() { Spacing = 6, Padding = new Thickness(20, 8, 20, 28), MaxWidth = 640 };
 
-    public AboutView()
+    readonly bool _darkMode;
+
+    public AboutView(bool darkMode)
     {
+        _darkMode = darkMode;
         string pc = Environment.MachineName;
-        var version = typeof(AboutView).Assembly.GetName().Version?.ToString(3) ?? "";
+        var version = Updater.CurrentText;  // as Settings and the updater say it (0.1.7, or 0.1.7.42 from CI)
+
+        // the site's mascot (site/src/img/hero.webp), on its own cream
+        var mascot = Path.Combine(AppContext.BaseDirectory, "Assets", "Mascot.png");
+        if (File.Exists(mascot))
+            _body.Children.Add(new Image
+            {
+                Source = new BitmapImage(new Uri(mascot)), Stretch = Stretch.Uniform, MaxHeight = 180,
+                HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 4),
+            });
 
         // header
         var head = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 14, Margin = new Thickness(0, 0, 0, 6) };
         var png = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.png");
         if (File.Exists(png)) head.Children.Add(new Image { Source = new BitmapImage(new Uri(png)), Width = 56, Height = 56 });
         var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        titles.Children.Add(new TextBlock { Text = "Phone Use", Style = ThemeStyle("TitleTextBlockStyle") });
+        titles.Children.Add(new TextBlock { Text = "Phone Use", Style = Brand.Title });
         titles.Children.Add(new TextBlock { Text = "Version " + version, Opacity = 0.6 });
         head.Children.Add(titles);
         _body.Children.Add(head);
@@ -53,10 +65,10 @@ public sealed class AboutView : UserControl
                "a delay, or only when you allow it.");
 
         Heading("The app and phoneuse");
-        Bullet("Opening Phone Use starts phoneuse in the background when it isn't already running " +
-               "(a phoneuse up in a terminal works too).");
+        Bullet("Opening Phone Use starts the local MCP server and starts phoneuse in the background " +
+               "if it isn't already running.");
         Bullet("Closing the window keeps Phone Use in the tray, so agents can keep using the phone. " +
-               "Click the tray icon to open it again; Quit in its menu stops the phoneuse it started.");
+               "Click the tray icon to open it again. Quit stops MCP and the phoneuse backend the app started.");
         Bullet("The Bluetooth keyboard and mouse keep running after Quit, so the iPhone stays paired. " +
                "phoneuse down stops them.");
         Bullet("Settings › Start with Windows starts phoneuse when you sign in, with Phone Use in the tray.");
@@ -90,12 +102,10 @@ public sealed class AboutView : UserControl
         Content = new ScrollViewer { Content = _body };
     }
 
-    static Style ThemeStyle(string key) => (Style)Application.Current.Resources[key];
-
     void Heading(string text) => _body.Children.Add(new TextBlock
     {
         Text = text,
-        Style = ThemeStyle("SubtitleTextBlockStyle"),
+        Style = Brand.Subtitle,
         Margin = new Thickness(0, 18, 0, 2),
     });
 
@@ -109,38 +119,32 @@ public sealed class AboutView : UserControl
 
     void Bullet(string text)
     {
-        var g = new Grid { ColumnSpacing = 10 };
-        g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var g = Ui.Columns(10, "auto", "*");
         g.Children.Add(new TextBlock { Text = "•", Opacity = 0.6 });
-        var t = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Opacity = 0.85, IsTextSelectionEnabled = true };
-        Grid.SetColumn(t, 1);
-        g.Children.Add(t);
+        new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Opacity = 0.85, IsTextSelectionEnabled = true }.AddTo(g, 1);
         _body.Children.Add(g);
     }
 
     void Step(int n, string title, string text)
     {
-        var g = new Grid { ColumnSpacing = 12, Margin = new Thickness(0, 4, 0, 4) };
-        g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var g = Ui.Columns(12, "auto", "*");
+        g.Margin = new Thickness(0, 4, 0, 4);
         var badge = new Border
         {
             Width = 24, Height = 24, CornerRadius = new CornerRadius(12), VerticalAlignment = VerticalAlignment.Top,
-            Background = (Brush)Application.Current.Resources["AccentFillColorDefaultBrush"],
+            Background = Brand.AppearanceBrush("Plum", _darkMode),
             Child = new TextBlock
             {
                 Text = n.ToString(), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                 HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-                Foreground = new SolidColorBrush(Microsoft.UI.Colors.Black),
+                Foreground = Brand.AppearanceBrush("Bg", _darkMode),
             },
         };
         g.Children.Add(badge);
         var col = new StackPanel { Spacing = 2 };
-        col.Children.Add(new TextBlock { Text = title, Style = ThemeStyle("BodyStrongTextBlockStyle") });
+        col.Children.Add(new TextBlock { Text = title, Style = Brand.BodyStrong });
         col.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Opacity = 0.85, IsTextSelectionEnabled = true });
-        Grid.SetColumn(col, 1);
-        g.Children.Add(col);
+        col.AddTo(g, 1);
         _body.Children.Add(g);
     }
 }

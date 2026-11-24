@@ -19,7 +19,7 @@ app isn't built.
 
 ## Install the app
 
-Each release, and each build of `main`, has two downloads (the GitHub workflow
+Each release, and each build of `master`, has two downloads (the GitHub workflow
 `.github/workflows/windows-app.yml` makes them with `windows/scripts/package.ps1`):
 
 - **`PhoneUse-<version>-win-x64-setup.exe`**, an installer for your account only (no admin
@@ -76,11 +76,10 @@ installer and the zip (it needs Inno Setup 6 for the installer).
 4. **For agents, pair the iPhone app** ([COMPANION.md](COMPANION.md)): in the Phone Use
    window, Settings › Pair iPhone shows a QR code to scan with the Phone Use app.
    Agents are refused until an app is paired.
-5. **Connect Claude Code**, if you use it: `phoneuse claude connect` links the phoneuse
-   skill into `~\.claude\skills` and puts the `phoneuse` command in `~\.local\bin`, where
-   Claude Code's own `claude` is (an sh script for its Bash tool, and `phoneuse.cmd` for
-   PowerShell and cmd). Both point at this copy of Phone Use. `phoneuse claude disconnect`
-   removes them. It also removes the MCP server older versions of Phone Use added.
+5. **Connect your agent** to the [Phone Use MCP server](MCP.md). WinUI starts
+   it automatically, and **Quit** in the tray menu stops it. For Claude Code,
+   `phoneuse claude connect` registers the endpoint and links the skill; for Codex,
+   `phoneuse codex connect` does the same.
 
 ## The Phone Use window
 
@@ -178,9 +177,8 @@ The bridge on Windows has been tested against a simulated bridge
 - The PC isn't published over Bonjour (no Avahi), so the iPhone app finds it only at
   the address in its pairing link: pair again after the PC's address changes.
 
-Logs are in `%LOCALAPPDATA%\phoneuse\run` (`phoneuse-up.log` when the window started
-phoneuse). Agents use the `phoneuse` command (`bin\phoneuse.exe` in a checkout,
-`core\bin\phoneuse.cmd` in the app), guided by [skill/SKILL.md](../skill/SKILL.md).
+Logs are in `%LOCALAPPDATA%\phoneuse\run`. The app writes the backend log to
+`phoneuse-up.log` and MCP startup errors to `phoneuse-mcp.log`.
 
 Configuration is the same as on Linux, in `%APPDATA%\phoneuse\config.toml`
 ([SOURCE.md](SOURCE.md#configuration)); the portable app keeps it in `data\`.

@@ -347,7 +347,7 @@ class Window(Adw.ApplicationWindow):
         self.pass_forget.set_visible(saved)
 
         c = s["claude"]
-        ok = c["skill"] and c["command"]
+        ok = c["skill"] and c["command"] and c["mcp"]
         self.claude_row.set_subtitle("Claude Code can see and use the phone" if ok
                                      else "Claude Code isn't installed" if not c["claude"]
                                      else "Let Claude Code see and use the phone")
@@ -1078,7 +1078,7 @@ class App(Adw.Application):
 
     def about(self):
         Adw.AboutDialog(application_name="Phone Use", application_icon=APP_ID, developer_name="Aleksey Smolenchuk",
-                        version="0.1.6", website="https://github.com/lxe/phoneuse",
+                        version="0.1.7", website="https://github.com/lxe/phoneuse",
                         license_type=Gtk.License.MIT_X11).present(self.win)
 
     def request_background(self, on):

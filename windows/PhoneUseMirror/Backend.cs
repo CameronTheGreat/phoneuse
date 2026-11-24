@@ -34,14 +34,24 @@ public static class Backend
 
     public static string LogPath => Path.Combine(Runtime, "phoneuse-up.log");
     static string PidPath => Path.Combine(Runtime, "phoneuse-background.pid");
+    static Process? _mcp;
 
     /// <summary>A phoneuse's Python: its .venv (a checkout, or an install made with the
     /// system's Python), else the standalone Python the app ships.</summary>
     static string? PythonIn(string root)
     {
-        foreach (var p in new[] { Path.Combine(root, ".venv", "Scripts", "python.exe"), Path.Combine(root, "python", "python.exe") })
-            if (File.Exists(p)) return p;
-        return null;
+        var venv = VenvPython(root);
+        if (venv != null) return venv;
+        var bundled = Path.Combine(root, "python", "python.exe");
+        return File.Exists(bundled) ? bundled : null;
+    }
+
+    /// <summary>The .venv's python.exe, only with its pyvenv.cfg: a venv's python.exe can't start without
+    /// it ("No pyvenv.cfg file"), and an update that couldn't finish deleting a .venv left just that.</summary>
+    static string? VenvPython(string root)
+    {
+        var p = Path.Combine(root, ".venv", "Scripts", "python.exe");
+        return File.Exists(p) && File.Exists(Path.Combine(root, ".venv", "pyvenv.cfg")) ? p : null;
     }
 
     public static string? Python => Root == null ? null : PythonIn(Root);
@@ -52,8 +62,7 @@ public static class Backend
         if (File.Exists(Path.Combine(core, "bin", "phoneuse")) && PythonIn(core) != null)
             return core;
         for (var d = new DirectoryInfo(AppContext.BaseDirectory); d != null; d = d.Parent)
-            if (File.Exists(Path.Combine(d.FullName, "bin", "phoneuse")) &&
-                File.Exists(Path.Combine(d.FullName, ".venv", "Scripts", "python.exe")))
+            if (File.Exists(Path.Combine(d.FullName, "bin", "phoneuse")) && VenvPython(d.FullName) != null)
                 return d.FullName;
         return null;
     }
@@ -102,6 +111,58 @@ public static class Backend
     }
 
     public static bool OwnsRunning => Background() != null;
+
+    public static void StartMcp()
+    {
+        if (Root == null || Python is not { } python) return;
+        var psi = new ProcessStartInfo(python, "-m phoneuse.mcp_server --winui")
+        {
+            WorkingDirectory = Root,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardInput = true,
+            RedirectStandardError = true,
+        };
+        psi.Environment["PYTHONUTF8"] = "1";
+        if (Portable) psi.Environment["PHONEUSE_CONFIG_DIR"] = PortableData;
+        try
+        {
+            _mcp = Process.Start(psi);
+            if (_mcp == null) return;
+            _mcp.ErrorDataReceived += (_, e) =>
+            {
+                if (e.Data != null) LogMcpError(e.Data);
+            };
+            _mcp.BeginErrorReadLine();
+        }
+        catch (Exception e) { LogMcpError(e.Message); }
+    }
+
+    static void LogMcpError(string message)
+    {
+        try
+        {
+            Directory.CreateDirectory(Runtime);
+            File.AppendAllText(Path.Combine(Runtime, "phoneuse-mcp.log"), message + Environment.NewLine);
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+
+    public static void StopMcp()
+    {
+        using var mcp = _mcp;
+        _mcp = null;
+        if (mcp == null) return;
+        try
+        {
+            mcp.StandardInput.Close();
+            if (!mcp.WaitForExit(2000)) mcp.Kill(entireProcessTree: true);
+        }
+        catch (InvalidOperationException) { } // The server already exited.
+        catch (IOException e) { LogMcpError(e.Message); }
+        catch (System.ComponentModel.Win32Exception e) { LogMcpError(e.Message); }
+    }
 
     /// <summary>Stop the background phoneuse. Its services are in its job object and stop
     /// with it; the Bluetooth HID service keeps running, as after `phoneuse up`.</summary>

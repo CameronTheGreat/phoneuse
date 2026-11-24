@@ -39,6 +39,7 @@ public sealed partial class MainWindow
             if (a.DidVisibilityChange || a.DidPresenterChange || a.DidSizeChange) ShowGlowHost();
         };
         ShowGlowHost();
+        UpdateHdr();  // WatchDisplay may have run first: give the glow the display's HDR state
         Closed += (_, _) => _glow?.Dispose();
     }
 
@@ -79,19 +80,37 @@ public sealed partial class MainWindow
         GlowIntensity.Value = look.Intensity;
         GlowSpeed.Value = look.Speed;
         GlowSize.Value = look.Size;
-        GlowBleed.IsChecked = look.Bleed;
+        GlowBleed.IsOn = look.Bleed;
+        GlowHdrPeak.Value = look.HdrPeak;
+        GlowHdrPanel.Visibility = _hdr ? Visibility.Visible : Visibility.Collapsed;  // only means something on an HDR display
         GlowOptions.Visibility = GlowSwitch.IsOn ? Visibility.Visible : Visibility.Collapsed;
         GlowUnavailable.Visibility = _glow is { Available: true } ? Visibility.Collapsed : Visibility.Visible;
         _glowFilling = false;
         UpdateGlowPreview();
     }
 
-    void SettingsTab_Changed(object sender, SelectionChangedEventArgs e) => UpdateGlowPreview();
+    /// <summary>Settings' tabs: one pane at a time.</summary>
+    void SettingsTab_Changed(object sender, RoutedEventArgs e)
+    {
+        if (PaneGeneral == null) return;  // the first tab's check, while the page is still being built
+        PaneGeneral.Visibility = TabGeneral.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        PaneAgent.Visibility = AgentControlTab.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        PaneLook.Visibility = TabLook.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        PaneBluetooth.Visibility = TabBluetooth.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        UpdateGlowPreview();
+        _ = LoadAgentConnectionsIfVisible();
+    }
+
+    /// <summary>A slider's value as the Settings page says it.</summary>
+    string Pct(double v) => $"{Math.Round(v * 100)}%";
+
+    /// <summary>The HDR rim's peak as a multiple of SDR white.</summary>
+    string Mult(double v) => $"{v:0.0}x";
 
     void UpdateGlowPreview()
     {
         if (_glow != null)
-            _glow.Preview = SettingsVisible && ReferenceEquals(SettingsTabs.SelectedItem, AgentControlTab);
+            _glow.Preview = SettingsVisible && AgentControlTab.IsChecked == true;
     }
 
     void Glow_Toggled(object sender, RoutedEventArgs e)
@@ -107,7 +126,7 @@ public sealed partial class MainWindow
     {
         if (_glowFilling) return;
         var look = new GlowLook((float)GlowIntensity.Value, (float)GlowSpeed.Value,
-            (float)GlowSize.Value, GlowBleed.IsChecked == true);
+            (float)GlowSize.Value, GlowBleed.IsOn, (float)GlowHdrPeak.Value);
         AppSettings.GlowLook = look;
         if (_glow != null) _glow.Look = look;
     }

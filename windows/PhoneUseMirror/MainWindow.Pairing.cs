@@ -10,7 +10,7 @@ namespace PhoneUseMirror;
 
 /// <summary>
 /// The Phone Use iPhone app (docs/COMPANION.md), where the owner allows and stops
-/// agents: agents are refused until one is paired. Settings › iPhone app shows how
+/// agents: agents are refused until one is paired. Setup's Agents stage (its card) shows how
 /// many are paired, pairs one with a QR code (a one-time link from
 /// /api/companion/pair that works for 10 minutes; a new code before it runs out),
 /// and unpairs (/api/companion/unpair), as the Linux and Mac apps do.
@@ -18,12 +18,6 @@ namespace PhoneUseMirror;
 public sealed partial class MainWindow
 {
     int _paired = -1;
-    // Shown only while no iPhone app is paired; once you close it, never again (AppSettings).
-    void PairingBar_Closed(InfoBar sender, InfoBarClosedEventArgs args)
-    {
-        if (args.Reason == InfoBarCloseReason.CloseButton) AppSettings.PairingBarDismissed = true;
-    }
-
     async Task<int> PairedCount()
     {
         var j = await _conn.GetAsync("api/app");
@@ -35,18 +29,27 @@ public sealed partial class MainWindow
     void ShowPaired(int n)
     {
         _paired = n;
+        PairedTitle.Text = n switch
+        {
+            < 0 => "phoneuse isn't answering",
+            0 => "iPhone app not paired",
+            1 => "1 iPhone paired",
+            _ => $"{n} iPhones paired",
+        };
         PairedText.Text = n switch
         {
-            < 0 => "phoneuse isn't answering.",
-            0 => "Not paired. Agents can't use the phone until you pair the Phone Use app (App Store) on the iPhone: " +
-                 "it's where you allow and stop them.",
-            1 => "1 iPhone paired. Agents can use the phone; you allow and stop them in the app.",
-            _ => $"{n} iPhones paired. Agents can use the phone; you allow and stop them in the app.",
+            < 0 => "Pairing shows here once it's back.",
+            0 => "Agents can't use the phone until you pair the Phone Use app (App Store) on the iPhone. " +
+                 "It's where you allow and stop them.",
+            _ => "Agents can use the phone; you allow and stop them in the app.",
         };
         PairButton.Content = n > 0 ? "Pair another" : "Pair iPhone";
         PairButton.IsEnabled = n >= 0;
         UnpairButton.Visibility = n > 0 ? Visibility.Visible : Visibility.Collapsed;
-        PairingBar.IsOpen = n == 0 && !AppSettings.PairingBarDismissed && SetupOverlay.Visibility != Visibility.Visible;
+        AgentSetupRow.Title = AppSettings.SetupMode == "agent" && n > 0 ? "Agent setup" : "Set up agent control";
+        AgentSetupRow.Subtitle = AppSettings.SetupMode == "agent" && n > 0
+            ? "iPhone pairing, agent connections and screen reading."
+            : "Pair the iPhone app, connect an agent and add screen reading.";
     }
 
     async void Pair_Click(object sender, RoutedEventArgs e)

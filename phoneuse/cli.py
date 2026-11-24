@@ -6,7 +6,8 @@ Setup and running:
                                bluetoothd config. Windows: UxPlay, the firewall rule
                                (asks for admin once). Both: the local vision models
   phoneuse doctor               check every part of the setup and say how to fix it
-  phoneuse claude [connect|disconnect]  Claude Code: the phoneuse skill and command (state)
+  phoneuse claude [connect|disconnect]  Claude Code: the Phone Use MCP connection and skill
+  phoneuse codex [connect|disconnect]   Codex (Windows): the same, as the app's Settings sets it
   phoneuse up                   mirror window + mouse control (click/drag on the mirror)
   phoneuse down                 Windows: also stop the Bluetooth keyboard and mouse, which
                                keep running after `up` stops (see up_windows)
@@ -47,6 +48,9 @@ points if any value is > 1 (screen_points in ~/.config/phoneuse/config.toml):
   phoneuse home | back | switcher | control-center | notifications | dismiss
                                 (the recipes of those names)
   phoneuse open APP             open an app by name (search, type, Enter)
+  phoneuse siriai --siri-plus-context|--on-device|--cloud|--cloud-pro [--timeout SECONDS] PROMPT
+                                ask Apple Intelligence; print the visible reply. Siri (the only one
+                                with personal context and app intents), or a PhoneUse shortcut's model
   phoneuse type [--append] TEXT  type text (US layout); \\n presses Enter. Replaces what
                                the field holds (Cmd+A first) unless --append
   phoneuse key COMBO            e.g. enter, escape, cmd+h, cmd+space, shift+tab
@@ -74,9 +78,17 @@ of ~1,300 for a screenshot):
   phoneuse text [--json] [--all] every line of text on screen with its centre (x, y), and
                                on/off switches as [switch on] / [switch off]; --all keeps
                                the status bar and stray icon glyphs
-  phoneuse tap-on TEXT          tap the on-screen text that matches (OCR); prints where it
-                               tapped; refused when the text isn't on screen, or when that
-                               area changed since your last look (--force taps anyway)
+  phoneuse tap-on TEXT [--timeout SECONDS] [--expect TEXT] [--json]
+                               wait for a unique text match, tap once, optionally verify a new label
+                               --near TEXT for a same-row label, --region LEFT,TOP,RIGHT,BOTTOM for normalized bounds
+  phoneuse wait-for TEXT [--timeout SECONDS] [--json]  wait for a visible text label
+  phoneuse wait-for-unlock [--timeout SECONDS] [--json]  wait for the owner to unlock the phone
+  phoneuse find-in-scroll TEXT [--direction up|down] [--max-scrolls N] [--timeout SECONDS] [--json]
+                               search the current list by scrolling until a label is visible
+  phoneuse inspect-region LEFT TOP RIGHT BOTTOM PATH [--json]  crop and read normalized bounds
+  phoneuse mcp                   serve PhoneUse tools over MCP stdio
+  phoneuse reconnect             recover the existing iPhone Bluetooth connection
+  phoneuse commands              print the discoverable agent command manifest as JSON
   phoneuse notifications-read   open Notification Center, print what it shows, close it
 
 iPhone settings this relies on: AssistiveTouch on, Dwell Control off.
@@ -334,12 +346,14 @@ ACTION = ""  # what the agent is doing now, in a few words (the companion app's 
 VERBS = {"open": "Opening", "open_app": "Opening", "tap-on": "Tapping", "tap_on": "Tapping", "tap": "Tapping",
          "longpress": "Long-pressing", "long_press": "Long-pressing", "long-press": "Long-pressing",
          "swipe": "Swiping", "gesture": "Touching", "scroll": "Scrolling",
-         "scroll_by": "Scrolling", "type": "Typing", "type_text": "Typing", "key": "Pressing",
+         "scroll_by": "Scrolling", "find-in-scroll": "Searching the list",
+         "type": "Typing", "type_text": "Typing", "key": "Pressing",
          "press_key": "Pressing", "back": "Going back", "home": "Going home", "switcher": "Opening the app switcher",
          "control-center": "Opening Control Center", "notifications": "Opening notifications",
          "dismiss": "Closing an overlay", "unlock": "Asking to unlock", "cursor": "Switching the pointer",
          "keyboard": "Showing the keyboard", "toggle_keyboard": "Showing the keyboard", "calibrate": "Calibrating",
-         "look": "Looking", "wait": "Waiting", "screenshot": "Looking", "text": "Reading the screen"}
+         "look": "Looking", "wait": "Waiting", "screenshot": "Looking", "text": "Reading the screen",
+         "siriai": "Asking Apple Intelligence"}
 
 
 def describe(cmd, what=""):
@@ -398,10 +412,14 @@ def agent_turn():
         # keep-awake's nudges (web.py) change the picture too: not someone else
         nudged_at = os.path.getmtime(NUDGED) if os.path.exists(NUDGED) else 0
         if time.time() - seen_at < 600 and seen_at >= acted_at and nudged_at < seen_at:
-            seen, now = int(open(LAST_SEEN).read()), frame_seq()
-            if now is not None and now > seen + 1:  # one late change is usually the end of an animation
-                NOTES.append("note: the screen changed since your last look without an action from you "
-                             "(someone may be using the phone, or it is animating); look before relying on it")
+            seen = int(open(LAST_SEEN).read())
+            if unexpected_change(seen):
+                # Frame changes alone cannot identify a user: autoplaying video and
+                # network updates also change the picture. Actual takeover is reported
+                # by /api/agent/act (409) and picture_note (PAUSED).
+                note = "note: the screen changed since your last look; refresh target positions before tapping"
+                if note not in NOTES:
+                    NOTES.append(note)
     except (OSError, ValueError):
         pass
 
@@ -412,10 +430,11 @@ def hid():
     agent_turn()
     try:
         h = Hid()
-    except OSError:
-        die("The Bluetooth HID service isn't running. " + ("It runs with `phoneuse up`." if IS_WINDOWS
-                                                            else "Run: phoneuse install"))
-    st = h.cmd("status")
+        st = h.cmd("status")
+    except OSError as e:
+        if IS_WINDOWS:
+            die(windows_service_error("Bluetooth HID service", e))
+        die("The Bluetooth HID service isn't running. Run: phoneuse install")
     if "connected=True" not in st:
         try:
             h.cmd("connect")
@@ -480,7 +499,7 @@ class AgentHid:
     def __init__(self, h):
         global _dots
         self.h = h
-        self.first_seq = None  # picture-change count just before the action's first command
+        self.first_seq = None  # pending result's baseline; renewed for each discrete keyboard input
         self.dot = None  # (x, y, down) where the touch or pointer is
         if _dots is None:
             _dots = DotPoster()
@@ -488,7 +507,8 @@ class AgentHid:
 
     def cmd(self, line):
         parts = line.split()
-        if self.first_seq is None and parts and parts[0] != "status" and not hidproto.passive(parts[0], parts[1:]):
+        if parts and parts[0] != "status" and not hidproto.passive(parts[0], parts[1:]) and (
+                self.first_seq is None or parts[0] in ("key", "type", "consumer", "eject")):
             # Taken here, after any OCR lookup the action did first, and after the hover that
             # brings the pointer to a tap or a press: those changes must not count as this
             # action's result. Counting the pointer's arrival read the screen in the still
@@ -526,6 +546,17 @@ def frame_seq():
         return int(line.split("seq=")[1].split()[0])
     except (OSError, IndexError, ValueError):
         return None
+
+
+def unexpected_change(seen):
+    """A changed screen is useful to flag; known video motion is not a takeover.
+    Target-local stale checks and explicit user takeover still apply either way."""
+    try:
+        line, _ = screen.frames_request("status", timeout=1)
+        fields = dict(p.split("=", 1) for p in line.split() if "=" in p)
+        return int(fields["seq"]) > seen + 1 and float(fields.get("ignored", 0)) <= 0.05
+    except (OSError, KeyError, ValueError):
+        return False
 
 
 def acted(seq_before=None):
@@ -783,7 +814,11 @@ def step(h, command, quiet=0.1, change=None):
         time.sleep(0.8)  # no frames service (older setup)
         return
     try:
-        screen.frames_request(f"settle {seq} {quiet} {change}", timeout=6)
+        line, _ = screen.frames_request(f"settle {seq} {quiet} {change}", timeout=change + 4)
+        if change >= REACT_WAIT and "reacted=" in line:
+            reaction_note(line.split("reacted=")[1].split()[0])
+        if isinstance(h, AgentHid):
+            h.first_seq = None
         acted(None)  # settled: reads in the same command needn't wait for a change again
         steplog("settled", command)
     except OSError:
@@ -942,8 +977,11 @@ def open_app(h, name):
     refuse_if_locked()
     step(h, "key space gui")
     step(h, "type " + name, quiet=0.35)  # search results arrive in waves
-    spot = spotlight_app(screen_text(), name)
-    if spot:  # the app is a result, but not the top hit (typing "Gmail" puts Mail first)
+    lines = screen_text()
+    spot = spotlight_tap(lines, name, orientation.current_points()[1])
+    if not isinstance(spot, tuple):
+        spot = spotlight_app(lines, name)
+    if spot:
         seq = frame_seq()
         touch.tap(h, *spot)
         if seq is not None:
@@ -977,9 +1015,8 @@ def spotlight_app(lines, name):
 
 
 def _open_app_ble(h, name):
-    """Windows (Bluetooth LE): every step checked on the screen. Measured on iOS 26.5, where
-    Spotlight blurs the home screen; on iOS 26 without the blur (lxe's iPhone 17 Pro) the
-    check that Spotlight opened fails, so Linux and macOS keep the sequence above."""
+    """Bluetooth LE: verify Spotlight, the matching app result and the launch.
+    Spotlight can blur the background or leave the home screen visible."""
     # The home screen first (also wakes a locked phone), with Home pressed twice
     # (home()): an app opened from Spotlight goes back to Spotlight on the first press
     # (measured, iPhone 14 Pro Max, iOS 26.5: 4 of 4). Typing into that Spotlight was
@@ -998,10 +1035,11 @@ def _open_app_ble(h, name):
     # Every step is checked on the screen: Spotlight open (else Cmd+Space again), the
     # app among the results (else type it again), the app's icon tapped, the app up.
     # Without the screen-reading models: the old blind sequence (Enter).
-    hit, up = "closed", False
+    hit, up, opened = "closed", False, False
     for attempt in range(3):
         if not up and not open_spotlight(h, at_home):
-            continue
+            break
+        opened = True
         # Spotlight may keep the last search in its field: select it so the name
         # replaces it. (Appended, "Settings" became "SettingsSettings", no app
         # matched, and Enter opened Google Maps.)
@@ -1011,15 +1049,13 @@ def _open_app_ble(h, name):
         if hit is None or isinstance(hit, tuple):
             break
         if hit == "missing":
-            h.cmd("key escape")
-            time.sleep(0.8)
-            up = False
+            break
         else:
             # Spotlight is up without results: the name was lost. Right after an app
             # closed, the first Spotlight sometimes took no keys for a moment (after
             # Calendar, 2 of 5 times); typed again 0.5 s later, it took them (2 of 2).
             # Cmd+Space would close it.
-            up = _differs(at_home)
+            up = hit != "closed"  # keep an empty Spotlight open without relying on blur
             time.sleep(0.5)
     if hit is None:  # the screen can't be read (no models): Enter takes Spotlight's top hit
         step(h, "key enter", quiet=0.3)
@@ -1030,9 +1066,10 @@ def _open_app_ble(h, name):
         h.cmd("key escape")
         die(f"'{name}' wasn't among Spotlight's results, so nothing was opened. Check the "
             "app's name as it appears under its icon, or look at the screen.")
-    if hit == "closed":
-        die(f"Spotlight didn't show its results after Cmd+Space, three times, so '{name}' wasn't "
-            "opened. Look at the screen.")
+    if not opened:
+        die(f"Couldn't open iPhone Search for '{name}'. Check the Home Screen.")
+    if hit in ("empty", "closed"):
+        die(f"Search opened, but PhoneUse couldn't verify that '{name}' registered. No app was tapped.")
     for _ in range(2):
         try:
             results = _thumb()
@@ -1066,11 +1103,8 @@ def _open_app_ble(h, name):
 # Section titles that only Spotlight shows: lines read without one aren't Spotlight's
 # results (the home screen's own icon labels matched an app's name once).
 SPOTLIGHT_MARKS = ("top hit", "suggestions", "siri suggestions", "search in app", "show more", "show less")
-# Spotlight's top hit is an app's icon with its name under it. A tap on the name did
-# nothing for some apps (Weather: 3 of 4 times, and a second tap too); a tap on the
-# icon opened every app tried (iPhone 14 Pro Max, iOS 26.5). There the name was
-# 119 pt under the "Top Hit" title and the icon's middle 47 pt above the name. Other
-# layouts (a list row, the Apps section) keep the tap on the name.
+SPOTLIGHT_EMPTY_FIELD = {"searchorask", "qsearchorask"}
+# The icon center is about 47 points above its label in Spotlight's large app tile.
 ICON_ABOVE = 47.0
 ICON_ROOM = 80.0  # more than this between the title and the name: an icon fits
 TOP_HIT_DEPTH = 160.0  # farther below the title: not the top hit
@@ -1094,24 +1128,102 @@ def _differs(ref, frac=0.3):
     return now.shape == ref.shape and float((np.abs(now - ref) > 25).mean()) > frac
 
 
-def open_spotlight(h, at_home, tries=3):
-    """Cmd+Space until Spotlight is open: 1 s later the picture must differ from the
-    home screen's (`at_home`, a _thumb) over most of its area, as Spotlight blurs the
-    screen behind its results. Compared with the home screen, not with the picture
-    just before the key: Cmd+Space toggles Spotlight, and closing one that was still
-    open changed the picture as much as opening it, so that counted as open and the
-    name was typed into the home screen."""
-    for _ in range(tries):
-        h.cmd("key space gui")
-        time.sleep(1.0)  # it opens 0.2-0.5 s after the key, then animates
-        if _differs(at_home):
-            try:  # let it finish opening; its field takes keys only a moment after
-                screen.frames_request("settle - 0.2 0", timeout=6)
-            except OSError:
-                pass
-            time.sleep(0.3)
-            return True
-    return False
+def home_search_target(lines):
+    hits = [(x, y) for x, y, t in lines if 0.35 < x < 0.65 and 0.70 < y < 0.92
+            and _plain(t) in {"search", "qsearch"}]
+    return hits[0] if len(hits) == 1 else None
+
+
+def home_icon_target(lines, x, y):
+    """Map an OCR label in a recognized SpringBoard grid to its app icon."""
+    search = home_search_target(lines)
+    if not search or not 0.16 < y < search[1] - 0.035:
+        return None
+    columns = (0.155, 0.385, 0.615, 0.845)
+    column = min(columns, key=lambda center: abs(x - center))
+    if abs(x - column) > 0.03:
+        return None
+
+    def row_columns(row_y):
+        return {center for center in columns for lx, ly, text in lines
+                if abs(lx - center) <= 0.03 and abs(ly - row_y) < 0.009
+                and len(_plain(text)) >= 2}
+
+    # A Search button by itself can also appear in apps. Require rows of
+    # labels in the regular four-column Home Screen grid before offsetting.
+    if len(row_columns(y)) < 3 or not any(
+        0.09 < abs(other_y - y) < 0.14 and other_y < search[1] - 0.035
+        and len(row_columns(other_y)) >= 3 for _, other_y, _ in lines
+    ):
+        return None
+    width, height = orientation.current_points()
+    return (column, y - ICON_ABOVE / height) if height > width else None
+
+
+def open_spotlight(h, at_home):
+    """Open Spotlight, including layouts that leave the home screen unblurred.
+    Check semantic evidence before toggling: Cmd+Space closes an already open search.
+    The image check remains a fallback when OCR models are unavailable."""
+    try:
+        lines = screen_text()
+    except SystemExit:
+        step(h, "key space gui", quiet=0.3)
+        return _differs(at_home)
+    if spotlight_open(lines):
+        return True
+    # The keyboard shortcut avoids depending on a pointer click on the Home
+    # Screen. Give delayed transitions time to finish before falling back.
+    h.cmd("key space gui")
+    acted(getattr(h, "first_seq", None))
+    lines = wait_for_spotlight()
+    if spotlight_open(lines):
+        return True
+    pos = home_search_target(lines)
+    if not pos or moved_since_look(*pos, strict=True):
+        return False
+    if isinstance(h, AgentHid):
+        h.first_seq = None
+    touch.tap(h, *pos)
+    acted(getattr(h, "first_seq", None))
+    return spotlight_open(wait_for_spotlight())
+
+
+def wait_for_spotlight():
+    deadline = time.monotonic() + 2.0
+    while True:
+        lines = screen_text()
+        if spotlight_open(lines) or time.monotonic() >= deadline:
+            return lines
+        time.sleep(0.15)
+
+
+def spotlight_open(lines):
+    """Spotlight headings, its top search field, or a bottom field with a keyboard.
+    A home-screen Search button alone is not evidence that search is open."""
+    texts = {_plain(t) for _, _, t in lines}
+    if texts.intersection({"tophit", "sirisuggestions", "searchinapp"}):
+        return True
+    if any(0.05 < y < 0.12 and 0.1 < x < 0.65 and _plain(t) in SPOTLIGHT_EMPTY_FIELD
+           for x, y, t in lines):
+        return True
+    if "apps" in texts and texts.intersection({"showmore", "showless"}):
+        return True
+    keyboard = {_plain(t) for _, y, t in lines if y > 0.65}
+    return len(keyboard.intersection(set("qwertyasdfzxc"))) >= 4 and (
+        bool(texts & SPOTLIGHT_EMPTY_FIELD) or spotlight_query_field(lines) is not None
+    )
+
+
+def spotlight_query_field(lines):
+    """A top search field corroborated by the same name on the large top-result tile."""
+    for x, y, text in lines:
+        query = _plain(text)
+        if not query or not (0.1 < x < 0.65 and 0.05 < y < 0.12):
+            continue
+        if any(lx < 0.25 and 0.15 < ly - y < 0.22 and _plain(label) == query
+               for lx, ly, label in lines):
+            return y, query
+    return None
 
 
 def _plain(text):
@@ -1120,13 +1232,13 @@ def _plain(text):
 
 def _has_marks(lines):
     marks = {_plain(m) for m in SPOTLIGHT_MARKS}
-    return any(_plain(t) in marks for _, _, t in lines)
+    return spotlight_open(lines) or any(_plain(t) in marks for _, _, t in lines)
 
 
 def spotlight_hit(name):
     """Where to tap in Spotlight's results to open the app `name`; "missing" when it
-    isn't among them, "closed" when the screen isn't Spotlight's results, None when
-    the screen can't be read (no models)."""
+    isn't among them, "empty" when search is open without a query, "closed" when
+    the screen isn't Spotlight, None when the screen can't be read (no models)."""
     try:
         lines = screen_text()
     except SystemExit:
@@ -1143,7 +1255,26 @@ def spotlight_tap(lines, name, screen_h_pt):
     if not _has_marks(lines):
         return "closed"
     want = _plain(name)
-    results = [(x, y, t) for x, y, t in lines if 0.06 < y < 0.88]  # not the search field at the bottom
+    # Top search layouts have an X close button beside the field: it must never
+    # match the X app. Nor may the on-screen keyboard's X key count as an app.
+    query_field = spotlight_query_field(lines)
+    top_search = query_field is not None or any(
+        y < 0.12 and (_plain(t) in SPOTLIGHT_EMPTY_FIELD or "open" in _plain(t)) for _, y, t in lines
+    )
+    low, high = (0.12, 0.65) if top_search else (0.06, 0.88)
+    results = [(x, y, t) for x, y, t in lines if low < y < high]
+    sections = {"tophit", "apps", "suggestions", "sirisuggestions", "searchinapp"}
+    # The app name may appear in the field (with or without "Open"), on the
+    # icon, and in its label roughly 170 points below the field.
+    field = next((y for x, y, t in lines if x < 0.65 and 0.05 < y < 0.12
+                  and _plain(t) == want + "open"), None)
+    if query_field and query_field[1] == want:
+        field = query_field[0]
+    if field is not None:
+        first_section = min((y for _, y, t in lines if y > field and _plain(t) in sections), default=high)
+        for x, y, t in results:
+            if x < 0.25 and y < first_section and 150 <= (y - field) * screen_h_pt <= 195 and _plain(t) == want:
+                return x, y - ICON_ABOVE / screen_h_pt
     found = next(((x, y) for x, y, t in results if _plain(t) == want), None)
     if found is None:
         for x, y, t in results:
@@ -1152,15 +1283,17 @@ def spotlight_tap(lines, name, screen_h_pt):
                 found = x, y
                 break
     if found is None:
-        return "missing"
+        return "empty" if any(_plain(t) in SPOTLIGHT_EMPTY_FIELD for _, _, t in lines) else "missing"
     x, y = found
-    head = [ly for _, ly, t in lines if _plain(t) == "tophit" and ly < y]
-    if head and ICON_ROOM < (y - head[-1]) * screen_h_pt <= TOP_HIT_DEPTH:
-        # The top hit, with room for its icon above its name. Text between the title
-        # and the name may only be on the icon itself (Clock's "12", Calendar's date).
-        between = [(lx, ly) for lx, ly, _ in lines if head[-1] < ly < y - 0.005 and abs(lx - x) < 0.12]
-        if all(abs(lx - x) < 0.03 and (y - ly) * screen_h_pt < ICON_ABOVE + 40 for lx, ly in between):
-            return x, y - ICON_ABOVE / screen_h_pt
+    section = max(((ly, _plain(t)) for _, ly, t in lines if ly < y and _plain(t) in sections),
+                  default=None)
+    if section and section[1] == "tophit":
+        top = section[0]
+        if ICON_ROOM < (y - top) * screen_h_pt <= TOP_HIT_DEPTH:
+            # Text between the heading and label can be printed on the icon itself.
+            between = [(lx, ly) for lx, ly, _ in lines if top < ly < y - 0.005 and abs(lx - x) < 0.12]
+            if all(abs(lx - x) < 0.03 and (y - ly) * screen_h_pt < ICON_ABOVE + 40 for lx, ly in between):
+                return x, y - ICON_ABOVE / screen_h_pt
     return x, y
 
 
@@ -1170,7 +1303,9 @@ def type_text(h, text):
         if i:
             h.cmd("key enter")
         if chunk:
-            h.cmd("type " + chunk)
+            # Cmd+A and lock-screen OCR may have changed the picture well before
+            # typing. Wait on this input's frame count, not that earlier selection.
+            step(h, "type " + chunk, quiet=0.35, change=REACT_WAIT)
 
 
 # ---------- screen ----------
@@ -1205,7 +1340,7 @@ def load_look():
         return None
 
 
-def moved_since_look(fx, fy, then=None):
+def moved_since_look(fx, fy, then=None, *, strict=False):
     """Has the area around (fx, fy) changed since the agent's last look (or `then`,
     a look loaded earlier)? Taps go by position, so a tap computed from an old
     picture of a feed that has since scrolled lands on something else. Returns a
@@ -1215,13 +1350,13 @@ def moved_since_look(fx, fy, then=None):
         if then is None:
             then = load_look()
         if then is None:
-            return None
+            return "there is no recent observation of the target" if strict else None
         settle()
         now = _small(screen.grab_rgb())
     except (OSError, ValueError, RuntimeError):
-        return None
+        return "the target could not be checked against a fresh frame" if strict else None
     if now.shape != then.shape:
-        return None
+        return "the mirrored screen size changed" if strict else None
     h, w = now.shape
     x0, x1 = int(max(0, fx - 0.08) * w), int(min(1, fx + 0.08) * w)
     y0, y1 = int(max(0, fy - 0.04) * h), int(min(1, fy + 0.04) * h)
@@ -1244,7 +1379,9 @@ def screenshot(path):
     settle()
     try:
         png = screen.grab_png()
-    except RuntimeError:
+    except RuntimeError as e:
+        if IS_WINDOWS and isinstance(e.__cause__, OSError):
+            die(f"Could not read the iPhone screen. {windows_service_error('Frames service', e.__cause__)}")
         die(f"No mirror window. Run `phoneuse up` and start Screen Mirroring to '{NAME}' on the iPhone.")
     with open(path, "wb") as f:
         f.write(png)
@@ -1331,13 +1468,16 @@ def status_bar_item(y, text):
 BACK_GLYPHS = {"く", "<", "‹", "〈", "〈"}  # how OCR reads the back chevron at the top left
 
 
+def picture_state():
+    with urllib.request.urlopen(f"http://127.0.0.1:{CFG['web_port']}/api/picture", timeout=1) as r:
+        return json.load(r)
+
+
 def picture_note():
     """Notes about the session for every screen read: the user took over (paused),
     or the mirror shows an old picture (web.py check_stale)."""
-    import json
     try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{CFG['web_port']}/api/picture", timeout=1) as r:
-            p = json.load(r)
+        p = picture_state()
     except (OSError, ValueError):
         return
     if p.get("paused"):
@@ -1989,22 +2129,55 @@ def up_windows(headless=False, started=None):
                     p.kill()
 
 
+def print_agent_control(picture):
+    state = "paused" if picture.get("paused") else picture.get("agent_state")
+    messages = {
+        "driving": "an agent already has control of the iPhone.",
+        "requested": "an agent is waiting for access.",
+        "idle": "no agent has control of the iPhone.",
+        "paused": "PAUSED. The owner took over. Wait for the owner to resume you and tell you to continue.",
+    }
+    print("Agent control:", messages.get(state, "unknown. The mirror did not report the session state."))
+
+
+def windows_service_error(service, error):
+    if isinstance(error, PermissionError):
+        return f"{service}: access to the local service was denied ({error})."
+    if isinstance(error, ConnectionRefusedError):
+        return f"{service}: no listener accepted the local connection ({error})."
+    if isinstance(error, (ConnectionResetError, ConnectionAbortedError)):
+        return f"{service}: the local connection closed before a reply ({error})."
+    return f"{service}: status unavailable ({error})."
+
+
 def status():
     if IS_WINDOWS:
         try:
-            st = Hid().cmd("status").replace("ok ", "")
+            line, _ = ipc.request("hid", "status", timeout=2)
+            if not line.startswith("ok "):
+                raise RuntimeError(line)
+            st = line.removeprefix("ok ")
             print("HID service: active")
             print("Bluetooth:", st)
-        except OSError:
-            print("HID service: not running (start `phoneuse up`)")
+            if "connected=False" in st:
+                print("Try reconnecting Bluetooth once. If it stays disconnected, ask the owner to tap "
+                      "the PC's name above in iPhone Settings > Bluetooth.")
+        except (OSError, RuntimeError) as e:
+            print(windows_service_error("HID service", e))
         try:
             line, _ = screen.hub_request("status", timeout=2)
             print("Video hub:", line.replace("ok ", ""))
-        except OSError:
-            print("Video hub: not running (start `phoneuse up`)")
-        live = screen.mirror_live()
-        print("Mirror:", "showing the phone" if live else
+        except (OSError, RuntimeError) as e:
+            print(windows_service_error("Video hub", e))
+        try:
+            picture = picture_state()
+        except (OSError, ValueError):
+            picture = {}
+        print("Mirror:", "showing the phone" if picture.get("live") else
               f"not mirroring (input to the phone is off). On the iPhone: Control Center > Screen Mirroring > {NAME}")
+        print_agent_control(picture)
+        if picture.get("stale"):
+            print("The picture has stopped updating. Ask the owner to wake the iPhone or reconnect Screen Mirroring.")
         print(f"Browser mirror: http://localhost:{WEB_PORT}")
         return
     from .config import USER_DAEMON
@@ -2020,11 +2193,13 @@ def status():
     if svc == "active":
         print("Bluetooth:", Hid().cmd("status").replace("ok ", ""))
     try:
-        p = json.load(urllib.request.urlopen(f"http://127.0.0.1:{CFG['web_port']}/api/picture", timeout=2))
+        p = picture_state()
         print("Browser mirror:", f"http://localhost:{CFG['web_port']},",
               "showing the phone" if p.get("live") else "not mirroring (input to the phone is off)")
     except (OSError, ValueError):
+        p = {}
         print("Browser mirror: not running")
+    print_agent_control(p)
     try:
         at, size = screen.mirror_window()
         live = "showing the phone" if screen.mirror_live() else "not mirroring (input to the phone is off)"
@@ -2033,9 +2208,34 @@ def status():
         print("Mirror window: none (the browser mirror shows the phone)")
 
 
+def reconnect_bluetooth():
+    """Wait for the existing Bluetooth pairing to reconnect without sending phone input."""
+    try:
+        picture = picture_state()
+    except (OSError, ValueError):
+        die("Open Phone Use and check status before reconnecting Bluetooth.")
+    if picture.get("paused"):
+        die("The owner took over the phone. Wait for them to resume you and tell you to continue.")
+    if not picture.get("live") or picture.get("stale"):
+        die(f"Ask the owner to wake the iPhone and check Control Center > Screen Mirroring > {NAME}.")
+    try:
+        h = Hid(timeout=30)
+        try:
+            print(h.cmd("connect"))
+        finally:
+            h.close()
+    except (OSError, RuntimeError) as e:
+        die(f"Bluetooth could not reconnect ({e}). Check status and ask the owner to reconnect in iPhone Settings.")
+
+
 def view(print_only):
-    """The browser mirror's address; opens it (Windows: in its own window) unless print_only."""
+    """Show the mirror, preferring the native Windows window, or print its browser URL."""
     url = f"http://localhost:{WEB_PORT}"
+    if IS_WINDOWS and not print_only:
+        from .windows import appwindow
+        if appwindow.open_native_window():
+            print("Opened or restored the native Phone Use window.")
+            return
     try:
         ipc.http_get(WEB_PORT, "/")
     except OSError:
@@ -2146,7 +2346,7 @@ def unlock_cmd():
     from . import unlock
     if not unlock.ENABLED:
         die(unlock.OFF)
-    print("Asked the owner to approve an unlock (browser mirror or notification); waiting...", flush=True)
+    print("Asked the owner to approve an unlock in Phone Use; waiting...", flush=True)
     try:
         code, body = ipc.http_post(WEB_PORT, "/api/unlock", timeout=150)
     except OSError as e:
@@ -2201,11 +2401,28 @@ def _main():
     if cmd == "doctor":
         from . import doctor
         sys.exit(doctor.main(args))
+    if cmd == "siriai":
+        from .siriai import run
+        return run(a[1:])
+    if cmd == "mcp":
+        from .mcp_server import main as serve_mcp
+        return serve_mcp()
+    if cmd == "commands":
+        from .commands import manifest
+        print(json.dumps(manifest()))
+        return
     # A sandbox that blocks local connections (Codex's, for one) makes every service look stopped:
     # say so, instead of "not running", which sent agents to start a second backend.
-    if IS_WINDOWS and cmd not in ("claude", "up", "serve", "install") and not can_reach_services():
+    if IS_WINDOWS and cmd not in ("claude", "codex", "up", "serve", "install") and not can_reach_services():
         die(SANDBOXED)
-    if cmd == "claude":  # link the skill and write the phoneuse command for Claude Code (claude_setup)
+    flag_args = args[:args.index("--")] if "--" in args else args
+    if cmd == "tap-on" and "--force" in flag_args:
+        if any(arg.split("=", 1)[0] in ("--near", "--region") for arg in flag_args):
+            die("Use --near and --region without --force.")
+    elif cmd in ("wait-for", "wait-for-unlock", "inspect-region", "find-in-scroll", "tap-on"):
+        from .agent_tools import run
+        sys.exit(0 if run(cmd, a[1:]) else 1)
+    if cmd == "claude":
         from . import claude_setup
         if args[:1] == ["connect"]:
             claude_setup.connect()
@@ -2214,8 +2431,29 @@ def _main():
         elif args:
             die("usage: phoneuse claude [connect|disconnect]")
         st = claude_setup.state()
-        print(f"Claude Code: skill {'linked' if st['skill'] else 'not linked'} ({claude_setup.SKILL_DIR}), "
+        print(f"Claude Code: MCP {'configured' if st['mcp'] else 'not configured'}, "
+              f"skill {'linked' if st['skill'] else 'not linked'} ({claude_setup.SKILL_DIR}), "
               f"command {'in place' if st['command'] else 'not in place'} ({claude_setup.BIN})")
+        return
+    if cmd == "codex":
+        if args[:1] not in ([], ["connect"], ["disconnect"]) or len(args) > 1:
+            die("usage: phoneuse codex [connect|disconnect]")
+        if not IS_WINDOWS:
+            # Codex is pointed at the Streamable HTTP server the Windows app runs; elsewhere, stdio
+            die("phoneuse codex is for Windows. Elsewhere run: codex mcp add phoneuse -- phoneuse mcp")
+        from . import codex_setup
+        try:
+            st = codex_setup.configure({"connect": True, "disconnect": False}.get(args[0]) if args else None)
+        except RuntimeError as exc:
+            die(str(exc))
+        if not st.get("available", True):
+            die("Codex isn't installed: no codex.exe in %LOCALAPPDATA%\\Programs\\OpenAI\\Codex\\bin or on PATH.")
+        if "error" in st:
+            die(st["error"])
+        print(f"Codex: MCP {'registered' if st['connected'] else 'not registered'} ({codex_setup.MCP_URL}), "
+              f"skill {'linked' if st['skill'] else 'not linked'} ({codex_setup.SKILL_DIR})")
+        if st["connected"]:
+            print("The MCP server runs inside the Phone Use app: keep it open (in the tray) while Codex uses it.")
         return
     if cmd == "install":
         subprocess.run(["sudo", os.path.join(ROOT, "scripts", "install.sh")], check=True)
@@ -2240,6 +2478,8 @@ def _main():
         return down()
     if cmd == "status":
         return status()
+    if cmd == "reconnect":
+        return reconnect_bluetooth()
     if cmd == "unlock":
         return unlock_cmd()
     if cmd == "done":
@@ -2355,7 +2595,7 @@ def _main():
         return
     else:
         die(f"unknown command: {cmd} (phoneuse --help)")
-    acted(h.first_seq if getattr(h, "first_seq", None) is not None else seq_before)
+    acted(getattr(h, "first_seq", seq_before))
     print("ok")
     if then_text:
         for x, y, t in screen_text():

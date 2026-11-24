@@ -914,7 +914,7 @@ async def serve(hid, sock):
     async def client(reader, writer):
         try:
             line = await reader.readline()
-            if line.strip() != f"auth {ipc.token()}".encode():
+            if line.strip() != f"auth {ipc.token(create=True)}".encode():
                 return
             while line := await reader.readline():
                 text = line.decode(errors="replace")

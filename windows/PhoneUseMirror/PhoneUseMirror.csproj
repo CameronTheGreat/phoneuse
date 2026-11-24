@@ -24,6 +24,9 @@
     <!-- The GitHub repository whose releases update this app (Updater.cs): package.ps1 passes
          the one CI built from, so a fork's builds update from the fork. -->
     <UpdateRepo Condition="'$(UpdateRepo)' == ''">lxe/phoneuse</UpdateRepo>
+    <!-- Phone Use's version (pyproject.toml) when the build isn't given one (a plain dotnet build,
+         Visual Studio): About and the updater read it. package.ps1 and build-winui.ps1 pass their own. -->
+    <Version Condition="'$(Version)' == ''">$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)..\..\pyproject.toml')), '(?m)(?&lt;=^version\s*=\s*")[^"]+').Value)</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -34,6 +37,8 @@
     <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\AppIcon.png" CopyToOutputDirectory="PreserveNewest" />
     <Manifest Include="$(ApplicationManifest)" />
+    <!-- the phone frames' table, shared with the browser mirror (Phones.cs) -->
+    <EmbeddedResource Include="..\..\phoneuse\web\phones.json" LogicalName="phones.json" Link="phones.json" />
   </ItemGroup>
 
   <ItemGroup>

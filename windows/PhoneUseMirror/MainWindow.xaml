@@ -38,6 +38,16 @@
                         ToolTipService.ToolTip="About Phone Use" Style="{StaticResource SubtleButtonStyle}">
                     <FontIcon Glyph="&#xE946;" FontSize="14" />
                 </Button>
+                <Button x:Name="ActivityButton" Padding="8,5" Click="ActivityButton_Click"
+                        ToolTipService.ToolTip="Agent activity" Style="{StaticResource SubtleButtonStyle}">
+                    <Grid>
+                        <FontIcon x:Name="ActivityIcon" Glyph="&#xE81C;" FontSize="14" />
+                        <!-- agent status dot at the icon's top-right (MainWindow.ActivityButton.cs) -->
+                        <Ellipse x:Name="ActivityDot" Width="7" Height="7" Visibility="Collapsed"
+                                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-3,-4,0"
+                                 IsHitTestVisible="False" />
+                    </Grid>
+                </Button>
                 <Button x:Name="SettingsButton" Padding="8,5" Click="OpenSettings_Click"
                         ToolTipService.ToolTip="Settings" Style="{StaticResource SubtleButtonStyle}">
                     <FontIcon Glyph="&#xE713;" FontSize="14" />
@@ -74,10 +84,10 @@
                                      Fill="#66FFFFFF" Stroke="White" StrokeThickness="2" />
                         </Canvas>
                         <Border x:Name="NoteBox" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"
-                                Background="#CC1C1C1E" CornerRadius="14" Padding="18,14" Visibility="Collapsed"
+                                Background="{StaticResource BrandNightBrush}" CornerRadius="18" Padding="18,14" Visibility="Collapsed"
                                 IsHitTestVisible="False">
                             <TextBlock x:Name="NoteText" TextWrapping="Wrap" TextAlignment="Center"
-                                       Foreground="#EBEBF5" FontSize="14" LineHeight="20" />
+                                       Foreground="{StaticResource BrandBgBrush}" FontSize="14" LineHeight="20" />
                         </Border>
                     </Grid>
 
@@ -86,15 +96,6 @@
                     <Grid x:Name="ScreenUi" HorizontalAlignment="Left" VerticalAlignment="Top">
                         <!-- notices, below the Dynamic Island (the AssistiveTouch reminder is a setup step) -->
                         <StackPanel x:Name="Bars" VerticalAlignment="Top" Margin="10,0,10,0" Spacing="6">
-                            <!-- while no iPhone app is paired: phoneuse refuses every agent action until one is -->
-                            <InfoBar x:Name="PairingBar" IsOpen="False" IsClosable="True" Severity="Informational"
-                                     Title="Agent control requires pairing"
-                                     Message="AI agents can't use the phone until you pair the Phone Use app (App Store) on the iPhone: it's where you allow and stop them."
-                                     Closed="PairingBar_Closed">
-                                <InfoBar.ActionButton>
-                                    <Button Content="Pair iPhone" Click="Pair_Click" />
-                                </InfoBar.ActionButton>
-                            </InfoBar>
                             <!-- a newer release on GitHub (MainWindow.Update.cs) -->
                             <InfoBar x:Name="UpdateNotice" IsOpen="False" IsClosable="True" Severity="Success"
                                      Closed="UpdateNotice_Closed">
@@ -107,17 +108,17 @@
                         <!-- first-time setup hidden but not finished -->
                         <Button x:Name="SetupResume" Click="SetupResume_Click" HorizontalAlignment="Center" VerticalAlignment="Top"
                                 CornerRadius="16" Padding="14,6" Visibility="Collapsed"
-                                Style="{StaticResource AccentButtonStyle}" />
+                                Style="{StaticResource BrandAccentButtonStyle}" />
 
                         <!-- while an agent has the phone (or you took it back): who, and the way to switch -->
                         <StackPanel x:Name="AgentPanel" HorizontalAlignment="Center" VerticalAlignment="Bottom" Spacing="6"
                                     Visibility="Collapsed">
                             <TextBlock x:Name="AgentWhat" HorizontalAlignment="Center" Margin="16,0,16,0"
-                                       Foreground="#CCEBEBF5" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                       Foreground="{StaticResource BrandOnNightTextBrush}" FontSize="12" TextTrimming="CharacterEllipsis" />
                             <Button x:Name="TakeoverButton" Click="Takeover_Click" HorizontalAlignment="Center"
-                                    CornerRadius="16" Padding="14,6" Background="#E61C1C1E">
+                                    CornerRadius="16" Padding="14,6" Background="{StaticResource BrandNightBrush}">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Ellipse x:Name="AgentLight" Width="8" Height="8" Fill="#30D158" VerticalAlignment="Center" />
+                                    <Ellipse x:Name="AgentLight" Width="8" Height="8" Fill="{StaticResource BrandGreenBrush}" VerticalAlignment="Center" />
                                     <TextBlock x:Name="TakeoverLabel" Text="You're in control" />
                                     <TextBlock x:Name="TakeoverAction" FontWeight="SemiBold"
                                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
@@ -128,7 +129,7 @@
                         <!-- the pointer's calibration (MainWindow.Calibration.cs): upright only. While it waits for an upright
                              phone or measures, a card says so; "Later" hides it until the state changes -->
                         <Border x:Name="CalibrationCard" VerticalAlignment="Bottom" Margin="10,0,10,64" CornerRadius="14"
-                                Padding="14,12" Background="#F2124A9E" Visibility="Collapsed">
+                                Padding="14,12" Background="{StaticResource BrandPlumGlassBrush}" Visibility="Collapsed">
                             <Grid ColumnSpacing="12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -142,11 +143,11 @@
                                 </FontIcon>
                                 <StackPanel Grid.Column="1" Spacing="4">
                                     <TextBlock x:Name="CalibrationTitle" FontWeight="SemiBold" Foreground="White" TextWrapping="Wrap" />
-                                    <TextBlock x:Name="CalibrationText" FontSize="12" Foreground="#E6FFFFFF" TextWrapping="Wrap" />
+                                    <TextBlock x:Name="CalibrationText" FontSize="12" Foreground="{StaticResource BrandWhiteSoftBrush}" TextWrapping="Wrap" />
                                     <ProgressBar x:Name="CalibrationProgress" Maximum="7" Visibility="Collapsed" Margin="0,4,0,0" />
                                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
                                         <Button x:Name="CalibrationRetry" Content="Try again" Click="CalibrationRetry_Click"
-                                                Visibility="Collapsed" Style="{StaticResource AccentButtonStyle}" />
+                                                Visibility="Collapsed" Style="{StaticResource BrandAccentButtonStyle}" />
                                         <Button x:Name="CalibrationLater" Content="Later" Click="CalibrationLater_Click" />
                                     </StackPanel>
                                 </StackPanel>
@@ -155,204 +156,454 @@
 
                         <!-- first-time setup (MainWindow.Setup.cs): the phone's screen until it's done or hidden -->
                         <!-- a pixel past the screen on every side, as the video: no lighter seam against the body at any size -->
-                        <Grid x:Name="SetupOverlay" Background="#FF0F0F11" Visibility="Collapsed" Margin="-1">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                <StackPanel x:Name="SetupBody" Padding="16,4,16,24" Spacing="10" />
+                        <Grid x:Name="SetupOverlay" RequestedTheme="Light" Background="{StaticResource BrandBgBrush}" Visibility="Collapsed" Margin="-1">
+                            <ScrollViewer x:Name="SetupScroll" VerticalScrollBarVisibility="Auto" SizeChanged="SetupScroll_SizeChanged">
+                                <!-- as tall as the screen at least, so the stage's buttons (SetupFoot) sit at the bottom -->
+                                <Grid x:Name="SetupLayout" Padding="18,4,18,18" RowSpacing="12">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <!-- drawn by MainWindow.Setup.cs: the stage's header and steps -->
+                                    <StackPanel x:Name="SetupBody" Spacing="10" />
+                                    <!-- the Agent setup stage's own cards, kept up to date by MainWindow.Pairing.cs and
+                                         MainWindow.Vision.cs; Claude Code's is drawn into ClaudeSlot -->
+                                    <StackPanel x:Name="AgentSetupPanel" Grid.Row="1" Spacing="10" Visibility="Collapsed">
+                                        <Border Background="{StaticResource BrandPlumDeepBrush}" CornerRadius="22" Padding="18">
+                                            <StackPanel Spacing="12">
+                                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                                    <Border Style="{StaticResource BrandIconTileStyle}" Background="{StaticResource BrandOnPlumFaintBrush}">
+                                                        <local:BrandIcon Stroke="{StaticResource BrandBgBrush}" Data="M8,2 L16,2 A2,2 0 0 1 18,4 L18,20 A2,2 0 0 1 16,22 L8,22 A2,2 0 0 1 6,20 L6,4 A2,2 0 0 1 8,2 Z M11,18 L13,18" />
+                                                    </Border>
+                                                    <TextBlock x:Name="PairedTitle" Text="iPhone app" FontSize="16" FontWeight="Bold" CharacterSpacing="-10"
+                                                               VerticalAlignment="Center" Foreground="{StaticResource BrandBgBrush}" />
+                                                </StackPanel>
+                                                <TextBlock x:Name="PairedText" FontSize="13" LineHeight="19" TextWrapping="Wrap" Foreground="{StaticResource BrandOnPlumTextBrush}" />
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button x:Name="PairButton" Content="Pair iPhone" Click="Pair_Click" Height="44" CornerRadius="22"
+                                                            HorizontalAlignment="Stretch" FontSize="14" FontWeight="Bold"
+                                                            Background="{StaticResource BrandBgBrush}" Foreground="{StaticResource BrandPlumDeepBrush}" />
+                                                    <Button x:Name="UnpairButton" Grid.Column="1" Content="Unpair" Click="Unpair_Click" Visibility="Collapsed"
+                                                            Height="44" CornerRadius="22" FontSize="14" FontWeight="SemiBold"
+                                                            Background="{StaticResource BrandOnPlumFaintBrush}" Foreground="{StaticResource BrandBgBrush}" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+                                        <StackPanel x:Name="ClaudeSlot" />
+                                        <Border Style="{StaticResource BrandCardStyle}">
+                                            <local:SettingsRow x:Name="SetupCodexRow" Style="{StaticResource BrandRowStyle}" Title="Codex"
+                                                               Subtitle="Let Codex use Phone Use."
+                                                               Icon="M9,6 L4,11 L9,16 M15,6 L20,11 L15,16">
+                                                <Button x:Name="SetupCodexButton" Content="Connect" Click="Codex_Click" IsEnabled="False"
+                                                        AutomationProperties.Name="Connect Codex" />
+                                            </local:SettingsRow>
+                                        </Border>
+                                        <Border Style="{StaticResource BrandCardStyle}" Padding="14">
+                                            <StackPanel Spacing="8">
+                                                <Grid ColumnSpacing="12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Style="{StaticResource BrandIconTileStyle}" VerticalAlignment="Top">
+                                                        <local:BrandIcon Data="M2,12 C2,12 5.5,5 12,5 C18.5,5 22,12 22,12 C22,12 18.5,19 12,19 C5.5,19 2,12 2,12 Z M12,15 A3,3 0 1 0 12,9 A3,3 0 1 0 12,15 Z" />
+                                                    </Border>
+                                                    <TextBlock x:Name="VisionText" Grid.Column="1" FontSize="13" LineHeight="18" TextWrapping="Wrap"
+                                                               VerticalAlignment="Center" Foreground="{StaticResource BrandInk2Brush}" />
+                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                                                        <ProgressRing x:Name="VisionRing" Width="20" Height="20" IsActive="False" Visibility="Collapsed" />
+                                                        <Button x:Name="VisionButton" Content="Install" Click="Vision_Click" Height="36" CornerRadius="18"
+                                                                Style="{StaticResource BrandAccentButtonStyle}" FontSize="13" />
+                                                    </StackPanel>
+                                                </Grid>
+                                                <!-- while installing: the current download's bytes, else indeterminate -->
+                                                <ProgressBar x:Name="VisionProgress" Maximum="1" Visibility="Collapsed" />
+                                                <TextBlock x:Name="VisionDetail" Style="{StaticResource BrandRowSubStyle}" Visibility="Collapsed" />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                    <!-- drawn by MainWindow.Setup.cs: the stage's buttons -->
+                                    <StackPanel x:Name="SetupFoot" Grid.Row="3" Spacing="8" />
+                                </Grid>
                             </ScrollViewer>
                         </Grid>
 
                         <!-- the calibration flow (MainWindow.Calibration.cs): AssistiveTouch, upright, measure -->
-                        <Grid x:Name="CalibrationOverlay" Background="#FF0F0F11" Visibility="Collapsed" Margin="-1">
+                        <Grid x:Name="CalibrationOverlay" RequestedTheme="Light" Background="{StaticResource BrandBgBrush}" Visibility="Collapsed" Margin="-1">
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
                                 <StackPanel x:Name="CalibrationBody" Padding="16,4,16,24" Spacing="10" />
                             </ScrollViewer>
                         </Grid>
 
                         <!-- About Phone Use, and the bridge's page: the phone's screen (the bar's (i), or the tray menu) -->
-                        <Grid x:Name="AboutOverlay" Background="#FF0F0F11" Visibility="Collapsed" Margin="-1" KeyDown="AboutOverlay_KeyDown">
+                        <Grid x:Name="AboutOverlay" RequestedTheme="Light" Background="{ThemeResource BrandThemedBgBrush}" Visibility="Collapsed" Margin="-1" KeyDown="AboutOverlay_KeyDown">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
-                            <Button x:Name="AboutBack" Click="AboutBack_Click" Style="{StaticResource SubtleButtonStyle}"
-                                    Margin="16,0,8,4" Padding="8,5" HorizontalAlignment="Left">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <FontIcon Glyph="&#xE72B;" FontSize="14" />
-                                    <TextBlock Text="Back to the phone" />
-                                </StackPanel>
-                            </Button>
+                            <Grid Margin="20,0,20,4">
+                                <Button x:Name="AboutBack" Click="AboutBack_Click" Height="40" Padding="10,0,16,0" CornerRadius="20"
+                                        HorizontalAlignment="Left" FontSize="14" FontWeight="SemiBold">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <local:BrandIcon Stroke="{ThemeResource BrandThemedInkBrush}" StrokeThickness="2.2" Data="M15,6 L9,12 L15,18" />
+                                        <TextBlock Text="Phone" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                                <!-- Settings only (ShowOverlay) -->
+                                <Border x:Name="SettingsChip" HorizontalAlignment="Right" VerticalAlignment="Center" Padding="10,5" CornerRadius="12"
+                                        Background="{ThemeResource BrandThemedPlumTintBrush}" Visibility="Collapsed">
+                                    <TextBlock Text="Alpha" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource BrandThemedPlumBrush}" />
+                                </Border>
+                            </Grid>
                         <Grid x:Name="SettingsPage" Grid.Row="1" Visibility="Collapsed">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
-                            <TextBlock Text="Settings" Style="{StaticResource TitleTextBlockStyle}" Margin="16,8,16,12" />
-                            <TabView x:Name="SettingsTabs" Grid.Row="1" SelectionChanged="SettingsTab_Changed" IsAddTabButtonVisible="False" TabWidthMode="Equal"
-                                     CanDragTabs="False" CanReorderTabs="False">
-                                <TabViewItem IsClosable="False">
-                                    <TabViewItem.Header>
-                                        <TextBlock Text="General" FontSize="12" />
-                                    </TabViewItem.Header>
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                        <StackPanel Padding="16,8,16,28" Spacing="6">
-                                            <ToggleSwitch x:Name="AwakeSwitch" Header="Keep screen awake"
-                                                          OnContent="On" OffContent="Off" Toggled="Awake_Toggled" />
-                                            <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.7" TextWrapping="Wrap"
-                                                       Text="Nudges the pointer about once a second while nobody else uses the phone, so Auto-Lock never fires." />
+                            <TextBlock Text="Settings" FontSize="36" LineHeight="38" FontWeight="Bold" CharacterSpacing="-35"
+                                       Foreground="{ThemeResource BrandThemedInkBrush}" Margin="20,10,20,14" />
+                            <!-- the tabs (SettingsTab_Changed shows one pane) -->
+                            <Grid Grid.Row="1" Margin="20,0,20,0" Padding="4" CornerRadius="22" ColumnSpacing="2"
+                                  Background="{ThemeResource BrandThemedCreamBrush}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <RadioButton x:Name="TabGeneral" Content="General" GroupName="SettingsTab" IsChecked="True"
+                                             Style="{StaticResource BrandSegmentStyle}" Checked="SettingsTab_Changed" />
+                                <RadioButton x:Name="AgentControlTab" Grid.Column="1" Content="Agent" GroupName="SettingsTab"
+                                             Style="{StaticResource BrandSegmentStyle}" Checked="SettingsTab_Changed" />
+                                <RadioButton x:Name="TabLook" Grid.Column="2" Content="Look" GroupName="SettingsTab"
+                                             Style="{StaticResource BrandSegmentStyle}" Checked="SettingsTab_Changed" />
+                                <RadioButton x:Name="TabBluetooth" Grid.Column="3" Content="Bluetooth" GroupName="SettingsTab"
+                                             Style="{StaticResource BrandSegmentStyle}" Checked="SettingsTab_Changed" />
+                            </Grid>
+                            <Grid Grid.Row="2">
 
-                                            <ToggleSwitch x:Name="StartupSwitch" Header="Start with Windows" Margin="0,14,0,0"
-                                                          OnContent="On" OffContent="Off" Toggled="Startup_Toggled" />
-                                            <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.7" TextWrapping="Wrap"
-                                                       Text="Starts phoneuse when you sign in, with Phone Use waiting in the tray." />
+                                <!-- GENERAL -->
+                                <ScrollViewer x:Name="PaneGeneral" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <StackPanel Padding="20,0,20,36">
+                                        <TextBlock Text="On this PC" Style="{StaticResource BrandSectionLabelStyle}" Margin="4,18,4,8" />
+                                        <Border Style="{StaticResource BrandCardStyle}">
+                                            <StackPanel>
+                                                <local:SettingsRow Style="{StaticResource BrandRowStyle}" Title="Keep screen awake"
+                                                                   Subtitle="Nudges the pointer while nobody uses the phone, so Auto-Lock never fires."
+                                                                   Icon="M12,4 L12,2 M12,22 L12,20 M4,12 L2,12 M22,12 L20,12 M5.6,5.6 L4.2,4.2 M19.8,19.8 L18.4,18.4 M5.6,18.4 L4.2,19.8 M19.8,4.2 L18.4,5.6 M16,12 A4,4 0 1 1 8,12 A4,4 0 1 1 16,12 Z">
+                                                    <ToggleSwitch x:Name="AwakeSwitch" Style="{StaticResource BrandSwitchStyle}"
+                                                                  Toggled="Awake_Toggled" AutomationProperties.Name="Keep screen awake" />
+                                                </local:SettingsRow>
+                                                <local:SettingsRow Style="{StaticResource BrandRowStyle}" BorderThickness="0,1,0,0" Title="Start with Windows"
+                                                                   Subtitle="Starts phoneuse when you sign in, waiting in the tray."
+                                                                   Icon="M12,3 L12,11 M7.1,6.3 A7,7 0 1 0 16.9,6.3">
+                                                    <ToggleSwitch x:Name="StartupSwitch" Style="{StaticResource BrandSwitchStyle}"
+                                                                  Toggled="Startup_Toggled" AutomationProperties.Name="Start with Windows" />
+                                                </local:SettingsRow>
+                                                <local:SettingsRow Style="{StaticResource BrandRowStyle}" BorderThickness="0,1,0,0" Title="Always on top"
+                                                                   Subtitle="Keeps the phone window above other apps' windows."
+                                                                   Icon="M12,3 L12,15 M7,8 L12,3 L17,8 M5,21 L19,21">
+                                                    <ToggleSwitch x:Name="TopmostSwitch" Style="{StaticResource BrandSwitchStyle}"
+                                                                  Toggled="Topmost_Toggled" AutomationProperties.Name="Always on top" />
+                                                </local:SettingsRow>
+                                                <local:SettingsRow Style="{StaticResource BrandRowStyle}" BorderThickness="0,1,0,0" Title="Keep above the tray icon"
+                                                                   Subtitle="Opens above the tray. Drag the bar to float it anywhere; drop it near the tray to snap it back. Off: it never snaps."
+                                                                   Icon="M4,15 L20,15 M6,19 L18,19 A2,2 0 0 0 20,17 L20,7 A2,2 0 0 0 18,5 L6,5 A2,2 0 0 0 4,7 L4,17 A2,2 0 0 0 6,19 Z">
+                                                    <ToggleSwitch x:Name="SnapSwitch" Style="{StaticResource BrandSwitchStyle}"
+                                                                  Toggled="Snap_Toggled" AutomationProperties.Name="Keep above the tray icon" />
+                                                </local:SettingsRow>
+                                                <local:SettingsRow Style="{StaticResource BrandRowStyle}" BorderThickness="0,1,0,0"
+                                                                   Title="Dark mode" Subtitle="Use a dark palette for Settings, About, and Activity."
+                                                                   Icon="M20,15 A8,8 0 1 1 9,4 A7,7 0 0 0 20,15 Z">
+                                                    <ToggleSwitch x:Name="DarkModeSwitch" Style="{StaticResource BrandSwitchStyle}"
+                                                                  Toggled="DarkMode_Toggled" AutomationProperties.Name="Dark mode" />
+                                                </local:SettingsRow>
+                                            </StackPanel>
+                                        </Border>
 
-                                            <ToggleSwitch x:Name="SnapSwitch" Header="Keep above the tray icon" Margin="0,14,0,0"
-                                                          OnContent="On" OffContent="Off" Toggled="Snap_Toggled" />
-                                            <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.7" TextWrapping="Wrap"
-                                                       Text="Opens above Phone Use's tray icon, on top of other windows. Drag the bar to take it anywhere; drop it near the tray to put it back." />
+                                        <StackPanel x:Name="PasscodeSection" Visibility="Collapsed">
+                                            <TextBlock Text="Passcode" Style="{StaticResource BrandSectionLabelStyle}" />
+                                            <Border Style="{StaticResource BrandCardStyle}" Padding="14">
+                                                <StackPanel Spacing="8">
+                                                    <Grid ColumnSpacing="8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <PasswordBox x:Name="PasscodeBox" PlaceholderText="Enter passcode" InputScope="NumericPin"
+                                                                     PasswordChanged="Passcode_Changed" KeyDown="Passcode_KeyDown" />
+                                                        <Button x:Name="PasscodeSave" Grid.Column="1" Content="Save" IsEnabled="False"
+                                                                Click="PasscodeSave_Click" Style="{StaticResource BrandAccentButtonStyle}" />
+                                                    </Grid>
+                                                    <Button x:Name="PasscodeRemove" Content="Remove Passcode" Foreground="{ThemeResource BrandThemedBrickBrush}"
+                                                            Click="PasscodeRemove_Click" Visibility="Collapsed" />
+                                                    <TextBlock x:Name="PasscodeError" Foreground="{ThemeResource BrandThemedBrickBrush}" TextWrapping="Wrap"
+                                                               FontSize="12.5" Visibility="Collapsed" />
+                                                </StackPanel>
+                                            </Border>
+                                        </StackPanel>
 
-                                            <StackPanel x:Name="PasscodeSection" Spacing="6" Visibility="Collapsed">
-                                                <TextBlock Text="Passcode" Margin="0,14,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" />
-                                                <Grid ColumnSpacing="8">
+                                        <!-- the installed and portable app only (Updater.Mode) -->
+                                        <StackPanel x:Name="UpdateSection">
+                                            <TextBlock Text="Updates" Style="{StaticResource BrandSectionLabelStyle}" />
+                                            <Border Style="{StaticResource BrandCardStyle}">
+                                                <StackPanel>
+                                                    <Grid Style="{StaticResource BrandRowStyle}" Padding="14">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Image Source="ms-appx:///Assets/AppIcon.png" Width="40" Height="40" VerticalAlignment="Center" />
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                            <TextBlock x:Name="UpdateTitle" Text="Phone Use" Style="{StaticResource BrandRowTitleStyle}" />
+                                                            <TextBlock x:Name="UpdateText" Style="{StaticResource BrandRowSubStyle}" />
+                                                        </StackPanel>
+                                                        <Border x:Name="UpdateChip" Grid.Column="2" VerticalAlignment="Center" Padding="10,5" CornerRadius="12"
+                                                                Background="{ThemeResource BrandThemedGreenTintBrush}" Visibility="Collapsed">
+                                                            <TextBlock x:Name="UpdateChipText" Text="Up to date" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource BrandThemedGreenTextBrush}" />
+                                                        </Border>
+                                                    </Grid>
+                                                    <local:SettingsRow Style="{StaticResource BrandRowStyle}" BorderThickness="0,1,0,0" Title="Check automatically" Plain="True">
+                                                        <ToggleSwitch x:Name="UpdateAuto" Style="{StaticResource BrandSwitchStyle}"
+                                                                      Toggled="UpdateAuto_Toggled" AutomationProperties.Name="Check automatically" />
+                                                    </local:SettingsRow>
+                                                    <Grid Padding="14,4,14,14" ColumnSpacing="10">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Button x:Name="UpdateButton" Content="Check for updates" Click="UpdateButton_Click" Height="44"
+                                                                CornerRadius="22" HorizontalAlignment="Stretch" FontSize="14" FontWeight="SemiBold" />
+                                                        <ProgressRing x:Name="UpdateRing" Grid.Column="1" Width="20" Height="20" IsActive="False"
+                                                                      Visibility="Collapsed" />
+                                                    </Grid>
+                                                </StackPanel>
+                                            </Border>
+                                        </StackPanel>
+
+                                        <TextBlock Text="Help" Style="{StaticResource BrandSectionLabelStyle}" />
+                                        <Border Style="{StaticResource BrandCardStyle}">
+                                            <StackPanel>
+                                                <Button Style="{StaticResource BrandRowButtonStyle}" Click="SetupGuide_Click">
+                                                    <local:SettingsRow Title="Setup guide" Plain="True" IconBackground="{ThemeResource BrandThemedAmberTintBrush}" IconStroke="{ThemeResource BrandThemedAmberIconBrush}" Chevron="True"
+                                                                       Icon="M4,5 A2,2 0 0 1 6,3 L19,3 L19,19 L6,19 A2,2 0 0 0 4,21 L4,5 Z M8,7 L15,7" />
+                                                </Button>
+                                                <Border Height="1" Background="{ThemeResource BrandThemedLineBrush}" />
+                                                <Button Style="{StaticResource BrandRowButtonStyle}" Click="CalibrateGuide_Click">
+                                                    <local:SettingsRow Title="Calibrate the pointer" Plain="True" IconBackground="{ThemeResource BrandThemedAmberTintBrush}" IconStroke="{ThemeResource BrandThemedAmberIconBrush}" Chevron="True"
+                                                                       Icon="M12,3 L12,6 M12,18 L12,21 M3,12 L6,12 M18,12 L21,12 M12,17 A5,5 0 1 0 12,7 A5,5 0 1 0 12,17 Z" />
+                                                </Button>
+                                                <Border Height="1" Background="{ThemeResource BrandThemedLineBrush}" />
+                                                <Button x:Name="OpenBrowser" Style="{StaticResource BrandRowButtonStyle}" Click="OpenBrowser_Click">
+                                                    <local:SettingsRow Title="Open the browser mirror" Plain="True" IconBackground="{ThemeResource BrandThemedAmberTintBrush}" IconStroke="{ThemeResource BrandThemedAmberIconBrush}" Chevron="True"
+                                                                       Icon="M12,21 A9,9 0 1 0 12,3 A9,9 0 1 0 12,21 Z M3,12 L21,12 M12,3 C14.5,5.5 15.5,8.5 15.5,12 C15.5,15.5 14.5,18.5 12,21 C9.5,18.5 8.5,15.5 8.5,12 C8.5,8.5 9.5,5.5 12,3 Z" />
+                                                </Button>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- the site's mascot, baked onto the cream (Assets/Mascot.png) -->
+                                        <StackPanel Margin="0,26,0,0" Spacing="6" HorizontalAlignment="Center">
+                                            <Image Source="ms-appx:///Assets/Mascot.png" Width="190" HorizontalAlignment="Center"
+                                                   AutomationProperties.Name="The Phone Use cloud holding a phone, beside a laptop" />
+                                            <TextBlock Text="Free and open source · No jailbreak · No cable" FontSize="12" HorizontalAlignment="Center"
+                                                       Foreground="{ThemeResource BrandThemedInk3Brush}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </ScrollViewer>
+
+                                <!-- AGENT -->
+                                <ScrollViewer x:Name="PaneAgent" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <StackPanel Padding="20,18,20,36">
+                                        <TextBlock Text="Agent setup" Style="{StaticResource BrandSectionLabelStyle}" Margin="4,0,4,8" />
+                                        <Border Style="{StaticResource BrandCardStyle}">
+                                            <StackPanel>
+                                                <Button Style="{StaticResource BrandRowButtonStyle}" Click="AgentSetup_Click">
+                                                    <local:SettingsRow x:Name="AgentSetupRow" Title="Set up agent control" IconBackground="{ThemeResource BrandThemedPlumTintBrush}" Chevron="True"
+                                                                       Subtitle="Pair the iPhone app, connect an agent and add screen reading."
+                                                                       Icon="M12,3 L13.8,8.2 L19,10 L13.8,11.8 L12,17 L10.2,11.8 L5,10 L10.2,8.2 Z" />
+                                                </Button>
+                                                <Border Height="1" Background="{ThemeResource BrandThemedLineBrush}" Margin="14,0" />
+                                                <local:SettingsRow x:Name="CodexRow" Style="{StaticResource BrandRowStyle}" Title="Codex"
+                                                                   Subtitle="Let Codex use Phone Use."
+                                                                   IconBackground="{ThemeResource BrandThemedPlumTintBrush}"
+                                                                   Icon="M9,6 L4,11 L9,16 M15,6 L20,11 L15,16">
+                                                    <Button x:Name="CodexButton" Content="Connect" Click="Codex_Click" IsEnabled="False"
+                                                            AutomationProperties.Name="Connect Codex" />
+                                                </local:SettingsRow>
+                                                <Border Height="1" Background="{ThemeResource BrandThemedLineBrush}" Margin="14,0" />
+                                                <local:SettingsRow x:Name="ClaudeRow" Style="{StaticResource BrandRowStyle}" Title="Claude Code"
+                                                                   Subtitle="Let Claude Code use Phone Use."
+                                                                   IconBackground="{ThemeResource BrandThemedPlumTintBrush}"
+                                                                   Icon="M12,4 L12,20 M4,12 L20,12 M6.3,6.3 L17.7,17.7 M6.3,17.7 L17.7,6.3">
+                                                    <Button x:Name="ClaudeButton" Content="Connect" Click="Claude_Click" IsEnabled="False"
+                                                            AutomationProperties.Name="Connect Claude Code" />
+                                                </local:SettingsRow>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <TextBlock Text="When an agent wants the phone" Style="{StaticResource BrandSectionLabelStyle}" />
+                                        <Border Style="{StaticResource BrandCardStyle}">
+                                            <StackPanel x:Name="StartMode">
+                                                <RadioButton x:Name="ModeAuto" Tag="auto" GroupName="StartMode" Style="{StaticResource BrandRadioRowStyle}"
+                                                             Checked="StartMode_Changed">
+                                                    <StackPanel>
+                                                        <TextBlock Text="Right away" Style="{StaticResource BrandRowTitleStyle}" />
+                                                        <TextBlock Text="Agents start using the phone as soon as they ask." Style="{StaticResource BrandRowSubStyle}" />
+                                                    </StackPanel>
+                                                </RadioButton>
+                                                <RadioButton x:Name="ModeCountdown" Tag="countdown" GroupName="StartMode" Style="{StaticResource BrandRadioRowStyle}"
+                                                             BorderBrush="{ThemeResource BrandThemedLineBrush}" BorderThickness="0,1,0,0" Checked="StartMode_Changed">
+                                                    <StackPanel>
+                                                        <TextBlock Text="After a delay" Style="{StaticResource BrandRowTitleStyle}" />
+                                                        <TextBlock Text="A countdown on the phone gives you time to say no." Style="{StaticResource BrandRowSubStyle}" />
+                                                    </StackPanel>
+                                                </RadioButton>
+                                                <Grid x:Name="StartSeconds" Visibility="Collapsed" Padding="48,0,14,14" ColumnSpacing="8">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
                                                     </Grid.ColumnDefinitions>
-                                                    <PasswordBox x:Name="PasscodeBox" PlaceholderText="Enter passcode" InputScope="NumericPin"
-                                                                 PasswordChanged="Passcode_Changed" KeyDown="Passcode_KeyDown" />
-                                                    <Button x:Name="PasscodeSave" Grid.Column="1" Content="Save" IsEnabled="False"
-                                                            Click="PasscodeSave_Click" Style="{StaticResource AccentButtonStyle}" />
+                                                    <RadioButton x:Name="Delay5" Tag="5" Content="5 s" GroupName="StartSeconds" Style="{StaticResource BrandChipStyle}" Checked="StartSeconds_Changed" />
+                                                    <RadioButton x:Name="Delay10" Grid.Column="1" Tag="10" Content="10 s" GroupName="StartSeconds" Style="{StaticResource BrandChipStyle}" Checked="StartSeconds_Changed" />
+                                                    <RadioButton x:Name="Delay15" Grid.Column="2" Tag="15" Content="15 s" GroupName="StartSeconds" Style="{StaticResource BrandChipStyle}" Checked="StartSeconds_Changed" />
+                                                    <RadioButton x:Name="Delay30" Grid.Column="3" Tag="30" Content="30 s" GroupName="StartSeconds" Style="{StaticResource BrandChipStyle}" Checked="StartSeconds_Changed" />
                                                 </Grid>
-                                                <Button x:Name="PasscodeRemove" Content="Remove Passcode" Foreground="#FF453A"
-                                                        Click="PasscodeRemove_Click" Visibility="Collapsed" />
-                                                <TextBlock x:Name="PasscodeError" Foreground="#FF453A" TextWrapping="Wrap"
-                                                           Style="{StaticResource CaptionTextBlockStyle}" Visibility="Collapsed" />
+                                                <RadioButton x:Name="ModeAsk" Tag="ask" GroupName="StartMode" Style="{StaticResource BrandRadioRowStyle}"
+                                                             BorderBrush="{ThemeResource BrandThemedLineBrush}" BorderThickness="0,1,0,0" Checked="StartMode_Changed">
+                                                    <StackPanel>
+                                                        <TextBlock Text="Ask every time" Style="{StaticResource BrandRowTitleStyle}" />
+                                                        <TextBlock Text="Nothing happens until you allow it on the iPhone." Style="{StaticResource BrandRowSubStyle}" />
+                                                    </StackPanel>
+                                                </RadioButton>
                                             </StackPanel>
+                                        </Border>
 
-                                            <!-- the installed and portable app only (Updater.Mode) -->
-                                            <StackPanel x:Name="UpdateSection" Spacing="6">
-                                                <TextBlock Text="Updates" Margin="0,14,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" />
-                                                <TextBlock x:Name="UpdateText" Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.7"
-                                                           TextWrapping="Wrap" />
-                                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                                    <Button x:Name="UpdateButton" Content="Check for updates" Click="UpdateButton_Click" />
-                                                    <ProgressRing x:Name="UpdateRing" Width="20" Height="20" IsActive="False"
-                                                                  Visibility="Collapsed" />
+                                        <!-- the light around the phone while an agent drives (MainWindow.Glow.cs); lit while the Agent tab is open -->
+                                        <TextBlock Text="Agent glow" Style="{StaticResource BrandSectionLabelStyle}" />
+                                        <Border Style="{StaticResource BrandCardStyle}">
+                                            <StackPanel>
+                                                <local:SettingsRow Style="{StaticResource BrandRowStyle}" Title="Light around the phone"
+                                                                   Subtitle="While an agent uses it; amber when you take over."
+                                                                   Icon="M12,3 L13.8,8.2 L19,10 L13.8,11.8 L12,17 L10.2,11.8 L5,10 L10.2,8.2 Z"
+                                                                   IconStroke="{StaticResource BrandOnAccentIconBrush}" IconBackground="{StaticResource BrandGlowGradient}">
+                                                    <ToggleSwitch x:Name="GlowSwitch" Style="{StaticResource BrandSwitchStyle}"
+                                                                  Toggled="Glow_Toggled" AutomationProperties.Name="Agent glow" />
+                                                </local:SettingsRow>
+                                                <TextBlock x:Name="GlowUnavailable" Style="{StaticResource BrandRowSubStyle}" Foreground="{ThemeResource BrandThemedAmberTextBrush}"
+                                                           Margin="14,0,14,12" Visibility="Collapsed"
+                                                           Text="The graphics card couldn't start the glow: a plain ring shows instead." />
+                                                <StackPanel x:Name="GlowOptions">
+                                                    <StackPanel Padding="14,4,14,6" Spacing="2" BorderBrush="{ThemeResource BrandThemedLineBrush}" BorderThickness="0,1,0,0">
+                                                        <Grid Margin="0,8,0,0">
+                                                            <TextBlock Text="Intensity" FontSize="13" FontWeight="Medium" />
+                                                            <TextBlock Text="{x:Bind Pct(GlowIntensity.Value), Mode=OneWay}" FontSize="13" HorizontalAlignment="Right"
+                                                                       Foreground="{ThemeResource BrandThemedInk3Brush}" />
+                                                        </Grid>
+                                                        <Slider x:Name="GlowIntensity" Minimum="0.2" Maximum="1.6" StepFrequency="0.01"
+                                                                ValueChanged="GlowLook_Changed" AutomationProperties.Name="Intensity" />
+                                                        <Grid>
+                                                            <TextBlock Text="Speed" FontSize="13" FontWeight="Medium" />
+                                                            <TextBlock Text="{x:Bind Pct(GlowSpeed.Value), Mode=OneWay}" FontSize="13" HorizontalAlignment="Right"
+                                                                       Foreground="{ThemeResource BrandThemedInk3Brush}" />
+                                                        </Grid>
+                                                        <Slider x:Name="GlowSpeed" Minimum="0.2" Maximum="3" StepFrequency="0.01"
+                                                                ValueChanged="GlowLook_Changed" AutomationProperties.Name="Speed" />
+                                                        <Grid>
+                                                            <TextBlock Text="Glow size" FontSize="13" FontWeight="Medium" />
+                                                            <TextBlock Text="{x:Bind Pct(GlowSize.Value), Mode=OneWay}" FontSize="13" HorizontalAlignment="Right"
+                                                                       Foreground="{ThemeResource BrandThemedInk3Brush}" />
+                                                        </Grid>
+                                                        <Slider x:Name="GlowSize" Minimum="0.3" Maximum="2.5" StepFrequency="0.01"
+                                                                ValueChanged="GlowLook_Changed" AutomationProperties.Name="Glow size" />
+                                                        <StackPanel x:Name="GlowHdrPanel" Spacing="2" Visibility="Collapsed">
+                                                            <Grid>
+                                                                <TextBlock Text="HDR brightness" FontSize="13" FontWeight="Medium" />
+                                                                <TextBlock Text="{x:Bind Mult(GlowHdrPeak.Value), Mode=OneWay}" FontSize="13" HorizontalAlignment="Right"
+                                                                           Foreground="{ThemeResource BrandThemedInk3Brush}" />
+                                                            </Grid>
+                                                            <Slider x:Name="GlowHdrPeak" Minimum="1" Maximum="4" StepFrequency="0.05" Value="2.5"
+                                                                    ValueChanged="GlowLook_Changed" AutomationProperties.Name="HDR brightness" />
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                    <local:SettingsRow Style="{StaticResource BrandRowStyle}" BorderThickness="0,1,0,0" Title="Spill onto the screen edge" Plain="True">
+                                                        <ToggleSwitch x:Name="GlowBleed" Style="{StaticResource BrandSwitchStyle}"
+                                                                      Toggled="GlowLook_Changed" AutomationProperties.Name="Spill onto the screen edge" />
+                                                    </local:SettingsRow>
+                                                    <HyperlinkButton Content="Reset to default" Margin="14,0,14,12" Padding="0,6" FontSize="13" FontWeight="SemiBold"
+                                                                     Click="GlowReset_Click" />
                                                 </StackPanel>
-                                                <CheckBox x:Name="UpdateAuto" Content="Check automatically" Click="UpdateAuto_Click" />
                                             </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </ScrollViewer>
 
-                                            <HyperlinkButton Content="Setup guide" Margin="0,12,0,0" Padding="0" Click="SetupGuide_Click" />
-                                            <HyperlinkButton Content="Calibrate the pointer" Padding="0" Click="CalibrateGuide_Click" />
-                                            <HyperlinkButton x:Name="OpenBrowser" Content="Open the browser mirror"
-                                                             Padding="0" Click="OpenBrowser_Click" />
-                                        </StackPanel>
-                                    </ScrollViewer>
-                                </TabViewItem>
-                                <TabViewItem x:Name="AgentControlTab" IsClosable="False">
-                                    <TabViewItem.Header>
-                                        <TextBlock Text="Agent Control" FontSize="12" />
-                                    </TabViewItem.Header>
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                        <StackPanel Padding="16,8,16,28" Spacing="6">
-                                            <TextBlock Text="iPhone app" Margin="0,14,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" />
-                                            <TextBlock x:Name="PairedText" Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.7"
-                                                       TextWrapping="Wrap" />
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <Button x:Name="PairButton" Content="Pair iPhone" Click="Pair_Click"
-                                                        Style="{StaticResource AccentButtonStyle}" />
-                                                <Button x:Name="UnpairButton" Content="Unpair" Click="Unpair_Click" Visibility="Collapsed" />
+                                <!-- LOOK: the phone frame's colour (MainWindow.Finish.cs fills the swatches) -->
+                                <ScrollViewer x:Name="PaneLook" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <StackPanel Padding="20,0,20,36">
+                                        <TextBlock Text="Frame colour" Style="{StaticResource BrandSectionLabelStyle}" Margin="4,18,4,8" />
+                                        <Border Style="{StaticResource BrandCardStyle}" Padding="14,16,14,10">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock x:Name="FinishName" FontSize="20" FontWeight="Bold" CharacterSpacing="-20" TextWrapping="Wrap"
+                                                           Foreground="{ThemeResource BrandThemedInkBrush}" />
+                                                <StackPanel x:Name="FinishGroups" />
                                             </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </ScrollViewer>
 
-                                            <TextBlock Text="Agent control" Margin="0,14,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" />
-                                            <ComboBox x:Name="StartMode" HorizontalAlignment="Stretch" SelectionChanged="StartMode_Changed">
-                                                <ComboBoxItem Content="Always" Tag="auto" />
-                                                <ComboBoxItem Content="After a delay" Tag="countdown" />
-                                                <ComboBoxItem Content="Ask every time" Tag="ask" />
-                                            </ComboBox>
-                                            <ComboBox x:Name="StartSeconds" Header="Delay" HorizontalAlignment="Stretch"
-                                                      Visibility="Collapsed" SelectionChanged="StartSeconds_Changed">
-                                                <ComboBoxItem Content="5 s" Tag="5" />
-                                                <ComboBoxItem Content="10 s" Tag="10" />
-                                                <ComboBoxItem Content="15 s" Tag="15" />
-                                                <ComboBoxItem Content="30 s" Tag="30" />
-                                            </ComboBox>
+                                <!-- BLUETOOTH -->
+                                <ScrollViewer x:Name="PaneBluetooth" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <StackPanel Padding="20,0,20,36">
+                                        <TextBlock Text="Keyboard and mouse" Style="{StaticResource BrandSectionLabelStyle}" Margin="4,18,4,8" />
+                                        <Border Style="{StaticResource BrandCardStyle}">
+                                                <!-- on while this PC's Bluetooth carries input; off: the bridge does. Greyed out (and on)
+                                                     until a bridge is set up and answering -->
+                                            <local:SettingsRow x:Name="BridgeRow" Style="{StaticResource BrandRowStyle}" Title="Use this PC's Bluetooth"
+                                                               Subtitle="Checking for a bridge…"
+                                                               Icon="M7,7 L17,17 L12,22 L12,2 L17,7 L7,17">
+                                                <ToggleSwitch x:Name="BridgeSwitch" Style="{StaticResource BrandSwitchStyle}" IsOn="True"
+                                                              IsEnabled="False" Toggled="Bridge_Toggled" AutomationProperties.Name="Use this PC's Bluetooth" />
+                                            </local:SettingsRow>
+                                        </Border>
 
-                                            <!-- the light around the phone while an agent drives (MainWindow.Glow.cs); lit while the Agent Control tab is open -->
-                                            <ToggleSwitch x:Name="GlowSwitch" Header="Agent glow" Margin="0,14,0,0"
-                                                          OnContent="On" OffContent="Off" Toggled="Glow_Toggled" />
-                                            <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.7" TextWrapping="Wrap"
-                                                       Text="Light around the phone while an agent uses it, amber when you take over. Previewed while the Agent Control tab is open." />
-                                            <TextBlock x:Name="GlowUnavailable" Style="{StaticResource CaptionTextBlockStyle}" Foreground="#FF9F0A"
-                                                       TextWrapping="Wrap" Visibility="Collapsed"
-                                                       Text="The graphics card couldn't start the glow: a plain ring shows instead." />
-                                            <StackPanel x:Name="GlowOptions" Spacing="2">
-                                                <Slider x:Name="GlowIntensity" Header="Intensity" Minimum="0.2" Maximum="1.6" StepFrequency="0.01"
-                                                        ValueChanged="GlowLook_Changed" />
-                                                <Slider x:Name="GlowSpeed" Header="Speed" Minimum="0.2" Maximum="3" StepFrequency="0.01"
-                                                        ValueChanged="GlowLook_Changed" />
-                                                <Slider x:Name="GlowSize" Header="Glow size" Minimum="0.3" Maximum="2.5" StepFrequency="0.01"
-                                                        ValueChanged="GlowLook_Changed" />
-                                                <CheckBox x:Name="GlowBleed" Content="Light spills onto the screen edge"
-                                                          Click="GlowLook_Changed" />
-                                                <HyperlinkButton Content="Reset to default" Padding="0" Click="GlowReset_Click" />
+                                        <Border Margin="0,14,0,0" Background="{ThemeResource BrandThemedCreamBrush}" CornerRadius="22" Padding="18">
+                                            <StackPanel Spacing="10">
+                                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                                    <Border Style="{StaticResource BrandIconTileStyle}" Background="{ThemeResource BrandThemedBgBrush}">
+                                                        <local:BrandIcon Stroke="{ThemeResource BrandThemedAmberIconBrush}" Data="M7,7 L17,7 L17,17 L7,17 Z M9,3 L9,7 M15,3 L15,7 M9,17 L9,21 M15,17 L15,21 M3,9 L7,9 M3,15 L7,15 M17,9 L21,9 M17,15 L21,15" />
+                                                    </Border>
+                                                    <TextBlock Text="Bluetooth bridge" FontSize="16" FontWeight="Bold" CharacterSpacing="-10" VerticalAlignment="Center"
+                                                               Foreground="{ThemeResource BrandThemedInkBrush}" />
+                                                </StackPanel>
+                                                <TextBlock Text="A LilyGO T-Display can be the keyboard and mouse instead, over Bluetooth Classic, as on Linux."
+                                                           FontSize="13" LineHeight="19" TextWrapping="Wrap" Foreground="{ThemeResource BrandThemedInk2Brush}" />
+                                                <Button x:Name="BridgeButton" Content="Bridge Settings" Click="BridgeSettings_Click" Height="44" CornerRadius="22"
+                                                        HorizontalAlignment="Stretch" Style="{StaticResource BrandAccentButtonStyle}" FontSize="14" />
                                             </StackPanel>
-
-                                            <TextBlock Text="Screen reading" Margin="0,14,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" />
-                                            <TextBlock x:Name="VisionText" Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.7"
-                                                       TextWrapping="Wrap" />
-                                            <!-- while installing: the current download's bytes, else indeterminate -->
-                                            <ProgressBar x:Name="VisionProgress" Maximum="1" Visibility="Collapsed" Margin="0,2,0,2" />
-                                            <TextBlock x:Name="VisionDetail" Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.7"
-                                                       TextWrapping="Wrap" Visibility="Collapsed" />
-                                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                                <Button x:Name="VisionButton" Content="Install" Click="Vision_Click" />
-                                                <ProgressRing x:Name="VisionRing" Width="20" Height="20" IsActive="False"
-                                                              Visibility="Collapsed" />
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </ScrollViewer>
-                                </TabViewItem>
-                                <!-- the phone frame's colour (MainWindow.Finish.cs) -->
-                                <TabViewItem IsClosable="False">
-                                    <TabViewItem.Header>
-                                        <TextBlock Text="Appearance" FontSize="12" />
-                                    </TabViewItem.Header>
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                        <StackPanel Padding="16,8,16,28" Spacing="2">
-                                            <TextBlock Text="Frame colour" Margin="0,14,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" />
-                                            <TextBlock x:Name="FinishName" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" />
-                                            <StackPanel x:Name="FinishGroups" />
-                                        </StackPanel>
-                                    </ScrollViewer>
-                                </TabViewItem>
-                                <TabViewItem IsClosable="False">
-                                    <TabViewItem.Header>
-                                        <TextBlock Text="Bluetooth" FontSize="12" />
-                                    </TabViewItem.Header>
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                        <StackPanel Padding="16,8,16,28" Spacing="6">
-                                            <TextBlock Text="Bluetooth bridge" Margin="0,14,0,0" Style="{StaticResource BodyStrongTextBlockStyle}" />
-                                            <!-- on while this PC's Bluetooth carries input; off: the bridge does. Greyed out (and on)
-                                                 until a bridge is set up and answering -->
-                                            <ToggleSwitch x:Name="BridgeSwitch" Header="Use this PC's Bluetooth"
-                                                          OnContent="On" OffContent="Off" IsOn="True"
-                                                          IsEnabled="False" Toggled="Bridge_Toggled" />
-                                            <TextBlock x:Name="BridgeText" Style="{StaticResource CaptionTextBlockStyle}" Opacity="0.7"
-                                                       TextWrapping="Wrap" Text="Checking for a bridge…" />
-                                            <Button x:Name="BridgeButton" Content="Bridge Settings" Click="BridgeSettings_Click" />
-                                        </StackPanel>
-                                    </ScrollViewer>
-                                </TabViewItem>
-                            </TabView>
+                                        </Border>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </Grid>
                         </Grid>
                             <ContentControl x:Name="AboutHost" Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                                             HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" IsTabStop="False" />
                         </Grid>
                         <Border x:Name="SnapReady" Visibility="Collapsed" HorizontalAlignment="Center"
-                                VerticalAlignment="Center" Background="#F21C1C1E" BorderBrush="#60D0FF"
+                                VerticalAlignment="Center" Background="{StaticResource BrandNightBrush}" BorderBrush="{StaticResource BrandAmberBrush}"
                                 BorderThickness="2" CornerRadius="14" Padding="16,10" IsHitTestVisible="False">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon Glyph="&#xE718;" Foreground="#60D0FF" FontSize="16" />
+                                <FontIcon Glyph="&#xE718;" Foreground="{StaticResource BrandAmberBrush}" FontSize="16" />
                                 <TextBlock Text="Release to snap to tray" FontWeight="SemiBold" />
                             </StackPanel>
                         </Border>

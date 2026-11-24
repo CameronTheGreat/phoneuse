@@ -29,6 +29,7 @@ import time
 from aiohttp import web
 
 from . import calibrate, orientation, screen, unlock
+from .activity import ActivityLog
 from .agent_session import AgentSession, set_start_setting, start_setting
 from .config import CFG, IS_WINDOWS, NAME, config_path, mirroring_model, runtime_path
 from .hidclient import Hid
@@ -156,6 +157,7 @@ class Mirror:
         self.hid = None
         # Who controls the phone (agent_session.py): the one record the gate, the pages,
         # the companion app and the notifications derive from.
+        self.activity = ActivityLog()
         self.session = AgentSession()
         self.session.listeners.append(self.on_session)
         self.bluetooth = True  # the phone's Bluetooth link (mouse and keyboard)
@@ -314,14 +316,28 @@ class Mirror:
         msg = json.dumps({"type": "agent-action", "action": self.agent_action, "steps": self.agent_steps})
         for tab in list(self.tabs):
             asyncio.ensure_future(tab.ws.send_str(msg))
+        self.push_activity(self.activity.add("action", self.agent_action))
         self.last_input_at = time.time()
         return True
+
+    def push_activity(self, entry):
+        """Send a new activity entry to every tab. Safe off the loop thread (on_session
+        can run there): the sends are scheduled on the loop."""
+        if not self.loop:
+            return
+        msg = json.dumps({"type": "activity", "entry": entry})
+
+        def send():
+            for tab in list(self.tabs):
+                asyncio.ensure_future(tab.ws.send_str(msg))
+        self.loop.call_soon_threadsafe(send)
 
     def on_session(self, session, old, why):
         """Every change of who controls the phone: tell the pages, and rest the pointer
         when an agent lets go."""
         if old != session.state:
             log(f"agent session: {old} -> {session.state} ({why})")
+            self.push_activity(self.activity.add("session", f"{old} -> {session.state}", why))
         if old == "driving" and session.state != "driving":
             self.park()
         if self.loop:
@@ -933,14 +949,39 @@ def app(mirror):
 
     for icon in ("favicon-32.png", "favicon-64.png", "apple-touch-icon.png"):  # scripts/make-icons.py
         a.router.add_get("/" + icon, lambda _r, f=icon: web.FileResponse(os.path.join(os.path.dirname(PAGE), f)))
+    # the phone's frame: the models and finishes (shared with the Windows app) and its drawing
+    for part in ("phones.json", "frame.js"):
+        a.router.add_get("/" + part, lambda _r, f=part: web.FileResponse(os.path.join(os.path.dirname(PAGE), f),
+                                                                         headers={"Cache-Control": "no-cache"}))
     a.router.add_post("/api/quit", quit_services)
     a.router.add_post("/api/agent/act", agent_act)
     a.router.add_post("/api/agent/phase", agent_phase)
     def picture_state():
-        return {"live": mirror.live(), "stale": mirror.stale, "paused": mirror.taken_over,
+        agent_state = mirror.session.current()
+        return {"live": mirror.live(), "stale": mirror.stale, "paused": agent_state == "paused",
+                "agent_state": agent_state,
                 "frame_age": round(time.time() - mirror.last_frame_at, 1) if mirror.last_frame_at else None}
     a.router.add_get("/api/picture", lambda _r: web.json_response(picture_state()))
     a.router.add_post("/api/agent/takeover", agent_takeover)
+
+    async def agent_activity(req):
+        # What agents did, for the owner's sidebar. Read-only; no CORS headers, and a
+        # request from another website (an Origin that is not this server) is refused.
+        if req.headers.get("Origin") is not None and not same_origin(req):
+            return web.Response(status=403)
+        try:
+            after = int(req.query.get("after", "0"))
+        except ValueError:
+            after = 0
+        return web.json_response({"entries": mirror.activity.entries(after)})
+
+    async def agent_activity_clear(req):
+        if not same_origin(req):
+            return web.Response(status=403)
+        mirror.activity.clear()
+        return web.json_response({"ok": True})
+    a.router.add_get("/api/agent/activity", agent_activity)
+    a.router.add_post("/api/agent/activity/clear", agent_activity_clear)
     a.router.add_post("/api/agent/cursor", agent_cursor)
     a.router.add_post("/api/agent/done", agent_done)
     a.router.add_route("*", "/api/awake", awake)
@@ -1075,19 +1116,47 @@ def app(mirror):
         return web.json_response({"choice": choice})
     a.router.add_post("/api/setup/input", setup_input)
 
-    async def claude_connect(req):
-        """{"on"}: connect Claude Code (the skill and the phoneuse command) or disconnect it."""
+    claude_lock = asyncio.Lock()
+
+    async def claude_connection(req):
+        """Read or change the Claude Code MCP, skill and command setup."""
         if not same_origin(req):
             return web.Response(status=403)
         from . import claude_setup
-        on = bool((await req.json()).get("on", True))
-        try:
-            await asyncio.get_running_loop().run_in_executor(
-                None, claude_setup.connect if on else claude_setup.disconnect)
-        except Exception as e:  # noqa: BLE001
-            return web.json_response({"error": str(e)})
-        return web.json_response(claude_setup.state())
-    a.router.add_post("/api/claude", claude_connect)
+        on = bool((await req.json()).get("on", True)) if req.method == "POST" else None
+
+        async with claude_lock:
+            try:
+                if on is not None:
+                    await asyncio.to_thread(claude_setup.connect if on else claude_setup.disconnect)
+                return web.json_response(await asyncio.to_thread(claude_setup.state))
+            except (OSError, RuntimeError, ValueError) as e:
+                return web.json_response({"error": str(e)})
+
+    a.router.add_get("/api/claude", claude_connection, allow_head=False)
+    a.router.add_post("/api/claude", claude_connection)
+
+    if IS_WINDOWS:
+        async def codex_connection(req):
+            if not same_origin(req):
+                return web.Response(status=403)
+            on = None
+            if req.method == "POST":
+                try:
+                    body = await req.json()
+                except ValueError:
+                    body = None
+                if not isinstance(body, dict) or not isinstance(body.get("on"), bool):
+                    return web.json_response({"error": "Expected an on/off value for Codex."}, status=400)
+                on = body["on"]
+            from . import codex_setup
+            try:
+                return web.json_response(await asyncio.to_thread(codex_setup.configure, on))
+            except RuntimeError as e:
+                return web.json_response({"error": str(e)}, status=502)
+
+        a.router.add_get("/api/codex", codex_connection, allow_head=False)
+        a.router.add_post("/api/codex", codex_connection)
     return a
 
 
@@ -1112,8 +1181,14 @@ def main():
         await web.TCPSite(runner, "127.0.0.1", PORT).start()
         log(f"browser mirror on http://localhost:{PORT}")
         from . import claude_setup
-        if claude_setup.refresh():  # an older Claude Code setup (a copied skill, the old MCP server)
+        if claude_setup.refresh():
             log("Claude Code: the skill and the phoneuse command now point at this copy")
+        if IS_WINDOWS:
+            from . import codex_setup
+            from .windows import packaged
+            for folder in packaged.clear_shadow_runtime():
+                log(f"removed a stale private copy of the runtime folder: {folder}")
+            asyncio.ensure_future(asyncio.to_thread(codex_setup.refresh))
         asyncio.ensure_future(mirror.keep_awake())
         asyncio.ensure_future(mirror.sessions.keep_gate())
 

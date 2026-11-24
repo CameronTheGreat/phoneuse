@@ -12,7 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Homebrew dependencies
-        run: |  # current kegs, so they match the macOS 15 bottles bundle_core.py copies
+        # Current kegs, so they match the macOS 15 bottles bundle_core.py copies. Only these formulae and
+        # their dependencies: a bare `brew upgrade` also upgrades the runner image's own tools, and one that
+        # can't link (ruby@3.4 over files the image already has) failed the v0.1.5 tag builds.
+        run: |
           brew update --quiet
           deps="gstreamer pygobject3 libplist openssl@3 cmake pkgconf"
           brew install $deps

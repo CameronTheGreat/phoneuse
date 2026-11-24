@@ -4,6 +4,7 @@
 #
 #   powershell -ExecutionPolicy Bypass -File windows\scripts\package.ps1 [-Version 0.1.5.42] [-Out windows\build\release]
 #     -NoZip: the installer only (no portable zip); -NoInstaller: the zip only.
+#     -UxPlayBundle <folder>: reuse the UxPlay bundle saved there (no MSYS2 needed), else make and save it.
 #   To try a change to the window on an installed Phone Use, update-installed.ps1 is much quicker.
 #
 # Layout (both):
@@ -21,6 +22,11 @@ param(
     [string]$Msys = $(if ($env:PHONEUSE_MSYS2) { $env:PHONEUSE_MSYS2 } else { "C:\msys64" }),
     # The audio-only FFmpeg (windows/scripts/build-ffmpeg-audio.sh); without it, MSYS2's full one (~150 MB more)
     [string]$FFmpegAudio = $env:PHONEUSE_FFMPEG_AUDIO,
+    # A folder for the finished UxPlay bundle: reused as it is when a complete one is there (MSYS2
+    # isn't needed then), else made from MSYS2 and saved there. CI caches it, and restores it only
+    # after uxplay-bundle-check.ps1 has thrown out a bundle MSYS2 has updates for;
+    # by hand, delete the folder (or run that check) to make the bundle again.
+    [string]$UxPlayBundle = $env:PHONEUSE_UXPLAY_BUNDLE,
     [switch]$NoInstaller,
     [switch]$NoZip,
     # The GitHub repository whose releases update the app (Updater.cs): in CI, the one being built
@@ -115,10 +121,34 @@ Remove-Item "$Core\python\Scripts" -Recurse -Force -ErrorAction SilentlyContinue
 if ($LASTEXITCODE -ne 0) { throw "the bundled Python can't import phoneuse" }
 
 # 4. UxPlay and its GStreamer, with every DLL they load from MSYS2
+$Ux = Join-Path $Core "uxplay"
+$reuse = $UxPlayBundle -and (Test-Path (Join-Path $UxPlayBundle "complete"))
+if ($reuse) {
+    Write-Step "UxPlay and GStreamer from the saved bundle in $UxPlayBundle"
+    Copy-Item -Recurse (Join-Path $UxPlayBundle "uxplay") $Ux
+    $InspectSrc = Join-Path $UxPlayBundle "gst-inspect-1.0.exe"
+} else {
 Write-Step "UxPlay and GStreamer from $Ucrt"
 if (-not (Test-Path "$Ucrt\bin\uxplay.exe")) { throw "no UxPlay in $Ucrt\bin: run windows/scripts/build-uxplay.sh in MSYS2 UCRT64 first" }
-$Ux = Join-Path $Core "uxplay"
+$InspectSrc = "$Ucrt\bin\gst-inspect-1.0.exe"
 New-Item -ItemType Directory -Force "$Ux\bin", "$Ux\lib\gstreamer-1.0", "$Ux\libexec\gstreamer-1.0", "$Ux\licenses" | Out-Null
+# Which MSYS2 package (and version) each file comes from, from pacman's own records: saved with the
+# bundle, for uxplay-bundle-check.ps1 to tell when MSYS2 has moved on from any of them.
+# pacman keeps each installed package in var\lib\pacman\local\<package>-<version>-<release>\.
+$owner = @{}
+$used = @{}
+foreach ($pkg in Get-ChildItem "$Msys\var\lib\pacman\local" -Directory) {
+    # FFmpeg's DLLs come from the audio-only build, but that's built at MSYS2's FFmpeg version
+    if ($pkg.Name -match '^mingw-w64-ucrt-x86_64-ffmpeg-[^-]+-[^-]+$') { $used[$pkg.Name] = $true }
+    foreach ($f in Get-Content "$($pkg.FullName)\files") {
+        if ($f -match '^ucrt64/(bin|lib/gstreamer-1\.0|libexec/gstreamer-1\.0)/[^/]+$') { $owner[$f.ToLower()] = $pkg.Name }
+    }
+}
+function Add-Owner($file) {
+    if (-not $file.StartsWith($Msys.TrimEnd("\") + "\", [StringComparison]::OrdinalIgnoreCase)) { return }
+    $rel =($file.Substring($Msys.TrimEnd("\").Length + 1) -replace '\\', '/').ToLower()
+    if ($owner.ContainsKey($rel)) { $used[$owner[$rel]] = $true }
+}
 if (-not $FFmpegAudio) { $FFmpegAudio = Join-Path $Msys "home\$env:USERNAME\ffmpeg-audio" }
 $FFbin = Join-Path $FFmpegAudio "bin"
 if (Test-Path "$FFbin\avcodec-*.dll") { Write-Host "    FFmpeg: audio only, from $FFmpegAudio" }
@@ -134,6 +164,7 @@ function Add-Closure($file) {
         $src = if ($FFbin -and (Test-Path (Join-Path $FFbin $dll))) { Join-Path $FFbin $dll } else { Join-Path "$Ucrt\bin" $dll }
         if (-not (Test-Path $src)) { continue }  # a Windows DLL (kernel32, ws2_32, ...)
         Copy-Item $src "$Ux\bin\"
+        Add-Owner $src
         Add-Closure $src
     }
 }
@@ -143,9 +174,11 @@ foreach ($p in $Plugins) {
     $dll = "$Ucrt\lib\gstreamer-1.0\libgst$p.dll"
     if (-not (Test-Path $dll)) { throw "GStreamer plugin $p isn't installed in MSYS2" }
     Copy-Item $dll "$Ux\lib\gstreamer-1.0\"
+    Add-Owner $dll
     Add-Closure $dll
 }
 Copy-Item "$Ucrt\libexec\gstreamer-1.0\gst-plugin-scanner.exe" "$Ux\libexec\gstreamer-1.0\"
+Add-Owner "$Ucrt\libexec\gstreamer-1.0\gst-plugin-scanner.exe"
 Add-Closure "$Ucrt\libexec\gstreamer-1.0\gst-plugin-scanner.exe"
 @"
 UxPlay (https://github.com/FDH2/UxPlay) is GPL-3.0; built from the commit pinned in
@@ -158,6 +191,8 @@ swresample) is LGPL-2.1, built from the release MSYS2 ships with only its AAC an
 Get-ChildItem "$Ucrt\share\licenses" -Directory -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -match '^(gstreamer|gst-plugins-base|gst-plugins-good|gst-plugins-bad|gst-libav|ffmpeg|libplist|openssl|glib2)$' } |
     ForEach-Object { Copy-Item -Recurse $_.FullName "$Ux\licenses\" }
+Write-Host "    From $($used.Count) MSYS2 packages"
+}  # end of making the bundle from MSYS2
 
 # UxPlay from the bundle alone (MSYS2 off the PATH): its pipelines must build, which loads every
 # plugin it needs; a missing one is "no element" in its output.
@@ -167,20 +202,39 @@ $env:GST_REGISTRY_1_0 = Join-Path $Work "gst-registry.bin"
 Remove-Item $env:GST_REGISTRY_1_0 -ErrorAction SilentlyContinue
 $savedPath = $env:PATH
 $env:PATH = ($env:PATH -split ";" | Where-Object { $_ -notlike "$Msys*" }) -join ";"
-try {
+# Started means it printed "Initialized server socket(s)" and is still running. On 2026-11-24 a CI run
+# that reused a saved bundle saw UxPlay exit silently before that line, and the same bundle started on
+# the next try and on a PC: one more try before failing, and the exit code when it fails.
+function Test-UxPlay {
+    Remove-Item $uxLog, "$uxLog.err" -ErrorAction SilentlyContinue
     # $uxProc, not $ux: PowerShell's names are case-insensitive, and $Ux is the folder
     $uxProc = Start-Process "$Ux\bin\uxplay.exe" -PassThru -WindowStyle Hidden -RedirectStandardOutput $uxLog -RedirectStandardError "$uxLog.err" `
         -ArgumentList '-p 47999 -n phoneuse-package-test -nh -vrtp "config-interval=1 pt=96 ! udpsink host=127.0.0.1 port=47998 sync=false" -vsync no -as "wasapisink low-latency=true" -al 0.1'
-    Start-Sleep 4
+    $deadline = (Get-Date).AddSeconds(15)
+    do {
+        Start-Sleep -Milliseconds 500
+        $said = (Get-Content $uxLog, "$uxLog.err" -ErrorAction SilentlyContinue) -join "`n"
+    } until ($uxProc.HasExited -or $said -match "Initialized server socket" -or (Get-Date) -gt $deadline)
+    Start-Sleep 1  # still running a moment after: the pipelines built
     $alive = -not $uxProc.HasExited
-    if ($alive) { Stop-Process $uxProc -Force }
+    if ($alive) { Stop-Process $uxProc -Force; $uxProc.WaitForExit() }
+    $said = (Get-Content $uxLog, "$uxLog.err" -ErrorAction SilentlyContinue) -join "`n"
+    $code = if ($alive) { "" } else { " (exit code 0x{0:X8})" -f $uxProc.ExitCode }
+    [pscustomobject]@{ Ok = $alive -and $said -match "Initialized server socket" -and $said -notmatch "no element|could not|failed"
+                       Said = $said; Code = $code; Error = $said -match "no element|could not|failed" }
+}
+try {
+    $run = Test-UxPlay
+    if (-not $run.Ok -and -not $run.Error) {
+        Write-Host "    UxPlay didn't start$($run.Code); trying once more:`n$($run.Said)"
+        $run = Test-UxPlay
+    }
 } finally { $env:PATH = $savedPath; Remove-Item Env:GST_REGISTRY_1_0 }
-$said = (Get-Content $uxLog, "$uxLog.err" -ErrorAction SilentlyContinue) -join "`n"
-if (-not $alive -or $said -match "no element|could not|failed") { Write-Host $said; throw "the bundled UxPlay didn't start" }
+if (-not $run.Ok) { Write-Host $run.Said; throw "the bundled UxPlay didn't start$($run.Code)" }
 # The elements themselves, the audio decoders above all: UxPlay only builds its audio pipeline when the
 # phone plays sound, so starting isn't proof (doctor.py checks the same list on users' PCs).
 $inspect = Join-Path $Ux "bin\gst-inspect-1.0.exe"
-Copy-Item "$Ucrt\bin\gst-inspect-1.0.exe" $inspect
+Copy-Item $InspectSrc $inspect
 $env:PATH = ($env:PATH -split ";" | Where-Object { $_ -notlike "$Msys*" }) -join ";"
 $env:GST_REGISTRY_1_0 = Join-Path $Work "gst-registry.bin"
 try {
@@ -189,6 +243,17 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "the bundled GStreamer has no $el" }
     }
 } finally { $env:PATH = $savedPath; Remove-Item Env:GST_REGISTRY_1_0; Remove-Item $inspect }
+
+# Save the bundle that just passed, for the next build to reuse (CI caches the folder)
+if ($UxPlayBundle -and -not $reuse) {
+    if (Test-Path $UxPlayBundle) { Remove-Item -Recurse -Force $UxPlayBundle }
+    New-Item -ItemType Directory -Force $UxPlayBundle | Out-Null
+    Copy-Item -Recurse $Ux (Join-Path $UxPlayBundle "uxplay")
+    Copy-Item $InspectSrc $UxPlayBundle
+    $used.Keys | Sort-Object | Set-Content -Encoding ascii (Join-Path $UxPlayBundle "packages.txt")
+    Set-Content (Join-Path $UxPlayBundle "complete") "made from $Ucrt"  # last: a half-copied folder isn't reused
+    Write-Host "    Saved the UxPlay bundle in $UxPlayBundle"
+}
 
 $mb = [math]::Round(((Get-ChildItem $Stage -Recurse -File | Measure-Object Length -Sum).Sum / 1MB))
 Write-Step "Staged $Stage ($mb MB)"

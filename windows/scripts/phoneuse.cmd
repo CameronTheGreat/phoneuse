@@ -5,7 +5,9 @@ rem else the standalone Python it ships. The portable app keeps its settings in 
 setlocal
 set "CORE=%~dp0.."
 if exist "%CORE%\..\portable" if not defined PHONEUSE_CONFIG_DIR set "PHONEUSE_CONFIG_DIR=%CORE%\..\data"
+rem a .venv counts only with its pyvenv.cfg: without it the venv's python.exe can't start (a half-deleted one)
 set "PY=%CORE%\.venv\Scripts\python.exe"
+if not exist "%CORE%\.venv\pyvenv.cfg" set "PY=%CORE%\python\python.exe"
 if not exist "%PY%" set "PY=%CORE%\python\python.exe"
 set PYTHONUTF8=1
 "%PY%" "%~dp0phoneuse" %*

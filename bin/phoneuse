@@ -9,6 +9,8 @@ here=$(dirname "$0")
 # The portable Windows app keeps its settings in data/ beside it (as bin/phoneuse.cmd does)
 if [ -f "$here/../../portable" ] && [ -z "$PHONEUSE_CONFIG_DIR" ]; then export PHONEUSE_CONFIG_DIR="$here/../../data"; fi
 for py in "$here/../.venv/Scripts/python.exe" "$here/../python/python.exe" "$here/../python/bin/python3" python3 python; do
+  # a .venv only with its pyvenv.cfg: a half-deleted one's python.exe can't start
+  case "$py" in */.venv/*) [ -f "$here/../.venv/pyvenv.cfg" ] || continue ;; esac
   if command -v "$py" >/dev/null 2>&1; then exec "$py" "$0" "$@"; fi
 done
 echo "phoneuse: no Python found" >&2

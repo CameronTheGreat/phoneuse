@@ -26,10 +26,14 @@ TOKEN_FILE = runtime_path("token")
 _token = None
 
 
-def token():
-    """This user's service token, created by whichever process needs it first. Read from
-    the file each time (it's tiny): a service that kept the token it started with turned
-    every client away once the file was made again, until it was restarted."""
+def token(create=False):
+    """This user's service token. Read from the file each time (it's tiny): a service that
+    kept the token it started with turned every client away once the file was made again,
+    until it was restarted.
+
+    Only services create it (create=True). A client that made one inside the Claude app's
+    MSIX package wrote it to the package's private copy of the folder, and from then on read
+    its own token there instead of the services' (windows/packaged.py)."""
     global _token
     for _ in range(50):
         try:
@@ -39,6 +43,9 @@ def token():
                 _token = t
                 return t
         except FileNotFoundError:
+            if not create:
+                time.sleep(0.02)
+                continue
             try:
                 fd = os.open(TOKEN_FILE, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             except FileExistsError:
@@ -53,6 +60,8 @@ def token():
         time.sleep(0.02)
     if _token:
         return _token
+    if not create:
+        raise RuntimeError(f"Phone Use isn't running: no service token in {TOKEN_FILE}. Open Phone Use.")
     raise RuntimeError(f"can't read the service token in {TOKEN_FILE}")
 
 
@@ -105,7 +114,7 @@ def listen(name, backlog=16):
         s.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
         s.bind(("127.0.0.1", SERVICE_PORTS[name]))
         s.listen(backlog)
-        token()  # make sure clients can find it
+        token(create=True)  # make sure clients can find it
         return s
     path = PATHS[name]
     try:
@@ -125,7 +134,7 @@ def authorized(rfile):
     if not IS_WINDOWS:
         return True
     line = rfile.readline(200)
-    return line.strip() == f"auth {token()}".encode()
+    return line.strip() == f"auth {token(create=True)}".encode()
 
 
 def serve(name, handler, log=print):

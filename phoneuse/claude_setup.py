@@ -1,7 +1,7 @@
-"""Connect Claude Code to Phone Use: the skill and the `phoneuse` command.
+"""Connect Claude Code to the Phone Use MCP server, skill and CLI.
 
-Agents use Phone Use through the `phoneuse` command, guided by the skill. Both point at
-this copy of Phone Use, so they change when it does:
+Windows clients connect to the MCP server started by WinUI. Other platforms use
+the CLI's stdio MCP transport. The skill and CLI point at this copy of Phone Use:
   * the skill is a link: to a checkout's skill/ folder (or the Mac app's), or inside the
     Flatpak to the installed app's skill through Flatpak's "active" path, which follows
     updates;
@@ -9,9 +9,9 @@ this copy of Phone Use, so they change when it does:
 A Flatpak pointed at a checkout (scripts/dev-link.sh) runs the checkout's code, so it
 links the checkout's skill, and edits there reach agents at once.
 
-state() says which pieces are in place; connect() and disconnect() add or remove both.
+state() says which pieces are in place; connect() and disconnect() set them up or remove them.
 refresh() redoes connect() for someone who connected before (the app runs it at start),
-so older setups catch up: a copied skill, or the MCP server Phone Use used to add.
+so older setups catch up.
 Nothing else in ~/.claude or ~/.claude.json changes.
 
 On Windows the skill is a directory junction (a symlink needs Developer Mode or admin),
@@ -24,6 +24,8 @@ import os
 import shlex
 import shutil
 import sys
+
+from .mcp_server import MCP_PORT
 
 HOME = os.path.expanduser("~")
 SKILL_DIR = os.path.join(HOME, ".claude", "skills", "phoneuse")
@@ -61,22 +63,24 @@ def _skill_source():
     return None
 
 
-def _windows_python():
-    """The Python that runs this copy: the installed app's core/.venv or its bundled one,
-    or the checkout's venv, as bin/phoneuse.cmd chooses."""
-    root = os.path.dirname(PKG)
-    for py in (os.path.join(root, ".venv", "Scripts", "python.exe"), os.path.join(root, "python", "python.exe")):
-        if os.path.isfile(py):
-            return py
-    return sys.executable
+def _fallback_python():
+    """The Python the launchers use when this copy has no working .venv: the bundled one if
+    there is one, else the one running now. The .venv itself is chosen when the launcher
+    runs, not when it's written: an update that set up core\\.venv after the app had already
+    rewritten the launchers left phoneuse.cmd on a core\\python that was gone (2026-11-24)."""
+    bundled = os.path.join(os.path.dirname(PKG), "python", "python.exe")
+    return bundled if os.path.isfile(bundled) else sys.executable
 
 
 def _cli_script():
     if WINDOWS:  # Git Bash: Windows paths with forward slashes work there
-        script = os.path.join(os.path.dirname(PKG), "bin", "phoneuse").replace("\\", "/")
-        py = _windows_python().replace("\\", "/")
+        root = os.path.dirname(PKG).replace("\\", "/")
+        fallback = _fallback_python().replace("\\", "/")
         return (f"#!/bin/sh\n{MARK}: lets agents (and you) run phoneuse commands.\n"
-                f"export PYTHONUTF8=1\nexec {shlex.quote(py)} {shlex.quote(script)} \"$@\"\n")
+                f"root={shlex.quote(root)}\n"
+                f"py=\"$root/.venv/Scripts/python.exe\"\n"
+                f"[ -f \"$root/.venv/pyvenv.cfg\" ] && [ -f \"$py\" ] || py={shlex.quote(fallback)}\n"
+                f"export PYTHONUTF8=1\nexec \"$py\" \"$root/bin/phoneuse\" \"$@\"\n")
     target = (f"flatpak run --command=phoneuse {FLATPAK_ID}" if FLATPAK_ID
               else shlex.quote(os.path.join(os.path.dirname(PKG), "bin", "phoneuse")))  # "Phone Use.app"
     return f"#!/bin/sh\n{MARK}: lets agents (and you) run phoneuse commands.\nexec {target} \"$@\"\n"
@@ -84,9 +88,15 @@ def _cli_script():
 
 def _cli_cmd():
     """Windows: phoneuse.cmd, the same command for PowerShell and cmd."""
-    script = os.path.join(os.path.dirname(PKG), "bin", "phoneuse")
+    # goto, not a ( ) block: an argument with a ")" in it would end the block early.
+    root = os.path.dirname(PKG)
     return (f"@echo off\r\nrem {MARK}: lets agents (and you) run phoneuse commands.\r\n"
-            f"set PYTHONUTF8=1\r\n\"{_windows_python()}\" \"{script}\" %*\r\n")
+            f"setlocal\r\nset PYTHONUTF8=1\r\nset \"PHONEUSE_ROOT={root}\"\r\n"
+            f"set \"PHONEUSE_PY={_fallback_python()}\"\r\n"
+            "if not exist \"%PHONEUSE_ROOT%\\.venv\\pyvenv.cfg\" goto run\r\n"
+            "if exist \"%PHONEUSE_ROOT%\\.venv\\Scripts\\python.exe\" "
+            "set \"PHONEUSE_PY=%PHONEUSE_ROOT%\\.venv\\Scripts\\python.exe\"\r\n"
+            ":run\r\n\"%PHONEUSE_PY%\" \"%PHONEUSE_ROOT%\\bin\\phoneuse\" %*\r\n")
 
 
 def _is_link(path):
@@ -135,14 +145,10 @@ def _ours(path):
 
 
 def state():
-    """{"skill", "command"}: each True when that piece is in place and points at this copy
+    """{"skill", "command", "mcp"}: each True when that piece is in place and points at this copy
     of Phone Use, and "claude": whether Claude Code looks installed (~/.claude exists)."""
-    src = _skill_source()
     # Compare the link's text: inside the Flatpak its target isn't visible.
-    if WINDOWS:
-        skill_ok = bool(src) and _is_link(SKILL_DIR) and _link_target(SKILL_DIR) == os.path.normcase(os.path.normpath(src))
-    else:
-        skill_ok = bool(src) and os.path.islink(SKILL_DIR) and os.readlink(SKILL_DIR) == src
+    skill_ok = skill_linked(SKILL_DIR)
     try:
         with open(BIN, newline="") as f:
             cmd_ok = f.read() == _cli_script()
@@ -151,42 +157,77 @@ def state():
                 cmd_ok = cmd_ok and f.read() == _cli_cmd()
     except OSError:
         cmd_ok = False
-    return {"claude": os.path.isdir(os.path.join(HOME, ".claude")), "skill": skill_ok, "command": cmd_ok}
+    mcp_ok = (_read_json().get("mcpServers") or {}).get("phoneuse") == _mcp_config()
+    return {"claude": os.path.isdir(os.path.join(HOME, ".claude")), "skill": skill_ok, "command": cmd_ok,
+            "mcp": mcp_ok}
 
 
 def connected():
     s = state()
-    return s["skill"] and s["command"]
+    return s["skill"] and s["command"] and s["mcp"]
 
 
-def _remove_skill():
-    if WINDOWS and _is_link(SKILL_DIR) and os.path.isdir(SKILL_DIR):
-        os.rmdir(SKILL_DIR)  # removes the junction only, never what it points at
-    elif os.path.islink(SKILL_DIR) or os.path.isfile(SKILL_DIR):
-        os.remove(SKILL_DIR)
-    elif os.path.isdir(SKILL_DIR):
-        shutil.rmtree(SKILL_DIR)
+def skill_linked(dest):
+    """Whether dest is a link to this copy's skill folder."""
+    src = _skill_source()
+    if WINDOWS:
+        return bool(src) and _is_link(dest) and _link_target(dest) == os.path.normcase(os.path.normpath(src))
+    return bool(src) and os.path.islink(dest) and os.readlink(dest) == src
 
 
-def _remove_old_mcp():
-    """Phone Use used to add an MCP server; agents now use the command."""
-    d = _read_json()
-    if (d.get("mcpServers") or {}).pop("phoneuse", None) is not None:
-        _write_json(d)
+def unlink_skill(dest, only_links=False):
+    """Remove dest. With only_links, a real folder there (someone's own skill) is left alone."""
+    if WINDOWS and _is_link(dest) and os.path.isdir(dest):
+        os.rmdir(dest)  # removes the junction only, never what it points at
+    elif os.path.islink(dest) or (os.path.isfile(dest) and not only_links):
+        os.remove(dest)
+    elif os.path.isdir(dest) and not only_links:
+        shutil.rmtree(dest)
 
 
-def connect():
+def link_skill(dest, only_links=False):
+    """Point dest at this copy's skill folder. Returns False when a real folder is in the way."""
     src = _skill_source()
     if not src:
         raise RuntimeError("the skill isn't in this copy of Phone Use")
-    _remove_skill()
-    os.makedirs(os.path.dirname(SKILL_DIR), exist_ok=True)
+    unlink_skill(dest, only_links)
+    if os.path.lexists(dest):
+        return False
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
     if WINDOWS:
         import _winapi
-        _winapi.CreateJunction(src, SKILL_DIR)
+        _winapi.CreateJunction(src, dest)
     else:
-        os.symlink(src, SKILL_DIR)
-    _remove_old_mcp()
+        os.symlink(src, dest)
+    return True
+
+
+def _remove_skill():
+    unlink_skill(SKILL_DIR)
+
+
+def _mcp_config():
+    if WINDOWS:
+        return {"type": "http", "url": f"http://127.0.0.1:{MCP_PORT}/mcp"}
+    return {"type": "stdio", "command": BIN, "args": ["mcp"]}
+
+
+def _configure_mcp(on):
+    d = _read_json()
+    servers = d.get("mcpServers") or {}
+    old = servers.get("phoneuse")
+    if on and old != _mcp_config():
+        servers["phoneuse"] = _mcp_config()
+    elif not on and old == _mcp_config():
+        del servers["phoneuse"]
+    else:
+        return
+    d["mcpServers"] = servers
+    _write_json(d)
+
+
+def connect():
+    link_skill(SKILL_DIR)
     os.makedirs(os.path.dirname(BIN), exist_ok=True)
     for path, text in [(BIN, _cli_script())] + ([(BIN_CMD, _cli_cmd())] if WINDOWS else []):
         if os.path.islink(path) or os.path.exists(path):
@@ -194,16 +235,13 @@ def connect():
         with open(path, "w", newline="") as f:
             f.write(text)
     os.chmod(BIN, 0o755)
+    _configure_mcp(True)
 
 
 def refresh():
-    """At start: for someone who connected before (our command, the skill or our old MCP
-    entry is there), connect again when a piece is missing or points elsewhere. Never
-    connects someone who hasn't."""
+    """Repair connections made through Phone Use when a piece is missing or has moved."""
     try:
-        before = _ours(BIN) or os.path.lexists(SKILL_DIR) or \
-            "phoneuse" in (_read_json().get("mcpServers") or {})
-        if before and (not connected() or "phoneuse" in (_read_json().get("mcpServers") or {})):
+        if (_ours(BIN) or os.path.lexists(SKILL_DIR)) and not connected():
             connect()
             return True
     except (OSError, RuntimeError, ValueError):
@@ -213,7 +251,7 @@ def refresh():
 
 def disconnect():
     _remove_skill()
-    _remove_old_mcp()
+    _configure_mcp(False)
     for path in (BIN, BIN_CMD):
         if _ours(path):
             os.remove(path)

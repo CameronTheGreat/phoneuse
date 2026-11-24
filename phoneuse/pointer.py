@@ -18,7 +18,10 @@ touch.scroll_step: quick while much is left, slow for the last points, so iOS
 sees a slow finger lift and doesn't fling (one fast drag per notch moved Hacker
 News over a screen per 145 pt notch). Near the screen edge the touch slows down
 the same way, lifts, and grips again where there is room, so long scrolls
-continue.
+continue while the wheel turns. The backlog follows the hand: it holds at most a
+screen each way (WHEEL_CAP), turning the other way starts from there instead of
+after what was left, and once the wheel has stopped a swipe that reaches the
+edge is the last one (WHEEL_IDLE).
 
 Verified on a touch-event test page (touchlab/): this delivers one touch whose
 path matches the request (175 -> 175 pt, flicks 144 -> 141 pt). An absolute
@@ -42,6 +45,11 @@ SCROLL_MARGIN = 0.06  # regrip before the touch comes this close to an edge (scr
 GRIP_DELAY = 0.024  # between the hover to the grip point and the press (s)
 MIN_GRIP = 15.0  # grip for at least this much wheel scrolling: a shorter drag reads as a tap
 WHEEL_FORGET = 0.3  # a remainder below MIN_GRIP is dropped once the wheel is idle this long (s)
+# The backlog follows the hand, not everything it ever sent: a fast flick of the wheel (or a
+# touchpad coasting on) queued screens of scrolling that played out as swipe after swipe
+# long after the hand stopped.
+WHEEL_CAP = 1.0  # the backlog holds at most this much of the screen in each direction
+WHEEL_IDLE = 0.25  # a swipe that reaches the edge grips again only if the wheel moved this recently (s)
 
 
 def clamp(v):
@@ -98,8 +106,12 @@ class Pointer:
                 return  # a held button is already dragging
             if self.at is None:
                 return
-            self.wheel[0] += dx_pt
-            self.wheel[1] += dy_pt
+            size = touch.pt()
+            for i, d in ((0, dx_pt), (1, dy_pt)):
+                if d * self.wheel[i] < 0:
+                    self.wheel[i] = 0.0  # the other way: from here, not after what was still to go
+                cap = WHEEL_CAP * size[i]
+                self.wheel[i] = min(max(self.wheel[i] + d, -cap), cap)
             self.scrolled_at = time.time()
 
     def _grip_point(self):
@@ -263,6 +275,8 @@ class Pointer:
                             self.carry = [0.0, 0.0]
                             self.log("scroll up", f"({self.touch[0]:.3f}, {self.touch[1]:.3f})",
                                      f"left {self.wheel[0]:.0f},{self.wheel[1]:.0f} pt")
+                            if clipped and now - self.scrolled_at > WHEEL_IDLE:
+                                self.wheel = [0.0, 0.0]  # at the edge with the wheel still: no swipe after it
                             continue
                     r = self.hid().cmd(f"md {ux} {uy} 0 0")
                     if "dropped" in r:  # the radio is behind: keep the motion for the next tick

@@ -104,7 +104,7 @@ public sealed partial class MainWindow
                 Text = group.Key == _phone.FinishGroup ? $"{label} · your iPhone" : label,
                 Margin = new Thickness(0, 10, 0, 2),
                 Opacity = 0.7,
-                Style = (Style)Application.Current.Resources["CaptionTextBlockStyle"],
+                Style = Brand.Caption,
                 TextWrapping = TextWrapping.Wrap,
             });
             var swatches = new VariableSizedWrapGrid { Orientation = Orientation.Horizontal, ItemWidth = 42, ItemHeight = 42 };

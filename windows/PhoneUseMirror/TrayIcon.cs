@@ -14,7 +14,7 @@ public sealed class TrayIcon : IDisposable
     const int NIN_BALLOONUSERCLICK = 0x0400 + 5;  // the notification was clicked
     const int NIM_ADD = 0, NIM_MODIFY = 1, NIM_DELETE = 2;
     const int NIF_MESSAGE = 1, NIF_ICON = 2, NIF_TIP = 4, NIF_INFO = 0x10;
-    const int CmdOpen = 1, CmdLogs = 2, CmdQuit = 3, CmdAbout = 4, CmdSnap = 5;
+    const int CmdOpen = 1, CmdLogs = 2, CmdQuit = 3, CmdAbout = 4, CmdTopmost = 5;
 
     readonly IntPtr _hwnd, _icon;
     readonly WndProc _proc;   // kept alive: the window calls it
@@ -24,10 +24,10 @@ public sealed class TrayIcon : IDisposable
 
     public event Action? Click;
     public event Action? Open;
-    public event Action<bool>? SnapChanged;
+    public event Action<bool>? AlwaysOnTopChanged;
 
-    /// <summary>The window is pinned above the icon: the menu's "Keep above the tray icon" is ticked.</summary>
-    public bool Snapped { get; set; }
+    /// <summary>The window stays above other windows: the menu's "Always on top" is ticked.</summary>
+    public bool AlwaysOnTop { get; set; }
     public event Action? Logs;
     public event Action? About;
     public event Action? Quit;
@@ -111,7 +111,7 @@ public sealed class TrayIcon : IDisposable
         AppendMenu(m, 0, CmdOpen, "Open Phone Use");
         AppendMenu(m, 0, CmdLogs, "Show phoneuse log");
         AppendMenu(m, 0, CmdAbout, "About Phone Use");
-        AppendMenu(m, Snapped ? 0x8 /*MF_CHECKED*/ : 0, CmdSnap, "Keep above the tray icon");
+        AppendMenu(m, AlwaysOnTop ? 0x8 /*MF_CHECKED*/ : 0, CmdTopmost, "Always on top");
         AppendMenu(m, 0x800 /*MF_SEPARATOR*/, 0, null);
         AppendMenu(m, 0, CmdQuit, "Quit");
         SetMenuDefaultItem(m, CmdOpen, 0);
@@ -124,7 +124,7 @@ public sealed class TrayIcon : IDisposable
             case CmdOpen: Open?.Invoke(); break;
             case CmdLogs: Logs?.Invoke(); break;
             case CmdAbout: About?.Invoke(); break;
-            case CmdSnap: SnapChanged?.Invoke(!Snapped); break;
+            case CmdTopmost: AlwaysOnTopChanged?.Invoke(!AlwaysOnTop); break;
             case CmdQuit: Quit?.Invoke(); break;
         }
     }

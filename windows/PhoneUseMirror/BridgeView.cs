@@ -65,7 +65,7 @@ public sealed class BridgeView : UserControl
 
     void Header(string? sub)
     {
-        _body.Children.Add(new TextBlock { Text = "Bluetooth Bridge", Style = ThemeStyle("TitleTextBlockStyle") });
+        _body.Children.Add(new TextBlock { Text = "Bluetooth Bridge", Style = Brand.Title });
         _body.Children.Add(Caption(sub ?? "A LilyGO T-Display can be the iPhone's keyboard and mouse instead of this PC: " +
             "over Bluetooth Classic, as on Linux, so the pointer is quicker than over this PC's Bluetooth LE. " +
             "This PC sends it input over Wi-Fi."));
@@ -100,12 +100,12 @@ public sealed class BridgeView : UserControl
         {
             state = "Offline";
             sub = (string?)st["error"] ?? sub;
-            color = Red;
+            color = Brand.Brick;
         }
         else if (other != null)  // connected, but not to the phone that mirrors: nothing goes to it
         {
             state = other;
-            color = Orange;
+            color = Brand.AmberText;
             sub = $"Not the mirroring {(string?)j["mirroring_phone"] ?? "iPhone"}";
             disconnect = Btn("Disconnect", async () => await Act("api/bridge/disconnect"));
         }
@@ -122,7 +122,7 @@ public sealed class BridgeView : UserControl
         else
         {
             state = "iPhone not connected";
-            color = Orange;
+            color = Brand.AmberText;
             sub = "On the iPhone: Settings › Bluetooth › Phone Use Bridge";
         }
         var stateText = new TextBlock { Text = state, VerticalAlignment = VerticalAlignment.Center, Opacity = color == null ? 0.75 : 1 };
@@ -472,8 +472,8 @@ public sealed class BridgeView : UserControl
             foreach (var (label, kind, fn) in actions)
             {
                 var b = new Button { Content = label, Width = 240, HorizontalAlignment = HorizontalAlignment.Center };
-                if (kind == 1) b.Style = BridgeView.ThemeStyle("AccentButtonStyle");
-                if (kind == 2) b.Foreground = Red;
+                if (kind == 1) b.Style = Brand.AccentButton;
+                if (kind == 2) b.Foreground = Brand.Brick;
                 b.Click += (_, _) => fn();
                 _box.Children.Add(b);
             }
@@ -492,7 +492,7 @@ public sealed class BridgeView : UserControl
             if (big != null)
                 _box.Children.Add(new TextBlock
                 {
-                    Text = big, Style = BridgeView.ThemeStyle("TitleLargeTextBlockStyle"), HorizontalAlignment = HorizontalAlignment.Center,
+                    Text = big, Style = Brand.TitleLarge, HorizontalAlignment = HorizontalAlignment.Center,
                 });
             if (spinner) _box.Children.Add(new ProgressRing { IsActive = true, Width = 32, Height = 32 });
             if (bar != null) _box.Children.Add(bar);
@@ -536,20 +536,15 @@ public sealed class BridgeView : UserControl
         }
     }
 
-    static readonly Brush Red = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0x45, 0x3A));
-    static readonly Brush Orange = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xFF, 0x9F, 0x0A));
-
-    static Style ThemeStyle(string key) => (Style)Application.Current.Resources[key];
-
     static TextBlock Caption(string text) => new()
     {
-        Text = text, TextWrapping = TextWrapping.Wrap, Opacity = 0.7, Style = ThemeStyle("CaptionTextBlockStyle"),
+        Text = text, TextWrapping = TextWrapping.Wrap, Opacity = 0.7, Style = Brand.Caption,
     };
 
     static Button Btn(string label, Action fn, bool accent = false, bool enabled = true)
     {
         var b = new Button { Content = label, IsEnabled = enabled, VerticalAlignment = VerticalAlignment.Center };
-        if (accent) b.Style = ThemeStyle("AccentButtonStyle");
+        if (accent) b.Style = Brand.AccentButton;
         b.Click += (_, _) => fn();
         return b;
     }
@@ -557,22 +552,19 @@ public sealed class BridgeView : UserControl
     /// <summary>A settings row: a title and a line under it, and a control on the right.</summary>
     static Border Row(string title, string sub, FrameworkElement right)
     {
-        var g = new Grid { ColumnSpacing = 16 };
-        g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var g = Ui.Columns(16, "*", "auto");
         var col = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
-        col.Children.Add(new TextBlock { Text = title, Style = ThemeStyle("BodyStrongTextBlockStyle") });
+        col.Children.Add(new TextBlock { Text = title, Style = Brand.BodyStrong });
         if (sub.Length > 0)
-            col.Children.Add(new TextBlock { Text = sub, TextWrapping = TextWrapping.Wrap, Opacity = 0.7, Style = ThemeStyle("CaptionTextBlockStyle") });
+            col.Children.Add(new TextBlock { Text = sub, TextWrapping = TextWrapping.Wrap, Opacity = 0.7, Style = Brand.Caption });
         g.Children.Add(col);
         right.VerticalAlignment = VerticalAlignment.Center;
-        Grid.SetColumn(right, 1);
-        g.Children.Add(right);
+        right.AddTo(g, 1);
         return new Border
         {
             Child = g, Padding = new Thickness(16, 12, 16, 12), CornerRadius = new CornerRadius(8),
-            Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
-            BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
+            Background = Brand.Card,
+            BorderBrush = Brand.Line,
             BorderThickness = new Thickness(1),
         };
     }

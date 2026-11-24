@@ -28,18 +28,6 @@ public static class AppSettings
         catch (Exception) { }
     }
 
-    /// <summary>"Agent control requires pairing" was closed: it stays gone for good.</summary>
-    public static bool PairingBarDismissed
-    {
-        get => (bool?)Load()["pairingBarDismissed"] ?? false;
-        set
-        {
-            var o = Load();
-            o["pairingBarDismissed"] = value;
-            Save(o);
-        }
-    }
-
     /// <summary>The first-time setup checklist was finished or skipped: it no longer opens by itself.</summary>
     public static bool SetupDone
     {
@@ -50,6 +38,21 @@ public static class AppSettings
             o["setupDone"] = value;
             Save(o);
         }
+    }
+
+    /// <summary>What setup was for (the first question it asks): "desktop" (the phone from this PC) or
+    /// "agent" (and AI agents too, which adds the Agent setup stage); null until chosen.</summary>
+    public static string? SetupMode
+    {
+        get => (string?)Load()["setupMode"];
+        set => Set("setupMode", value);
+    }
+
+    /// <summary>Setup's last screen turned Start with Windows on once (the agent path): it doesn't again.</summary>
+    public static bool StartupOffered
+    {
+        get => (bool?)Load()["startupOffered"] ?? false;
+        set => Set("startupOffered", value);
     }
 
     /// <summary>Look for a newer release on GitHub now and then (Updater).</summary>
@@ -76,11 +79,19 @@ public static class AppSettings
         }
     }
 
-    /// <summary>The window is pinned above the tray icon (MainWindow.Snap.cs); on by default.</summary>
-    public static bool Snapped
+    /// <summary>The window stays above other apps' windows (MainWindow.Snap.cs); on by default.</summary>
+    public static bool AlwaysOnTop
     {
-        get => (bool?)Load()["snapped"] ?? true;
-        set => Set("snapped", value);
+        get => (bool?)Load()["alwaysOnTop"] ?? true;
+        set => Set("alwaysOnTop", value);
+    }
+
+    /// <summary>The window opens above the tray icon and snaps back there when dropped near it
+    /// (MainWindow.Snap.cs); on by default. Off: no snapping at all, it stays where it's put.</summary>
+    public static bool KeepAboveTray
+    {
+        get => (bool?)Load()["keepAboveTray"] ?? true;
+        set => Set("keepAboveTray", value);
     }
 
     /// <summary>Where it's pinned, in DIPs: along the taskbar from the icon's centre.</summary>
@@ -123,6 +134,20 @@ public static class AppSettings
         Save(o);
     }
 
+    /// <summary>The dark palette for the mirror's app screens. Existing installs start in light mode.</summary>
+    public static bool DarkMode
+    {
+        get => Load()["darkMode"] is JsonValue value && value.TryGetValue<bool>(out var enabled) && enabled;
+        set => Set("darkMode", value);
+    }
+
+    /// <summary>The activity sidebar beside the phone (ActivitySidebar) is open; closed by default.</summary>
+    public static bool ActivityOpen
+    {
+        get => (bool?)Load()["activityOpen"] ?? false;
+        set => Set("activityOpen", value);
+    }
+
     /// <summary>The agent glow around the phone (AgentGlow); on by default.</summary>
     public static bool GlowOn
     {
@@ -130,7 +155,7 @@ public static class AppSettings
         set => Set("glowOn", value);
     }
 
-    public static readonly GlowLook DefaultGlowLook = new(1f, 1f, 0.4f, true);
+    public static readonly GlowLook DefaultGlowLook = new(1f, 1f, 1.3f, true, 2.5f);
 
     /// <summary>The Aurora glow's tuning (Settings › Agent glow).</summary>
     public static GlowLook GlowLook
@@ -145,7 +170,8 @@ public static class AppSettings
                     Math.Clamp((float?)g["intensity"] ?? d.Intensity, 0.2f, 1.6f),
                     Math.Clamp((float?)g["speed"] ?? d.Speed, 0.2f, 3f),
                     Math.Clamp((float?)g["size"] ?? d.Size, 0.3f, 2.5f),
-                    (bool?)g["bleed"] ?? d.Bleed);
+                    (bool?)g["bleed"] ?? d.Bleed,
+                    Math.Clamp((float?)g["hdrPeak"] ?? d.HdrPeak, 1f, 4f));
             }
             catch (Exception) { return d; }
         }
@@ -155,6 +181,7 @@ public static class AppSettings
             ["speed"] = Math.Round(value.Speed, 2),
             ["size"] = Math.Round(value.Size, 2),
             ["bleed"] = value.Bleed,
+            ["hdrPeak"] = Math.Round(value.HdrPeak, 2),
         });
     }
 
