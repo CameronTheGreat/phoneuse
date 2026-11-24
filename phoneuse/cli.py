@@ -245,7 +245,9 @@ def follow_sender(stream, echo=False):
                 print(time.strftime("%H:%M:%S"), Hid().cmd("mirror " + m[1]), flush=True)
             except Exception as e:
                 print(time.strftime("%H:%M:%S"), f"could not tell the HID daemon: {e}", flush=True)
-            if phones.needs_calibration(m[1]):
+            # Windows: the browser mirror (web.py auto_calibrate) measures it as the owner's own
+            # action; from here it would count as an agent session and fail without showing it.
+            if not IS_WINDOWS and phones.needs_calibration(m[1]):
                 threading.Thread(target=calibrate_when_ready, args=(m[1],), daemon=True).start()
 
 

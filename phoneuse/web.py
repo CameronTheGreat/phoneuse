@@ -169,6 +169,7 @@ class Mirror:
         self.unlocks = None
         self.sessions = None
         self.calibration = None  # calibrate.status(): where the pointer's measurement stands, for the pages
+        self.auto_cal_for = None  # the phone auto_calibrate last looked at
 
     def get_hid(self):
         if self.hid is None:
@@ -220,6 +221,28 @@ class Mirror:
                 self.park()
         threading.Thread(target=go, daemon=True).start()
         return None
+
+    def auto_calibrate(self):
+        """Windows: a phone that has no table for this link started mirroring, so measure it
+        once its Bluetooth link is up, as the owner's own action. cli.follow_sender does this
+        on Linux and Mac, but through the agent gate (agent_turn): on Windows that reported
+        "an agent started" for a phone nobody asked an agent to use, and when the pointer
+        looked off it ended without a word (calibration status None), so the app never
+        showed the calibration card or its Retry. Here a failed measurement is shown, with
+        the reason. Once per phone: after that, the owner's Calibrate button measures again."""
+        if not IS_WINDOWS or not self.live() or not self.bluetooth:
+            return
+        from . import phones
+        name = phones.current()
+        if not name or name == self.auto_cal_for:
+            return
+        self.auto_cal_for = name
+        try:
+            if phones.needs_calibration(name):
+                err = self.start_calibration()
+                log(f"{name} has no calibration: " + (f"not measured ({err})" if err else "measuring it"))
+        except Exception as e:  # noqa: BLE001 - a missing phones file must not stop the watcher
+            log("auto calibration:", e)
 
     # ---- keep awake: stop Auto-Lock while nobody uses the phone ----
     AWAKE_EVERY = 1.0  # seconds between nudges
@@ -439,6 +462,7 @@ class Mirror:
                 except Exception:
                     self.hid = None
             self.mirroring, self.bluetooth = mirroring, bt
+            await loop.run_in_executor(None, self.auto_calibrate)
             for tab in list(self.tabs):
                 if changed or tab.told_live != self.live() or tab.told_agent != self.agent():
                     tab.state()
