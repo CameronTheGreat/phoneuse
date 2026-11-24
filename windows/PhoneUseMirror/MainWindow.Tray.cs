@@ -23,7 +23,6 @@ public sealed partial class MainWindow
         _tray.Open += () => _ui.TryEnqueue(ShowFromTray);
         _tray.AlwaysOnTopChanged += on => _ui.TryEnqueue(() => SetAlwaysOnTop(on));
         _tray.Logs += () => _ui.TryEnqueue(ShowLog);
-        _tray.About += () => _ui.TryEnqueue(() => { ShowFromTray(); ShowAbout(); });
         _tray.Quit += () => _ui.TryEnqueue(QuitApp);
         _tick.Tick += (_, _) =>
             _tray?.SetTip("Phone Use" + (string.IsNullOrEmpty(StatusText.Text) ? "" : " · " + StatusText.Text));

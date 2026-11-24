@@ -141,6 +141,8 @@ class BleHid:
         self.mirror_name = last_mirroring_phone()
         self.lock = asyncio.Lock()  # one notification at a time, in order
         self.buttons = 0
+        self.finger_down = False  # an absolute report with a button held, not yet lifted
+        self.input_at = 0.0  # when an input command (hovers too) last came in, from anyone
         self.consumer_bits = 0
         self.nudge = AbsoluteNudge()
         self.last_sent = 0.0  # when the last report went out (perf_counter)
@@ -785,6 +787,25 @@ class BleHid:
                 f"problem={self.problem!r} notify_avg_ms={avg:.1f} notify_max_ms={st['max_ms']:.1f} "
                 f"waited_for_link={st['waited']} started={STARTED:.0f}")
 
+    async def keep_awake_nudge(self, args):
+        """Keep-awake (web.py) moves the pointer a little about once a second so Auto-Lock
+        never fires, during an agent's session too: an agent that reads or thinks for a
+        minute between actions sends nothing, and a phone with a 30 s Auto-Lock locks.
+        As in hid_daemon.py, the nudge goes only while no finger is down and no input came
+        in for QUIET seconds, so it never lifts a drag or moves the pointer between a hover
+        and its press. Without this command every nudge failed with "unknown command" and
+        the phone locked as if keep-awake were off."""
+        quiet = float(args[2]) if len(args) > 2 else 2.0
+        if self.finger_down or self.buttons or time.time() - self.input_at < quiet:
+            return "ok busy"
+        report = absolute(args[0], args[1], 0)
+        if self.through_bridge():
+            return "ok" if await asyncio.to_thread(self._bridge_skippable, 3, report) else "ok dropped"
+        if not self.clients:  # nobody to nudge: don't wait for a phone, the next try is a second away
+            return "ok dropped"
+        await self.send(3, report)
+        return "ok"
+
     async def run(self, line):
         parts = line.strip().split(" ", 1)
         cmd, rest = parts[0].lower(), (parts[1] if len(parts) > 1 else "")
@@ -812,6 +833,10 @@ class BleHid:
             except asyncio.TimeoutError:
                 raise RuntimeError(f"no iPhone connected. On the iPhone: Settings > Bluetooth, tap "
                                    f"{self.local_name()} (under My Devices once paired)")
+        if cmd in INPUT_COMMANDS:
+            self.input_at = time.time()
+        if cmd == "nudge":  # nudge FX FY QUIET: keep-awake's hover, only while nobody touches the phone
+            return await self.keep_awake_nudge(args)
         if cmd == "gate":  # the browser mirror's agent gate: the Linux daemon enforces it, Windows doesn't yet
             return "ok"
         if cmd == "mirror":
@@ -854,6 +879,7 @@ class BleHid:
         if cmd == "a":
             buttons = int(args[2]) if len(args) > 2 else 0
             sure = len(args) > 3 and args[3] == "sure"  # a lift or a pre-press hover: must arrive
+            self.finger_down = bool(buttons)
             if self.through_bridge() and not buttons and not self.buttons and not sure:
                 return "ok" if await asyncio.to_thread(self._bridge_skippable, 3, absolute(args[0], args[1], 0)) \
                     else "ok dropped"
@@ -908,6 +934,10 @@ class BleHid:
         else:
             return f"err unknown command {cmd!r}"
         return "ok"
+
+
+INPUT_COMMANDS = {"a", "nudge", "tap", "m", "md", "k", "consumer", "eject", "move", "corner", "click", "down", "up",
+                  "scroll", "key", "type"}  # the same set as hid_daemon.py
 
 
 async def serve(hid, sock):
