@@ -70,11 +70,27 @@ moved since then, look again.
 | `toggle_keyboard` | `keyboard` | Show or hide the on-screen keyboard. |
 | `back` | `back` | Go back in the current app. |
 | `navigate` | `recipe` | Use a system gesture: home, switcher, control-center, notifications or dismiss. |
-| `run_steps` | (MCP only) | Run several steps you already know will work in one call, such as `open_app`, then `tap_on` with `expect`, then `type_text`. It stops at the first failure. |
+| `run_steps` | (MCP only) | Batch up to four steps in 60 seconds. Stops on failure or uncertainty. |
 
 If a result says input "was sent" or "may have been sent", look at the screen
 before you retry, so nothing happens twice. Avoid tapping the Dynamic Island,
 because that can stop Screen Mirroring.
+
+## Batch routine actions
+
+Prefer `run_steps` when you can supply the steps and their arguments up front.
+The app can be unopened and the screen can be unseen. `tap_on` looks for a
+unique label on the live screen, `expect` verifies the transition, and
+`wait_for` checks that a label appears. Put `look` or `inspect_region` last.
+
+- Open an app and read it with `open_app` → `look`.
+- Browse a feed with `scroll_by` → `look`.
+- Open Settings, tap **General** with `expect: "About"`, then read the screen.
+- Type and submit a search once you know the search field has focus.
+
+Use a separate call when you need to choose the next action from the screen
+or get owner approval. If a batch stops after sending input, inspect the
+current screen before resuming from the unfinished step.
 
 ## Asking Apple Intelligence: `siriai`
 

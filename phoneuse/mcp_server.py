@@ -34,8 +34,10 @@ INPUT_TOOLS = {"open_app", "tap_on", "scroll_by", "type_text", "press_key"}
 RUN_STEPS = {
     "name": "run_steps",
     "description": (
-        f"Run 1–{MAX_STEPS} known phone steps in order within {STEPS_TIMEOUT} seconds, using each tool's usual arguments. "
-        "Use tap_on with expect to verify screen transitions. Use look or inspect_region only as the last step. "
+        f"Prefer batching 1–{MAX_STEPS} steps within {STEPS_TIMEOUT} seconds when you can supply their usual arguments up front. "
+        "For example, open an app or scroll, then look. The screen need not be visible in advance: "
+        "tap_on finds a live label, expect checks the transition, and wait_for waits for a label. "
+        "Use look or inspect_region only as the last step. "
         "Returns brief step statuses and the final result. Stops on failure or uncertainty. "
         "Use individual calls when you need to inspect a result or get owner approval before continuing."
     ),

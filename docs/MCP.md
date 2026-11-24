@@ -88,8 +88,10 @@ The adapter handles plain text, structured JSON, and a PNG with JSON metadata.
 
 ## Running a sequence
 
-After `status` and `show_mirror`, use the MCP-only `run_steps` tool for up to
-four known steps. It accepts `open_app`, `tap_on`, `scroll_by`, `type_text`,
+After `status` and `show_mirror`, prefer the MCP-only `run_steps` tool for up
+to four steps whose arguments you can supply up front. The screen can be
+unseen: `tap_on` finds a live label and `expect` verifies the transition.
+It accepts `open_app`, `tap_on`, `scroll_by`, `type_text`,
 `press_key`, `wait_for`, `look`, and `inspect_region` with their usual
 arguments. Put `look` or `inspect_region` last. Use separate calls when the
 next action depends on inspecting a result or getting owner approval.
