@@ -238,25 +238,15 @@ public sealed partial class MainWindow : Window
 
     // The phone around the screen, in units of the screen's short side (so a sideways phone keeps
     // them): a thin black border around the glass (the model's: PhoneModel.cs), the band, and how far
-    // the side buttons stand out. Slimmer than the server's bezel, which the browser mirror uses.
-    const double Band = 0.017, Knob = 0.009;
+    // the side buttons stand out (phoneuse/web/phones.json: the browser mirror draws the same frame).
+    static readonly double Band = Phones.Num(Phones.Json["frame"]!["band"]), Knob = Phones.Num(Phones.Json["frame"]!["knob"]);
     PhoneModel _phone = PhoneModel.Default;
     double Glass => _phone.Glass;
     double Frame => Glass + Band + Knob;
 
-    // Side buttons of an upright phone, for the models Apple has no drawings of (the iPhone 11 and
-    // older): (left side?, top, bottom) as fractions of the band's height, estimated from photos.
-    static readonly (bool left, double top, double bottom)[] EstimatedSideButtons =
-    {
-        (true, 0.155, 0.180),   // ring/silent switch
-        (true, 0.245, 0.316),   // volume up
-        (true, 0.340, 0.411),   // volume down
-        (false, 0.265, 0.385),  // side button
-    };
-
     /// <summary>This model's side buttons, where its drawing puts them (PhoneModel).</summary>
     (bool left, double top, double bottom)[] SideButtons =>
-        _phone.Buttons is { } b ? b.Select(x => (x.Left, x.Top, x.Bottom)).ToArray() : EstimatedSideButtons;
+        _phone.Buttons is { } b ? b.Select(x => (x.Left, x.Top, x.Bottom)).ToArray() : PhoneModel.EstimatedButtons;
 
     /// <summary>Camera Control: lower on the right, where this model has it (PhoneModel), a sapphire
     /// button barely standing out of the band.</summary>
@@ -594,9 +584,7 @@ public sealed partial class MainWindow : Window
         TakeoverLabel.Text = driving ? "Agent in control" : _agent == "paused" ? "You took over" : "You're in control";
         TakeoverAction.Text = driving ? "Take over" : _agent == "paused" ? "Resume agent" : "";
         TakeoverAction.Visibility = _agent == "idle" ? Visibility.Collapsed : Visibility.Visible;
-        AgentLight.Fill = new SolidColorBrush(driving
-            ? Windows.UI.Color.FromArgb(255, 0xE3, 0x9C, 0xBE)   // Brand.xaml: plum light, amber, green
-            : _agent == "paused" ? Windows.UI.Color.FromArgb(255, 0xFD, 0xA5, 0x5E) : Windows.UI.Color.FromArgb(255, 0x3E, 0x9B, 0x6B));
+        AgentLight.Fill = driving ? Brand.PlumLight : _agent == "paused" ? Brand.Amber : Brand.Green;
         AgentWhat.Text = driving ? _agentAction : "";
     }
 

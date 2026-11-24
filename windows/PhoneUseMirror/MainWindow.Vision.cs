@@ -6,7 +6,7 @@ using Microsoft.UI.Xaml.Controls;
 namespace PhoneUseMirror;
 
 /// <summary>
-/// Settings › Screen reading: the OCR that reads the phone's screen (RapidOCR on ONNX Runtime,
+/// Screen reading (setup's Agents stage): the OCR that reads the phone's screen (RapidOCR on ONNX Runtime,
 /// windows\scripts\setup-vision.ps1, in .venv-vision next to phoneuse). Agents need it to read text,
 /// tap labels, type and open apps by name. Install runs the setup script in the background (its output
 /// goes to phoneuse-vision-setup.log) with PHONEUSE_PROGRESS=raw, so each download and the unpacking

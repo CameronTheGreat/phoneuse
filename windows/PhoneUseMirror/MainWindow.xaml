@@ -86,15 +86,6 @@
                     <Grid x:Name="ScreenUi" HorizontalAlignment="Left" VerticalAlignment="Top">
                         <!-- notices, below the Dynamic Island (the AssistiveTouch reminder is a setup step) -->
                         <StackPanel x:Name="Bars" VerticalAlignment="Top" Margin="10,0,10,0" Spacing="6">
-                            <!-- while no iPhone app is paired: phoneuse refuses every agent action until one is -->
-                            <InfoBar x:Name="PairingBar" IsOpen="False" IsClosable="True" Severity="Informational"
-                                     Title="Agent control requires pairing"
-                                     Message="AI agents can't use the phone until you pair the Phone Use app (App Store) on the iPhone: it's where you allow and stop them."
-                                     Closed="PairingBar_Closed">
-                                <InfoBar.ActionButton>
-                                    <Button Content="Pair iPhone" Click="Pair_Click" />
-                                </InfoBar.ActionButton>
-                            </InfoBar>
                             <!-- a newer release on GitHub (MainWindow.Update.cs) -->
                             <InfoBar x:Name="UpdateNotice" IsOpen="False" IsClosable="True" Severity="Success"
                                      Closed="UpdateNotice_Closed">
@@ -113,7 +104,7 @@
                         <StackPanel x:Name="AgentPanel" HorizontalAlignment="Center" VerticalAlignment="Bottom" Spacing="6"
                                     Visibility="Collapsed">
                             <TextBlock x:Name="AgentWhat" HorizontalAlignment="Center" Margin="16,0,16,0"
-                                       Foreground="#CCFFF7F0" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                       Foreground="{StaticResource BrandOnNightTextBrush}" FontSize="12" TextTrimming="CharacterEllipsis" />
                             <Button x:Name="TakeoverButton" Click="Takeover_Click" HorizontalAlignment="Center"
                                     CornerRadius="16" Padding="14,6" Background="{StaticResource BrandNightBrush}">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
@@ -128,7 +119,7 @@
                         <!-- the pointer's calibration (MainWindow.Calibration.cs): upright only. While it waits for an upright
                              phone or measures, a card says so; "Later" hides it until the state changes -->
                         <Border x:Name="CalibrationCard" VerticalAlignment="Bottom" Margin="10,0,10,64" CornerRadius="14"
-                                Padding="14,12" Background="#F2712A4D" Visibility="Collapsed">
+                                Padding="14,12" Background="{StaticResource BrandPlumGlassBrush}" Visibility="Collapsed">
                             <Grid ColumnSpacing="12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -142,7 +133,7 @@
                                 </FontIcon>
                                 <StackPanel Grid.Column="1" Spacing="4">
                                     <TextBlock x:Name="CalibrationTitle" FontWeight="SemiBold" Foreground="White" TextWrapping="Wrap" />
-                                    <TextBlock x:Name="CalibrationText" FontSize="12" Foreground="#E6FFFFFF" TextWrapping="Wrap" />
+                                    <TextBlock x:Name="CalibrationText" FontSize="12" Foreground="{StaticResource BrandWhiteSoftBrush}" TextWrapping="Wrap" />
                                     <ProgressBar x:Name="CalibrationProgress" Maximum="7" Visibility="Collapsed" Margin="0,4,0,0" />
                                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
                                         <Button x:Name="CalibrationRetry" Content="Try again" Click="CalibrationRetry_Click"
@@ -156,8 +147,73 @@
                         <!-- first-time setup (MainWindow.Setup.cs): the phone's screen until it's done or hidden -->
                         <!-- a pixel past the screen on every side, as the video: no lighter seam against the body at any size -->
                         <Grid x:Name="SetupOverlay" RequestedTheme="Light" Background="{StaticResource BrandBgBrush}" Visibility="Collapsed" Margin="-1">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                <StackPanel x:Name="SetupBody" Padding="16,4,16,24" Spacing="10" />
+                            <ScrollViewer x:Name="SetupScroll" VerticalScrollBarVisibility="Auto" SizeChanged="SetupScroll_SizeChanged">
+                                <!-- as tall as the screen at least, so the stage's buttons (SetupFoot) sit at the bottom -->
+                                <Grid x:Name="SetupLayout" Padding="18,4,18,18" RowSpacing="12">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <!-- drawn by MainWindow.Setup.cs: the stage's header and steps -->
+                                    <StackPanel x:Name="SetupBody" Spacing="10" />
+                                    <!-- the Agent setup stage's own cards, kept up to date by MainWindow.Pairing.cs and
+                                         MainWindow.Vision.cs; Claude Code's is drawn into ClaudeSlot -->
+                                    <StackPanel x:Name="AgentSetupPanel" Grid.Row="1" Spacing="10" Visibility="Collapsed">
+                                        <Border Background="{StaticResource BrandPlumDeepBrush}" CornerRadius="22" Padding="18">
+                                            <StackPanel Spacing="12">
+                                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                                    <Border Style="{StaticResource BrandIconTileStyle}" Background="{StaticResource BrandOnPlumFaintBrush}">
+                                                        <local:BrandIcon Stroke="{StaticResource BrandBgBrush}" Data="M8,2 L16,2 A2,2 0 0 1 18,4 L18,20 A2,2 0 0 1 16,22 L8,22 A2,2 0 0 1 6,20 L6,4 A2,2 0 0 1 8,2 Z M11,18 L13,18" />
+                                                    </Border>
+                                                    <TextBlock x:Name="PairedTitle" Text="iPhone app" FontSize="16" FontWeight="Bold" CharacterSpacing="-10"
+                                                               VerticalAlignment="Center" Foreground="{StaticResource BrandBgBrush}" />
+                                                </StackPanel>
+                                                <TextBlock x:Name="PairedText" FontSize="13" LineHeight="19" TextWrapping="Wrap" Foreground="{StaticResource BrandOnPlumTextBrush}" />
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button x:Name="PairButton" Content="Pair iPhone" Click="Pair_Click" Height="44" CornerRadius="22"
+                                                            HorizontalAlignment="Stretch" FontSize="14" FontWeight="Bold"
+                                                            Background="{StaticResource BrandBgBrush}" Foreground="{StaticResource BrandPlumDeepBrush}" />
+                                                    <Button x:Name="UnpairButton" Grid.Column="1" Content="Unpair" Click="Unpair_Click" Visibility="Collapsed"
+                                                            Height="44" CornerRadius="22" FontSize="14" FontWeight="SemiBold"
+                                                            Background="{StaticResource BrandOnPlumFaintBrush}" Foreground="{StaticResource BrandBgBrush}" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+                                        <StackPanel x:Name="ClaudeSlot" />
+                                        <Border Style="{StaticResource BrandCardStyle}" Padding="14">
+                                            <StackPanel Spacing="8">
+                                                <Grid ColumnSpacing="12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Style="{StaticResource BrandIconTileStyle}" VerticalAlignment="Top">
+                                                        <local:BrandIcon Data="M2,12 C2,12 5.5,5 12,5 C18.5,5 22,12 22,12 C22,12 18.5,19 12,19 C5.5,19 2,12 2,12 Z M12,15 A3,3 0 1 0 12,9 A3,3 0 1 0 12,15 Z" />
+                                                    </Border>
+                                                    <TextBlock x:Name="VisionText" Grid.Column="1" FontSize="13" LineHeight="18" TextWrapping="Wrap"
+                                                               VerticalAlignment="Center" Foreground="{StaticResource BrandInk2Brush}" />
+                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                                                        <ProgressRing x:Name="VisionRing" Width="20" Height="20" IsActive="False" Visibility="Collapsed" />
+                                                        <Button x:Name="VisionButton" Content="Install" Click="Vision_Click" Height="36" CornerRadius="18"
+                                                                Style="{StaticResource BrandAccentButtonStyle}" FontSize="13" />
+                                                    </StackPanel>
+                                                </Grid>
+                                                <!-- while installing: the current download's bytes, else indeterminate -->
+                                                <ProgressBar x:Name="VisionProgress" Maximum="1" Visibility="Collapsed" />
+                                                <TextBlock x:Name="VisionDetail" Style="{StaticResource BrandRowSubStyle}" Visibility="Collapsed" />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                    <!-- drawn by MainWindow.Setup.cs: the stage's buttons -->
+                                    <StackPanel x:Name="SetupFoot" Grid.Row="3" Spacing="8" />
+                                </Grid>
                             </ScrollViewer>
                         </Grid>
 
@@ -178,11 +234,7 @@
                                 <Button x:Name="AboutBack" Click="AboutBack_Click" Height="40" Padding="10,0,16,0" CornerRadius="20"
                                         HorizontalAlignment="Left" FontSize="14" FontWeight="SemiBold">
                                     <StackPanel Orientation="Horizontal" Spacing="4">
-                                        <Viewbox Width="18" Height="18">
-                                            <Canvas Width="24" Height="24">
-                                                <Path Style="{StaticResource BrandIconPathStyle}" Stroke="{StaticResource BrandInkBrush}" StrokeThickness="2.2" Data="M15,6 L9,12 L15,18" />
-                                            </Canvas>
-                                        </Viewbox>
+                                        <local:BrandIcon Stroke="{StaticResource BrandInkBrush}" StrokeThickness="2.2" Data="M15,6 L9,12 L15,18" />
                                         <TextBlock Text="Phone" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </Button>
@@ -226,60 +278,24 @@
                                         <TextBlock Text="On this PC" Style="{StaticResource BrandSectionLabelStyle}" Margin="4,18,4,8" />
                                         <Border Style="{StaticResource BrandCardStyle}">
                                             <StackPanel>
-                                                <Grid Style="{StaticResource BrandRowStyle}">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto" />
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <Border Style="{StaticResource BrandIconTileStyle}">
-                                                        <Viewbox Width="18" Height="18"><Canvas Width="24" Height="24">
-                                                            <Path Style="{StaticResource BrandIconPathStyle}" Data="M12,4 L12,2 M12,22 L12,20 M4,12 L2,12 M22,12 L20,12 M5.6,5.6 L4.2,4.2 M19.8,19.8 L18.4,18.4 M5.6,18.4 L4.2,19.8 M19.8,4.2 L18.4,5.6 M16,12 A4,4 0 1 1 8,12 A4,4 0 1 1 16,12 Z" />
-                                                        </Canvas></Viewbox>
-                                                    </Border>
-                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                        <TextBlock Text="Keep screen awake" Style="{StaticResource BrandRowTitleStyle}" />
-                                                        <TextBlock Text="Nudges the pointer while nobody uses the phone, so Auto-Lock never fires." Style="{StaticResource BrandRowSubStyle}" />
-                                                    </StackPanel>
-                                                    <ToggleSwitch x:Name="AwakeSwitch" Grid.Column="2" Style="{StaticResource BrandSwitchStyle}"
+                                                <local:SettingsRow Style="{StaticResource BrandRowStyle}" Title="Keep screen awake"
+                                                                   Subtitle="Nudges the pointer while nobody uses the phone, so Auto-Lock never fires."
+                                                                   Icon="M12,4 L12,2 M12,22 L12,20 M4,12 L2,12 M22,12 L20,12 M5.6,5.6 L4.2,4.2 M19.8,19.8 L18.4,18.4 M5.6,18.4 L4.2,19.8 M19.8,4.2 L18.4,5.6 M16,12 A4,4 0 1 1 8,12 A4,4 0 1 1 16,12 Z">
+                                                    <ToggleSwitch x:Name="AwakeSwitch" Style="{StaticResource BrandSwitchStyle}"
                                                                   Toggled="Awake_Toggled" AutomationProperties.Name="Keep screen awake" />
-                                                </Grid>
-                                                <Grid Style="{StaticResource BrandRowStyle}" BorderThickness="0,1,0,0">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto" />
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <Border Style="{StaticResource BrandIconTileStyle}">
-                                                        <Viewbox Width="18" Height="18"><Canvas Width="24" Height="24">
-                                                            <Path Style="{StaticResource BrandIconPathStyle}" Data="M12,3 L12,11 M7.1,6.3 A7,7 0 1 0 16.9,6.3" />
-                                                        </Canvas></Viewbox>
-                                                    </Border>
-                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                        <TextBlock Text="Start with Windows" Style="{StaticResource BrandRowTitleStyle}" />
-                                                        <TextBlock Text="Starts phoneuse when you sign in, waiting in the tray." Style="{StaticResource BrandRowSubStyle}" />
-                                                    </StackPanel>
-                                                    <ToggleSwitch x:Name="StartupSwitch" Grid.Column="2" Style="{StaticResource BrandSwitchStyle}"
+                                                </local:SettingsRow>
+                                                <local:SettingsRow Style="{StaticResource BrandRowStyle}" BorderThickness="0,1,0,0" Title="Start with Windows"
+                                                                   Subtitle="Starts phoneuse when you sign in, waiting in the tray."
+                                                                   Icon="M12,3 L12,11 M7.1,6.3 A7,7 0 1 0 16.9,6.3">
+                                                    <ToggleSwitch x:Name="StartupSwitch" Style="{StaticResource BrandSwitchStyle}"
                                                                   Toggled="Startup_Toggled" AutomationProperties.Name="Start with Windows" />
-                                                </Grid>
-                                                <Grid Style="{StaticResource BrandRowStyle}" BorderThickness="0,1,0,0">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto" />
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <Border Style="{StaticResource BrandIconTileStyle}">
-                                                        <Viewbox Width="18" Height="18"><Canvas Width="24" Height="24">
-                                                            <Path Style="{StaticResource BrandIconPathStyle}" Data="M4,15 L20,15 M6,19 L18,19 A2,2 0 0 0 20,17 L20,7 A2,2 0 0 0 18,5 L6,5 A2,2 0 0 0 4,7 L4,17 A2,2 0 0 0 6,19 Z" />
-                                                        </Canvas></Viewbox>
-                                                    </Border>
-                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                        <TextBlock Text="Keep above the tray icon" Style="{StaticResource BrandRowTitleStyle}" />
-                                                        <TextBlock Text="Opens above the tray, on top. Drag the bar anywhere; drop it near the tray to put it back." Style="{StaticResource BrandRowSubStyle}" />
-                                                    </StackPanel>
-                                                    <ToggleSwitch x:Name="SnapSwitch" Grid.Column="2" Style="{StaticResource BrandSwitchStyle}"
+                                                </local:SettingsRow>
+                                                <local:SettingsRow Style="{StaticResource BrandRowStyle}" BorderThickness="0,1,0,0" Title="Keep above the tray icon"
+                                                                   Subtitle="Opens above the tray, on top. Drag the bar anywhere; drop it near the tray to put it back."
+                                                                   Icon="M4,15 L20,15 M6,19 L18,19 A2,2 0 0 0 20,17 L20,7 A2,2 0 0 0 18,5 L6,5 A2,2 0 0 0 4,7 L4,17 A2,2 0 0 0 6,19 Z">
+                                                    <ToggleSwitch x:Name="SnapSwitch" Style="{StaticResource BrandSwitchStyle}"
                                                                   Toggled="Snap_Toggled" AutomationProperties.Name="Keep above the tray icon" />
-                                                </Grid>
+                                                </local:SettingsRow>
                                             </StackPanel>
                                         </Border>
 
@@ -322,20 +338,14 @@
                                                             <TextBlock x:Name="UpdateText" Style="{StaticResource BrandRowSubStyle}" />
                                                         </StackPanel>
                                                         <Border x:Name="UpdateChip" Grid.Column="2" VerticalAlignment="Center" Padding="10,5" CornerRadius="12"
-                                                                Background="#FFE3F2E9" Visibility="Collapsed">
-                                                            <TextBlock x:Name="UpdateChipText" Text="Up to date" FontSize="12" FontWeight="SemiBold" Foreground="#FF2E7A53" />
+                                                                Background="{StaticResource BrandGreenTintBrush}" Visibility="Collapsed">
+                                                            <TextBlock x:Name="UpdateChipText" Text="Up to date" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource BrandGreenTextBrush}" />
                                                         </Border>
                                                     </Grid>
-                                                    <Grid Style="{StaticResource BrandRowStyle}" BorderThickness="0,1,0,0">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Text="Check automatically" FontSize="15" FontWeight="Medium" VerticalAlignment="Center"
-                                                                   Foreground="{StaticResource BrandInkBrush}" />
-                                                        <ToggleSwitch x:Name="UpdateAuto" Grid.Column="1" Style="{StaticResource BrandSwitchStyle}"
+                                                    <local:SettingsRow Style="{StaticResource BrandRowStyle}" BorderThickness="0,1,0,0" Title="Check automatically" Plain="True">
+                                                        <ToggleSwitch x:Name="UpdateAuto" Style="{StaticResource BrandSwitchStyle}"
                                                                       Toggled="UpdateAuto_Toggled" AutomationProperties.Name="Check automatically" />
-                                                    </Grid>
+                                                    </local:SettingsRow>
                                                     <Grid Padding="14,4,14,14" ColumnSpacing="10">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="*" />
@@ -354,60 +364,18 @@
                                         <Border Style="{StaticResource BrandCardStyle}">
                                             <StackPanel>
                                                 <Button Style="{StaticResource BrandRowButtonStyle}" Click="SetupGuide_Click">
-                                                    <Grid ColumnSpacing="12">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto" />
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <Border Style="{StaticResource BrandIconTileStyle}" Background="{StaticResource BrandAmberTintBrush}">
-                                                            <Viewbox Width="18" Height="18"><Canvas Width="24" Height="24">
-                                                                <Path Style="{StaticResource BrandIconPathStyle}" Stroke="#FFA0521A" Data="M4,5 A2,2 0 0 1 6,3 L19,3 L19,19 L6,19 A2,2 0 0 0 4,21 L4,5 Z M8,7 L15,7" />
-                                                            </Canvas></Viewbox>
-                                                        </Border>
-                                                        <TextBlock Grid.Column="1" Text="Setup guide" FontSize="15" FontWeight="Medium" VerticalAlignment="Center" />
-                                                        <Viewbox Grid.Column="2" Width="16" Height="16"><Canvas Width="24" Height="24">
-                                                            <Path Style="{StaticResource BrandIconPathStyle}" Stroke="{StaticResource BrandInk3Brush}" StrokeThickness="2" Data="M9,6 L15,12 L9,18" />
-                                                        </Canvas></Viewbox>
-                                                    </Grid>
+                                                    <local:SettingsRow Title="Setup guide" Plain="True" IconBackground="{StaticResource BrandAmberTintBrush}" IconStroke="{StaticResource BrandAmberIconBrush}" Chevron="True"
+                                                                       Icon="M4,5 A2,2 0 0 1 6,3 L19,3 L19,19 L6,19 A2,2 0 0 0 4,21 L4,5 Z M8,7 L15,7" />
                                                 </Button>
                                                 <Border Height="1" Background="{StaticResource BrandLineBrush}" />
                                                 <Button Style="{StaticResource BrandRowButtonStyle}" Click="CalibrateGuide_Click">
-                                                    <Grid ColumnSpacing="12">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto" />
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <Border Style="{StaticResource BrandIconTileStyle}" Background="{StaticResource BrandAmberTintBrush}">
-                                                            <Viewbox Width="18" Height="18"><Canvas Width="24" Height="24">
-                                                                <Path Style="{StaticResource BrandIconPathStyle}" Stroke="#FFA0521A" Data="M12,3 L12,6 M12,18 L12,21 M3,12 L6,12 M18,12 L21,12 M12,17 A5,5 0 1 0 12,7 A5,5 0 1 0 12,17 Z" />
-                                                            </Canvas></Viewbox>
-                                                        </Border>
-                                                        <TextBlock Grid.Column="1" Text="Calibrate the pointer" FontSize="15" FontWeight="Medium" VerticalAlignment="Center" />
-                                                        <Viewbox Grid.Column="2" Width="16" Height="16"><Canvas Width="24" Height="24">
-                                                            <Path Style="{StaticResource BrandIconPathStyle}" Stroke="{StaticResource BrandInk3Brush}" StrokeThickness="2" Data="M9,6 L15,12 L9,18" />
-                                                        </Canvas></Viewbox>
-                                                    </Grid>
+                                                    <local:SettingsRow Title="Calibrate the pointer" Plain="True" IconBackground="{StaticResource BrandAmberTintBrush}" IconStroke="{StaticResource BrandAmberIconBrush}" Chevron="True"
+                                                                       Icon="M12,3 L12,6 M12,18 L12,21 M3,12 L6,12 M18,12 L21,12 M12,17 A5,5 0 1 0 12,7 A5,5 0 1 0 12,17 Z" />
                                                 </Button>
                                                 <Border Height="1" Background="{StaticResource BrandLineBrush}" />
                                                 <Button x:Name="OpenBrowser" Style="{StaticResource BrandRowButtonStyle}" Click="OpenBrowser_Click">
-                                                    <Grid ColumnSpacing="12">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto" />
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <Border Style="{StaticResource BrandIconTileStyle}" Background="{StaticResource BrandAmberTintBrush}">
-                                                            <Viewbox Width="18" Height="18"><Canvas Width="24" Height="24">
-                                                                <Path Style="{StaticResource BrandIconPathStyle}" Stroke="#FFA0521A" Data="M12,21 A9,9 0 1 0 12,3 A9,9 0 1 0 12,21 Z M3,12 L21,12 M12,3 C14.5,5.5 15.5,8.5 15.5,12 C15.5,15.5 14.5,18.5 12,21 C9.5,18.5 8.5,15.5 8.5,12 C8.5,8.5 9.5,5.5 12,3 Z" />
-                                                            </Canvas></Viewbox>
-                                                        </Border>
-                                                        <TextBlock Grid.Column="1" Text="Open the browser mirror" FontSize="15" FontWeight="Medium" VerticalAlignment="Center" />
-                                                        <Viewbox Grid.Column="2" Width="16" Height="16"><Canvas Width="24" Height="24">
-                                                            <Path Style="{StaticResource BrandIconPathStyle}" Stroke="{StaticResource BrandInk3Brush}" StrokeThickness="2" Data="M9,6 L15,12 L9,18" />
-                                                        </Canvas></Viewbox>
-                                                    </Grid>
+                                                    <local:SettingsRow Title="Open the browser mirror" Plain="True" IconBackground="{StaticResource BrandAmberTintBrush}" IconStroke="{StaticResource BrandAmberIconBrush}" Chevron="True"
+                                                                       Icon="M12,21 A9,9 0 1 0 12,3 A9,9 0 1 0 12,21 Z M3,12 L21,12 M12,3 C14.5,5.5 15.5,8.5 15.5,12 C15.5,15.5 14.5,18.5 12,21 C9.5,18.5 8.5,15.5 8.5,12 C8.5,8.5 9.5,5.5 12,3 Z" />
                                                 </Button>
                                             </StackPanel>
                                         </Border>
@@ -425,31 +393,13 @@
                                 <!-- AGENT -->
                                 <ScrollViewer x:Name="PaneAgent" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel Padding="20,18,20,36">
-                                        <Border Background="{StaticResource BrandPlumDeepBrush}" CornerRadius="22" Padding="18">
-                                            <StackPanel Spacing="12">
-                                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                                    <Border Style="{StaticResource BrandIconTileStyle}" Background="#24FFF7F0">
-                                                        <Viewbox Width="18" Height="18"><Canvas Width="24" Height="24">
-                                                            <Path Style="{StaticResource BrandIconPathStyle}" Stroke="{StaticResource BrandBgBrush}" Data="M8,2 L16,2 A2,2 0 0 1 18,4 L18,20 A2,2 0 0 1 16,22 L8,22 A2,2 0 0 1 6,20 L6,4 A2,2 0 0 1 8,2 Z M11,18 L13,18" />
-                                                        </Canvas></Viewbox>
-                                                    </Border>
-                                                    <TextBlock x:Name="PairedTitle" Text="iPhone app" FontSize="16" FontWeight="Bold" CharacterSpacing="-10"
-                                                               VerticalAlignment="Center" Foreground="{StaticResource BrandBgBrush}" />
-                                                </StackPanel>
-                                                <TextBlock x:Name="PairedText" FontSize="13" LineHeight="19" TextWrapping="Wrap" Foreground="#D1FFF7F0" />
-                                                <Grid ColumnSpacing="8">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <Button x:Name="PairButton" Content="Pair iPhone" Click="Pair_Click" Height="44" CornerRadius="22"
-                                                            HorizontalAlignment="Stretch" FontSize="14" FontWeight="Bold"
-                                                            Background="{StaticResource BrandBgBrush}" Foreground="{StaticResource BrandPlumDeepBrush}" />
-                                                    <Button x:Name="UnpairButton" Grid.Column="1" Content="Unpair" Click="Unpair_Click" Visibility="Collapsed"
-                                                            Height="44" CornerRadius="22" FontSize="14" FontWeight="SemiBold"
-                                                            Background="#24FFF7F0" Foreground="{StaticResource BrandBgBrush}" />
-                                                </Grid>
-                                            </StackPanel>
+                                        <TextBlock Text="Agent setup" Style="{StaticResource BrandSectionLabelStyle}" Margin="4,0,4,8" />
+                                        <Border Style="{StaticResource BrandCardStyle}">
+                                            <Button Style="{StaticResource BrandRowButtonStyle}" Click="AgentSetup_Click">
+                                                <local:SettingsRow x:Name="AgentSetupRow" Title="Set up agent control" IconBackground="{StaticResource BrandPlumTintBrush}" Chevron="True"
+                                                                   Subtitle="Pair the Phone Use app, connect Claude Code and add screen reading."
+                                                                   Icon="M12,3 L13.8,8.2 L19,10 L13.8,11.8 L12,17 L10.2,11.8 L5,10 L10.2,8.2 Z" />
+                                            </Button>
                                         </Border>
 
                                         <TextBlock Text="When an agent wants the phone" Style="{StaticResource BrandSectionLabelStyle}" />
@@ -495,30 +445,13 @@
                                         <TextBlock Text="Agent glow" Style="{StaticResource BrandSectionLabelStyle}" />
                                         <Border Style="{StaticResource BrandCardStyle}">
                                             <StackPanel>
-                                                <Grid Style="{StaticResource BrandRowStyle}">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto" />
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <Border Style="{StaticResource BrandIconTileStyle}">
-                                                        <Border.Background>
-                                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                                                <GradientStop Color="{StaticResource BrandPlum}" Offset="0" />
-                                                                <GradientStop Color="{StaticResource BrandAmber}" Offset="1" />
-                                                            </LinearGradientBrush>
-                                                        </Border.Background>
-                                                        <Viewbox Width="18" Height="18"><Canvas Width="24" Height="24">
-                                                            <Path Style="{StaticResource BrandIconPathStyle}" Stroke="{StaticResource BrandBgBrush}" Data="M12,3 L13.8,8.2 L19,10 L13.8,11.8 L12,17 L10.2,11.8 L5,10 L10.2,8.2 Z" />
-                                                        </Canvas></Viewbox>
-                                                    </Border>
-                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                        <TextBlock Text="Light around the phone" Style="{StaticResource BrandRowTitleStyle}" />
-                                                        <TextBlock Text="While an agent uses it; amber when you take over." Style="{StaticResource BrandRowSubStyle}" />
-                                                    </StackPanel>
-                                                    <ToggleSwitch x:Name="GlowSwitch" Grid.Column="2" Style="{StaticResource BrandSwitchStyle}"
+                                                <local:SettingsRow Style="{StaticResource BrandRowStyle}" Title="Light around the phone"
+                                                                   Subtitle="While an agent uses it; amber when you take over."
+                                                                   Icon="M12,3 L13.8,8.2 L19,10 L13.8,11.8 L12,17 L10.2,11.8 L5,10 L10.2,8.2 Z"
+                                                                   IconStroke="{StaticResource BrandBgBrush}" IconBackground="{StaticResource BrandGlowGradient}">
+                                                    <ToggleSwitch x:Name="GlowSwitch" Style="{StaticResource BrandSwitchStyle}"
                                                                   Toggled="Glow_Toggled" AutomationProperties.Name="Agent glow" />
-                                                </Grid>
+                                                </local:SettingsRow>
                                                 <TextBlock x:Name="GlowUnavailable" Style="{StaticResource BrandRowSubStyle}" Foreground="{StaticResource BrandAmberTextBrush}"
                                                            Margin="14,0,14,12" Visibility="Collapsed"
                                                            Text="The graphics card couldn't start the glow: a plain ring shows instead." />
@@ -546,47 +479,13 @@
                                                         <Slider x:Name="GlowSize" Minimum="0.3" Maximum="2.5" StepFrequency="0.01"
                                                                 ValueChanged="GlowLook_Changed" AutomationProperties.Name="Glow size" />
                                                     </StackPanel>
-                                                    <Grid Style="{StaticResource BrandRowStyle}" BorderThickness="0,1,0,0">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Text="Spill onto the screen edge" FontSize="15" FontWeight="Medium" VerticalAlignment="Center"
-                                                                   Foreground="{StaticResource BrandInkBrush}" />
-                                                        <ToggleSwitch x:Name="GlowBleed" Grid.Column="1" Style="{StaticResource BrandSwitchStyle}"
+                                                    <local:SettingsRow Style="{StaticResource BrandRowStyle}" BorderThickness="0,1,0,0" Title="Spill onto the screen edge" Plain="True">
+                                                        <ToggleSwitch x:Name="GlowBleed" Style="{StaticResource BrandSwitchStyle}"
                                                                       Toggled="GlowLook_Changed" AutomationProperties.Name="Spill onto the screen edge" />
-                                                    </Grid>
+                                                    </local:SettingsRow>
                                                     <HyperlinkButton Content="Reset to default" Margin="14,0,14,12" Padding="0,6" FontSize="13" FontWeight="SemiBold"
                                                                      Click="GlowReset_Click" />
                                                 </StackPanel>
-                                            </StackPanel>
-                                        </Border>
-
-                                        <TextBlock Text="Screen reading" Style="{StaticResource BrandSectionLabelStyle}" />
-                                        <Border Style="{StaticResource BrandCardStyle}" Padding="14">
-                                            <StackPanel Spacing="8">
-                                                <Grid ColumnSpacing="12">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto" />
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <Border Style="{StaticResource BrandIconTileStyle}" VerticalAlignment="Top">
-                                                        <Viewbox Width="18" Height="18"><Canvas Width="24" Height="24">
-                                                            <Path Style="{StaticResource BrandIconPathStyle}" Data="M2,12 C2,12 5.5,5 12,5 C18.5,5 22,12 22,12 C22,12 18.5,19 12,19 C5.5,19 2,12 2,12 Z M12,15 A3,3 0 1 0 12,9 A3,3 0 1 0 12,15 Z" />
-                                                        </Canvas></Viewbox>
-                                                    </Border>
-                                                    <TextBlock x:Name="VisionText" Grid.Column="1" FontSize="13" LineHeight="18" TextWrapping="Wrap"
-                                                               VerticalAlignment="Center" Foreground="{StaticResource BrandInk2Brush}" />
-                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
-                                                        <ProgressRing x:Name="VisionRing" Width="20" Height="20" IsActive="False" Visibility="Collapsed" />
-                                                        <Button x:Name="VisionButton" Content="Install" Click="Vision_Click" Height="36" CornerRadius="18"
-                                                                Style="{StaticResource BrandAccentButtonStyle}" FontSize="13" />
-                                                    </StackPanel>
-                                                </Grid>
-                                                <!-- while installing: the current download's bytes, else indeterminate -->
-                                                <ProgressBar x:Name="VisionProgress" Maximum="1" Visibility="Collapsed" />
-                                                <TextBlock x:Name="VisionDetail" Style="{StaticResource BrandRowSubStyle}" Visibility="Collapsed" />
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>
@@ -611,35 +510,21 @@
                                     <StackPanel Padding="20,0,20,36">
                                         <TextBlock Text="Keyboard and mouse" Style="{StaticResource BrandSectionLabelStyle}" Margin="4,18,4,8" />
                                         <Border Style="{StaticResource BrandCardStyle}">
-                                            <Grid Style="{StaticResource BrandRowStyle}">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
-                                                <Border Style="{StaticResource BrandIconTileStyle}">
-                                                    <Viewbox Width="18" Height="18"><Canvas Width="24" Height="24">
-                                                        <Path Style="{StaticResource BrandIconPathStyle}" Data="M7,7 L17,17 L12,22 L12,2 L17,7 L7,17" />
-                                                    </Canvas></Viewbox>
-                                                </Border>
                                                 <!-- on while this PC's Bluetooth carries input; off: the bridge does. Greyed out (and on)
                                                      until a bridge is set up and answering -->
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                    <TextBlock Text="Use this PC's Bluetooth" Style="{StaticResource BrandRowTitleStyle}" />
-                                                    <TextBlock x:Name="BridgeText" Text="Checking for a bridge…" Style="{StaticResource BrandRowSubStyle}" />
-                                                </StackPanel>
-                                                <ToggleSwitch x:Name="BridgeSwitch" Grid.Column="2" Style="{StaticResource BrandSwitchStyle}" IsOn="True"
+                                            <local:SettingsRow x:Name="BridgeRow" Style="{StaticResource BrandRowStyle}" Title="Use this PC's Bluetooth"
+                                                               Subtitle="Checking for a bridge…"
+                                                               Icon="M7,7 L17,17 L12,22 L12,2 L17,7 L7,17">
+                                                <ToggleSwitch x:Name="BridgeSwitch" Style="{StaticResource BrandSwitchStyle}" IsOn="True"
                                                               IsEnabled="False" Toggled="Bridge_Toggled" AutomationProperties.Name="Use this PC's Bluetooth" />
-                                            </Grid>
+                                            </local:SettingsRow>
                                         </Border>
 
                                         <Border Margin="0,14,0,0" Background="{StaticResource BrandCreamBrush}" CornerRadius="22" Padding="18">
                                             <StackPanel Spacing="10">
                                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                                     <Border Style="{StaticResource BrandIconTileStyle}" Background="{StaticResource BrandBgBrush}">
-                                                        <Viewbox Width="18" Height="18"><Canvas Width="24" Height="24">
-                                                            <Path Style="{StaticResource BrandIconPathStyle}" Stroke="#FFA0521A" Data="M7,7 L17,7 L17,17 L7,17 Z M9,3 L9,7 M15,3 L15,7 M9,17 L9,21 M15,17 L15,21 M3,9 L7,9 M3,15 L7,15 M17,9 L21,9 M17,15 L21,15" />
-                                                        </Canvas></Viewbox>
+                                                        <local:BrandIcon Stroke="{StaticResource BrandAmberIconBrush}" Data="M7,7 L17,7 L17,17 L7,17 Z M9,3 L9,7 M15,3 L15,7 M9,17 L9,21 M15,17 L15,21 M3,9 L7,9 M3,15 L7,15 M17,9 L21,9 M17,15 L21,15" />
                                                     </Border>
                                                     <TextBlock Text="Bluetooth bridge" FontSize="16" FontWeight="Bold" CharacterSpacing="-10" VerticalAlignment="Center"
                                                                Foreground="{StaticResource BrandInkBrush}" />

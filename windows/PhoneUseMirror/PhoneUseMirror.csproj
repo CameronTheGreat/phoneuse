@@ -37,6 +37,8 @@
     <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\AppIcon.png" CopyToOutputDirectory="PreserveNewest" />
     <Manifest Include="$(ApplicationManifest)" />
+    <!-- the phone frames' table, shared with the browser mirror (Phones.cs) -->
+    <EmbeddedResource Include="..\..\phoneuse\web\phones.json" LogicalName="phones.json" Link="phones.json" />
   </ItemGroup>
 
   <ItemGroup>

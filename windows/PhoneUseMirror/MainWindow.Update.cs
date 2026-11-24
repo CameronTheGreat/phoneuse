@@ -86,8 +86,8 @@ public sealed partial class MainWindow
         bool latest = !busy && _update == null && _updateChecked && _updateError == null;
         UpdateChip.Visibility = latest || (_update != null && !_updateInstalling) ? Visibility.Visible : Visibility.Collapsed;
         UpdateChipText.Text = latest ? "Up to date" : "Update";
-        UpdateChip.Background = (Brush)Application.Current.Resources[latest ? "BrandGreenTintBrush" : "BrandPlumTintBrush"];
-        UpdateChipText.Foreground = (Brush)Application.Current.Resources[latest ? "BrandGreenTextBrush" : "BrandPlumBrush"];
+        UpdateChip.Background = latest ? Brand.GreenTint : Brand.PlumTint;
+        UpdateChipText.Foreground = latest ? Brand.GreenText : Brand.Plum;
         if (_updateInstalling)
         {
             UpdateText.Text = _updateProgress < 1

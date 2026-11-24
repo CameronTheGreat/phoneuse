@@ -28,18 +28,6 @@ public static class AppSettings
         catch (Exception) { }
     }
 
-    /// <summary>"Agent control requires pairing" was closed: it stays gone for good.</summary>
-    public static bool PairingBarDismissed
-    {
-        get => (bool?)Load()["pairingBarDismissed"] ?? false;
-        set
-        {
-            var o = Load();
-            o["pairingBarDismissed"] = value;
-            Save(o);
-        }
-    }
-
     /// <summary>The first-time setup checklist was finished or skipped: it no longer opens by itself.</summary>
     public static bool SetupDone
     {
@@ -50,6 +38,21 @@ public static class AppSettings
             o["setupDone"] = value;
             Save(o);
         }
+    }
+
+    /// <summary>What setup was for (the first question it asks): "desktop" (the phone from this PC) or
+    /// "agent" (and AI agents too, which adds the Agent setup stage); null until chosen.</summary>
+    public static string? SetupMode
+    {
+        get => (string?)Load()["setupMode"];
+        set => Set("setupMode", value);
+    }
+
+    /// <summary>Setup's last screen turned Start with Windows on once (the agent path): it doesn't again.</summary>
+    public static bool StartupOffered
+    {
+        get => (bool?)Load()["startupOffered"] ?? false;
+        set => Set("startupOffered", value);
     }
 
     /// <summary>Look for a newer release on GitHub now and then (Updater).</summary>

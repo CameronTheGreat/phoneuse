@@ -12,9 +12,15 @@
   html { background: #0e0e11; }  /* on html only: the agent glow sits behind the phone, above this */
   body { display: grid; place-items: center; box-sizing: border-box; padding-bottom: 24px; font: 15px system-ui, sans-serif; color: rgba(255, 255, 255, .55); }
   #phone { position: relative; touch-action: none; user-select: none; }
-  /* body, screen and rim are squircles (superellipse corners, like the phone's): clip paths from layout() */
-  #body { position: absolute; inset: 0; background: #18181c; }
-  #rim { position: absolute; display: none; background: rgba(100, 210, 255, .35); pointer-events: none; }
+  /* The frame, as the Windows mirror window draws it (frame.js): back to front, the phone's shadow and
+     black back, the screen, the side buttons, the band (lit in a canvas; a plain gradient until it's
+     drawn), the black border around the screen, the glass's edge. Shapes have iOS's continuous corners. */
+  #phone > svg, #band { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+  #under { filter: drop-shadow(0 5px 16px rgba(0, 0, 0, .5)); }
+  #band { display: none; }
+  #band.drawn { display: block; }
+  #phone.lit #plainBand, #phone.lit #plainButtons { display: none; }
+  #rim { display: none; fill: none; stroke: rgba(100, 210, 255, .55); stroke-width: 2; }
   #phone.driving #rim { display: block; }
   #screen { position: absolute; background: #000; overflow: hidden; }
   canvas { display: block; width: 100%; height: 100%; }
@@ -197,6 +203,10 @@
       <span class="grow">Keep screen awake</span><span class="sw"></span>
     </button>
   </div>
+  <div class="group" style="margin-bottom: 14px">
+    <label class="item"><span class="grow">Frame</span>
+      <select id="finishSel" class="pick" aria-label="Frame colour"></select></label>
+  </div>
   <div class="group" id="startMode" style="margin-bottom: 14px">
     <label class="item"><span class="grow">Agent control</span>
       <select id="startModeSel" class="pick">
@@ -246,14 +256,35 @@
   </div>
 </div>
 <div id="phone">
-  <div id="body"></div>
+  <svg id="under" aria-hidden="true"><path id="silhouette" fill="#000"/></svg>
   <div id="screen">
     <canvas id="video"></canvas>
     <div id="agentDot" hidden></div>
     <div id="note"></div>
   </div>
-  <div id="rim"></div>
+  <svg id="mid" aria-hidden="true">
+    <defs>
+      <linearGradient id="gBand" x1="0" y1="0" x2="1" y2="1"><stop offset="0"/><stop offset=".45"/><stop offset="1"/></linearGradient>
+      <linearGradient id="gButtons" x1="0" y1="0" x2="1" y2="0"><stop offset="0"/><stop offset=".5"/><stop offset="1"/></linearGradient>
+      <linearGradient id="gCamera" x1="0" y1="0" x2="1" y2="0"><stop offset="0"/><stop offset=".5"/><stop offset="1"/></linearGradient>
+    </defs>
+    <path id="plainButtons" fill="url(#gButtons)"/>
+    <path id="camera" fill="url(#gCamera)"/>
+    <path id="plainBand" fill="url(#gBand)" fill-rule="evenodd" stroke="rgba(255, 255, 255, .35)" stroke-width=".75"/>
+  </svg>
+  <canvas id="band"></canvas>
+  <svg id="over" aria-hidden="true">
+    <defs>
+      <linearGradient id="gGlass" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#fff" stop-opacity=".31"/><stop offset=".5" stop-color="#fff" stop-opacity=".07"/>
+        <stop offset="1" stop-color="#fff" stop-opacity=".16"/></linearGradient>
+    </defs>
+    <path id="border" fill="#050506" fill-rule="evenodd"/>
+    <path id="glassEdge" fill="none" stroke="url(#gGlass)" stroke-width=".8"/>
+    <path id="rim"/>
+  </svg>
 </div>
+<script src="/frame.js"></script>
 <script>
 "use strict";
 // Video: H.264 access units over the WebSocket, decoded with WebCodecs and drawn
@@ -262,7 +293,7 @@
 
 const phone = document.getElementById("phone");
 const scr = document.getElementById("screen");
-const body = document.getElementById("body"), rim = document.getElementById("rim");
+const $ = (id) => document.getElementById(id);
 const canvas = document.getElementById("video");
 const note = document.getElementById("note");
 const ctx = canvas.getContext("2d", { alpha: false });  // (desynchronized drew over the settings panel)
@@ -322,41 +353,141 @@ function screenShape() {
   const [w, h] = state.screen;
   return frameSideways === null || frameSideways === (w > h) ? [w, h] : [h, w];
 }
+// The frame of the phone that's mirroring (state.model) from phones.json, in its finish. Until
+// the table arrives (or if it can't), a plain black frame from the server's bezel and corner.
+let frameReady = false;
+fetch("/phones.json").then((r) => r.json()).then((j) => { Frame.load(j); frameReady = true; fillFinishes(); layout(); })
+  .catch((e) => console.warn("phones.json:", e));
+const FINISH_KEY = "phoneuse.frameFinish";
+function savedFinish() { try { return localStorage.getItem(FINISH_KEY); } catch { return null; } }
+function saveFinish(id) { try { localStorage.setItem(FINISH_KEY, id); } catch { /* private window: this visit only */ } }
+let finishId = savedFinish();
+
 function layout() {
-  // in units of the screen's short side: the bezel and corners are fractions of it, so a
+  // in units of the screen's short side: the frame and corners are fractions of it, so a
   // sideways phone keeps the same ones
   const [sw0, sh0] = screenShape(), short = Math.min(sw0, sh0);
-  const dw = sw0 / short + 2 * state.bezel, dh = sh0 / short + 2 * state.bezel;
+  const m = frameReady ? Frame.modelFor(state.model) : null;
+  const f = frameReady ? Frame.frameUnits() : { band: 0, knob: 0 };
+  const glass = m ? m.glass : state.bezel, band = f.band, knob = f.knob;
+  const radius = m ? m.corner / short : state.radius;  // the model's corner is in points, as state.screen
+  const fr = glass + band + knob;
+  const dw = sw0 / short + 2 * fr, dh = sh0 / short + 2 * fr;
   // px per screen short side; room above and below (and at the sides) for the agent glow
   const u = Math.min((innerWidth - 64) / dw, (innerHeight - 120) / dh);  // 48 px above, 72 px below
-  const pw = dw * u, ph = dh * u, pr = (state.radius + state.bezel) * u;
-  const b = state.bezel * u, sw = sw0 / short * u, sh = sh0 / short * u, sr = state.radius * u;
+  if (!(u > 10)) return;
+  const pw = dw * u, ph = dh * u, sw = sw0 / short * u, sh = sh0 / short * u, sr = radius * u;
+  const k = knob * u, t = band * u, g = glass * u, o = k + t + g;  // o: the screen's offset
+  const R = sr + g + t;  // the band's outer corner
+  const rect = Frame.rect;
   // border-radius stays on #phone for the blurred glow, which inherits it
-  Object.assign(phone.style, { width: `${pw}px`, height: `${ph}px`, borderRadius: `${pr}px` });
-  phone.style.setProperty("--halo", `path("${squircle(pw + 5, ph + 5, pr + 2.5)}")`);
-  body.style.clipPath = `path("${squircle(pw, ph, pr)}")`;
-  Object.assign(scr.style, { left: `${b}px`, top: `${b}px`, width: `${sw}px`, height: `${sh}px`,
-                             clipPath: `path("${squircle(sw, sh, sr)}")` });
-  // a 1 px ring around the screen while an agent drives
-  Object.assign(rim.style, { left: `${b - 1}px`, top: `${b - 1}px`, width: `${sw + 2}px`, height: `${sh + 2}px`,
-                             clipPath: `path(evenodd, "${squircle(sw + 2, sh + 2, sr + 1)} ${squircle(sw, sh, sr, 1)}")` });
-}
+  Object.assign(phone.style, { width: `${pw}px`, height: `${ph}px`, borderRadius: `${R + k}px` });
+  phone.style.setProperty("--halo", `path("${rect(k, k, pw - 2 * k + 5, ph - 2 * k + 5, R + 2.5)}")`);
+  for (const id of ["under", "mid", "over"]) { $(id).setAttribute("width", pw); $(id).setAttribute("height", ph); }
+  Object.assign(scr.style, { left: `${o}px`, top: `${o}px`, width: `${sw}px`, height: `${sh}px`,
+                             clipPath: `path("${rect(0, 0, sw, sh, sr)}")` });
 
-// SVG path of a w x h rectangle at (o, o) whose corners are superellipse quarters
-// (|x|^3 + |y|^3 = 1) of radius r: the continuous corners of the phone and its screen.
-function squircle(w, h, r, o = 0) {
-  r = Math.min(r, w / 2, h / 2);
-  const n = 3, steps = 16, pts = [];
-  const centers = [[o + w - r, o + r], [o + w - r, o + h - r], [o + r, o + h - r], [o + r, o + r]];
-  centers.forEach(([cx, cy], q) => {
-    for (let i = 0; i <= steps; i++) {
-      const t = (q + i / steps) * Math.PI / 2 - Math.PI / 2, c = Math.cos(t), s = Math.sin(t);
-      pts.push([cx + r * Math.sign(c) * Math.abs(c) ** (2 / n), cy + r * Math.sign(s) * Math.abs(s) ** (2 / n)]);
-    }
-  });
-  return pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(2)}`).join("") + "Z";
+  const outer = rect(k, k, pw - 2 * k, ph - 2 * k, R), inner = rect(k + t, k + t, pw - 2 * (k + t), ph - 2 * (k + t), sr + g);
+  $("silhouette").setAttribute("d", outer);
+  $("plainBand").setAttribute("d", t > 0 ? outer + inner : "");
+  $("border").setAttribute("d", (t > 0 ? inner : outer) + rect(o, o, sw, sh, sr));
+  const e = k + t + 0.4;
+  $("glassEdge").setAttribute("d", t > 0 ? rect(e, e, pw - 2 * e, ph - 2 * e, sr + g - 0.4) : "");
+  $("rim").setAttribute("d", rect(o - 1, o - 1, sw + 2, sh + 2, sr + 1));  // the 2 px stroke sits just outside the screen
+
+  const sideways = sw0 > sh0;
+  const buttons = m ? buttonRects(m.buttons, pw, ph, k, t, 1, sideways) : [];
+  const camera = m && m.camera ? buttonRects([m.camera], pw, ph, k, t, 0.45, sideways) : [];
+  $("plainButtons").setAttribute("d", buttons.map(([x, y, w, h]) => rect(x, y, w, h, k * 0.9)).join(""));
+  $("camera").setAttribute("d", camera.map(([x, y, w, h]) => rect(x, y, w, h, k * 0.9)).join(""));
+  if (m) paintFinish(m, { pw, ph, k, t, R, buttons });
 }
 addEventListener("resize", layout);
+
+/** Side buttons standing out from the band by `stand` of k and tucked under it, as [x, y, w, h] in the
+ *  phone. Sideways, the phone is drawn turned to the left (its top at the left), so the volume buttons are below. */
+function buttonRects(list, pw, ph, k, t, stand, sideways) {
+  const uw = sideways ? ph : pw, uh = sideways ? pw : ph;  // the upright phone's size
+  const bandH = uh - 2 * k, room = k * (1 - stand);
+  return list.map(({ left, top, bottom }) => {
+    const bw = k * stand + t, x = left ? room : uw - room - bw, y = k + top * bandH, bh = (bottom - top) * bandH;
+    return sideways ? [y, uw - x - bw, bh, bw] : [x, y, bw, bh];
+  });
+}
+
+// ---- the band in the chosen finish: the plain gradient at once, the lit one when the Worker has drawn it ----
+const bandCanvas = $("band"), bandCtx = bandCanvas.getContext("2d");
+let bandWorker = null, bandAsked = 0, bandShown = "", bandTimer = 0, bandWanted = null;
+try {
+  bandWorker = new Worker("/frame.js");
+  bandWorker.onmessage = (e) => {
+    const m = e.data;
+    if (m.id !== bandAsked || !bandWanted) return;  // an older size: another is on its way
+    if (m.error) { console.warn("band:", m.error); return plainBand(); }
+    bandCanvas.width = m.w; bandCanvas.height = m.h;
+    bandCtx.putImageData(new ImageData(m.px, m.w, m.h), 0, 0);
+    bandShown = bandWanted.key;
+    placeBand();
+  };
+  bandWorker.onerror = (e) => { console.warn("band worker:", e.message); bandWorker = null; plainBand(); };
+} catch (e) { console.warn("band worker:", e); }
+
+// the lit band can't be drawn: the plain one, as the Windows app falls back to
+function plainBand() { bandShown = ""; bandCanvas.classList.remove("drawn"); phone.classList.remove("lit"); }
+
+function placeBand() {
+  // the drawn band, stretched to the phone's size until the one for this size arrives
+  if (!bandShown || !bandWanted) return;
+  Object.assign(bandCanvas.style, { width: `${bandWanted.pw}px`, height: `${bandWanted.ph}px` });
+  bandCanvas.classList.add("drawn");
+  phone.classList.add("lit");
+}
+
+function paintFinish(m, { pw, ph, k, t, R, buttons }) {
+  const fin = Frame.finishFor(finishId);
+  const rgb = (c) => `rgb(${c.join(",")})`;
+  const stops = (id, colors) => [...$(id).children].forEach((s, i) => s.setAttribute("stop-color", rgb(colors[i])));
+  stops("gBand", [fin.light, fin.dark, fin.mid]);
+  stops("gButtons", [fin.buttonEdge, fin.buttonMid, fin.buttonEdge]);
+  // Camera Control's sapphire: dark glass on a dark band; on a light one, the light metal under the
+  // glass, brightest down the middle, with a dark edge (MainWindow.Finish.cs)
+  const luma = (0.299 * fin.band[0] + 0.587 * fin.band[1] + 0.114 * fin.band[2]) / 255;
+  const mix = (a, b, x) => a.map((v, i) => Math.round(v + (b[i] - v) * x));
+  const light = luma >= 0.45;
+  const edge = light ? mix(fin.band, [0x1c, 0x1c, 0x22], 0.5) : [0x14, 0x14, 0x16];
+  const mid = light ? mix(fin.band, [255, 255, 255], 0.4) : [0x4c, 0x4c, 0x54];
+  stops("gCamera", [edge, mid, edge]);
+  $("camera").setAttribute("stroke", light ? "rgba(0, 0, 0, .63)" : "none");
+  $("camera").setAttribute("stroke-width", ".8");
+
+  // the lit band, at the screen's pixels; redrawn only when its size, finish or buttons change
+  const s = devicePixelRatio || 1;
+  const w = Math.round(pw * s), h = Math.round(ph * s);
+  const material = Frame.groupMaterial(fin.group) || m.material;
+  const px = buttons.map((b) => b.map((v) => v * s));
+  const key = `${w}x${h}|${fin.id}|${material}|${px.length}|${px[0] ? px[0].map(Math.round).join(",") : ""}`;
+  bandWanted = { key, pw, ph };
+  if (key === bandShown) return placeBand();
+  if (bandShown) placeBand(); else phone.classList.remove("lit");
+  if (!bandWorker) return;
+  clearTimeout(bandTimer);  // while the window is being resized, only the last size
+  bandTimer = setTimeout(() => {
+    bandWorker.postMessage({ id: ++bandAsked, w, h, k: k * s, t: t * s, r: R * s, band: fin.band, material, buttons: px });
+  }, bandShown ? 120 : 0);
+}
+
+// Settings › Frame: the band's colour, from real iPhone finishes (remembered in this browser)
+function fillFinishes() {
+  const sel = $("finishSel");
+  sel.innerHTML = "";
+  const groups = new Map();
+  for (const f of Frame.finishes()) {
+    if (!groups.has(f.group)) { const og = document.createElement("optgroup"); og.label = f.group; groups.set(f.group, og); sel.append(og); }
+    groups.get(f.group).append(new Option(f.name, f.id));
+  }
+  sel.value = Frame.finishFor(finishId).id;
+}
+$("finishSel").onchange = (e) => { finishId = e.target.value; saveFinish(finishId); layout(); };
 
 // ---- video ----
 function codecString(data) {

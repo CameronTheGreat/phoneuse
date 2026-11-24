@@ -10,7 +10,6 @@
     <Color x:Key="BrandBg">#FFFFF7F0</Color>
     <Color x:Key="BrandCream">#FFFEEAD9</Color>
     <Color x:Key="BrandAmberTint">#FFFFE4CC</Color>
-    <Color x:Key="BrandCoralTint">#FFFDE0DC</Color>
     <Color x:Key="BrandPlumTint">#FFF6E0EA</Color>
     <Color x:Key="BrandLine">#FFF0D9C8</Color>
     <Color x:Key="BrandInk">#FF3A1A2E</Color>
@@ -32,7 +31,6 @@
     <SolidColorBrush x:Key="BrandBgBrush" Color="{StaticResource BrandBg}" />
     <SolidColorBrush x:Key="BrandCreamBrush" Color="{StaticResource BrandCream}" />
     <SolidColorBrush x:Key="BrandAmberTintBrush" Color="{StaticResource BrandAmberTint}" />
-    <SolidColorBrush x:Key="BrandCoralTintBrush" Color="{StaticResource BrandCoralTint}" />
     <SolidColorBrush x:Key="BrandPlumTintBrush" Color="{StaticResource BrandPlumTint}" />
     <SolidColorBrush x:Key="BrandLineBrush" Color="{StaticResource BrandLine}" />
     <SolidColorBrush x:Key="BrandInkBrush" Color="{StaticResource BrandInk}" />
@@ -50,14 +48,39 @@
     <SolidColorBrush x:Key="BrandGreenTextBrush" Color="#FF2E7A53" />
     <!-- cards on the cream pages: white, a little see-through -->
     <SolidColorBrush x:Key="BrandCardBrush" Color="#B3FFFFFF" />
+    <!-- the agent glow's tile (Settings › Agent): plum into amber -->
+    <LinearGradientBrush x:Key="BrandGlowGradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="{StaticResource BrandPlum}" Offset="0" />
+        <GradientStop Color="{StaticResource BrandAmber}" Offset="1" />
+    </LinearGradientBrush>
+    <!-- the cream and plum tints' hover and press shades, and the line a shade darker -->
+    <Color x:Key="BrandCreamPressed">#FFF9DCC4</Color>
+    <Color x:Key="BrandLineStrong">#FFE6C9B4</Color>
+    <Color x:Key="BrandPlumWash">#149A3C69</Color>
+    <Color x:Key="BrandPlumWashStrong">#229A3C69</Color>
+    <SolidColorBrush x:Key="BrandCreamPressedBrush" Color="{StaticResource BrandCreamPressed}" />
+    <SolidColorBrush x:Key="BrandLineStrongBrush" Color="{StaticResource BrandLineStrong}" />
+    <SolidColorBrush x:Key="BrandPlumWashBrush" Color="{StaticResource BrandPlumWash}" />
+    <SolidColorBrush x:Key="BrandPlumWashStrongBrush" Color="{StaticResource BrandPlumWashStrong}" />
+    <SolidColorBrush x:Key="BrandPlumTintHoverBrush" Color="#FFF0D2E0" />
+    <SolidColorBrush x:Key="BrandPlumTintPressedBrush" Color="#FFEAC4D6" />
+    <!-- the amber icons' stroke (Settings › Help, the bridge) -->
+    <SolidColorBrush x:Key="BrandAmberIconBrush" Color="#FFA0521A" />
+    <!-- on the deep plum and night glass: cream, see-through -->
+    <SolidColorBrush x:Key="BrandOnPlumFaintBrush" Color="#24FFF7F0" />
+    <SolidColorBrush x:Key="BrandOnPlumTextBrush" Color="#D1FFF7F0" />
+    <SolidColorBrush x:Key="BrandOnNightTextBrush" Color="#CCFFF7F0" />
+    <!-- the calibration card over the phone: deep plum glass, and its white text a little softer -->
+    <SolidColorBrush x:Key="BrandPlumGlassBrush" Color="#F2712A4D" />
+    <SolidColorBrush x:Key="BrandWhiteSoftBrush" Color="#E6FFFFFF" />
 
     <!-- plum in place of the Windows accent colour, for whatever still reads it directly -->
-    <Color x:Key="SystemAccentColor">#FF9A3C69</Color>
+    <StaticResource x:Key="SystemAccentColor" ResourceKey="BrandPlum" />
     <Color x:Key="SystemAccentColorLight1">#FFB4597F</Color>
-    <Color x:Key="SystemAccentColorLight2">#FFE39CBE</Color>
+    <StaticResource x:Key="SystemAccentColorLight2" ResourceKey="BrandPlumLight" />
     <Color x:Key="SystemAccentColorLight3">#FFF6CFE1</Color>
-    <Color x:Key="SystemAccentColorDark1">#FF9A3C69</Color>
-    <Color x:Key="SystemAccentColorDark2">#FF7B354E</Color>
+    <StaticResource x:Key="SystemAccentColorDark1" ResourceKey="BrandPlum" />
+    <StaticResource x:Key="SystemAccentColorDark2" ResourceKey="BrandPlumHi" />
     <Color x:Key="SystemAccentColorDark3">#FF5E2340</Color>
 
     <!-- Geist, converted from the site's own font (site/src/fonts); Segoe fills in glyphs it lacks -->
@@ -71,50 +94,50 @@
     <ResourceDictionary.ThemeDictionaries>
         <!-- cream pages: setup, calibration, settings, about -->
         <ResourceDictionary x:Key="Light">
-            <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#FF9A3C69" />
-            <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#FF7B354E" />
-            <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#FF712A4D" />
+            <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="{StaticResource BrandPlum}" />
+            <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="{StaticResource BrandPlumHi}" />
+            <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="{StaticResource BrandPlumDeep}" />
             <SolidColorBrush x:Key="AccentFillColorDisabledBrush" Color="#373A1A2E" />
-            <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush" Color="#FF9A3C69" />
-            <SolidColorBrush x:Key="AccentTextFillColorSecondaryBrush" Color="#FF7B354E" />
-            <SolidColorBrush x:Key="AccentTextFillColorTertiaryBrush" Color="#FF712A4D" />
-            <SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush" Color="#FFFFF7F0" />
+            <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush" Color="{StaticResource BrandPlum}" />
+            <SolidColorBrush x:Key="AccentTextFillColorSecondaryBrush" Color="{StaticResource BrandPlumHi}" />
+            <SolidColorBrush x:Key="AccentTextFillColorTertiaryBrush" Color="{StaticResource BrandPlumDeep}" />
+            <SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush" Color="{StaticResource BrandBg}" />
             <SolidColorBrush x:Key="TextOnAccentFillColorSecondaryBrush" Color="#E6FFF7F0" />
 
-            <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#FF3A1A2E" />
-            <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="#FF6B4558" />
-            <SolidColorBrush x:Key="TextFillColorTertiaryBrush" Color="#FF80586A" />
+            <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="{StaticResource BrandInk}" />
+            <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="{StaticResource BrandInk2}" />
+            <SolidColorBrush x:Key="TextFillColorTertiaryBrush" Color="{StaticResource BrandInk3}" />
             <SolidColorBrush x:Key="TextFillColorDisabledBrush" Color="#663A1A2E" />
 
             <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#B3FFFFFF" />
-            <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="#FFFEEAD9" />
-            <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#FFF0D9C8" />
+            <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="{StaticResource BrandCream}" />
+            <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="{StaticResource BrandLine}" />
 
             <!-- buttons, boxes: the site's cream "Download for Mac" -->
-            <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#FFFEEAD9" />
-            <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="#FFFFE4CC" />
-            <SolidColorBrush x:Key="ControlFillColorTertiaryBrush" Color="#FFF9DCC4" />
+            <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="{StaticResource BrandCream}" />
+            <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="{StaticResource BrandAmberTint}" />
+            <SolidColorBrush x:Key="ControlFillColorTertiaryBrush" Color="{StaticResource BrandCreamPressed}" />
             <SolidColorBrush x:Key="ControlFillColorInputActiveBrush" Color="#FFFFFFFF" />
-            <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="#FFF0D9C8" />
-            <SolidColorBrush x:Key="ControlStrokeColorSecondaryBrush" Color="#FFE6C9B4" />
-            <SolidColorBrush x:Key="SubtleFillColorSecondaryBrush" Color="#149A3C69" />
-            <SolidColorBrush x:Key="SubtleFillColorTertiaryBrush" Color="#229A3C69" />
-            <SolidColorBrush x:Key="ControlStrongStrokeColorDefaultBrush" Color="#FF80586A" />
-            <SolidColorBrush x:Key="ControlStrongFillColorDefaultBrush" Color="#FF80586A" />
+            <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="{StaticResource BrandLine}" />
+            <SolidColorBrush x:Key="ControlStrokeColorSecondaryBrush" Color="{StaticResource BrandLineStrong}" />
+            <SolidColorBrush x:Key="SubtleFillColorSecondaryBrush" Color="{StaticResource BrandPlumWash}" />
+            <SolidColorBrush x:Key="SubtleFillColorTertiaryBrush" Color="{StaticResource BrandPlumWashStrong}" />
+            <SolidColorBrush x:Key="ControlStrongStrokeColorDefaultBrush" Color="{StaticResource BrandInk3}" />
+            <SolidColorBrush x:Key="ControlStrongFillColorDefaultBrush" Color="{StaticResource BrandInk3}" />
 
             <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelected" Color="#FFFFFFFF" />
-            <SolidColorBrush x:Key="TabViewBorderBrush" Color="#FFF0D9C8" />
+            <SolidColorBrush x:Key="TabViewBorderBrush" Color="{StaticResource BrandLine}" />
         </ResourceDictionary>
 
         <!-- over the phone's picture and in the bar: a lighter plum that reads on dark -->
         <ResourceDictionary x:Key="Dark">
-            <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#FFE39CBE" />
+            <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="{StaticResource BrandPlumLight}" />
             <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#E6E39CBE" />
             <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#CCE39CBE" />
             <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush" Color="#FFF0B9D3" />
             <SolidColorBrush x:Key="AccentTextFillColorSecondaryBrush" Color="#FFF0B9D3" />
-            <SolidColorBrush x:Key="AccentTextFillColorTertiaryBrush" Color="#FFE39CBE" />
-            <SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush" Color="#FF3A1A2E" />
+            <SolidColorBrush x:Key="AccentTextFillColorTertiaryBrush" Color="{StaticResource BrandPlumLight}" />
+            <SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush" Color="{StaticResource BrandInk}" />
             <SolidColorBrush x:Key="TextOnAccentFillColorSecondaryBrush" Color="#CC3A1A2E" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>

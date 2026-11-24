@@ -125,7 +125,7 @@
                                         <VisualState x:Name="Dragging" />
                                         <VisualState x:Name="Off">
                                             <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="KnobMove" Storyboard.TargetProperty="X" To="0" Duration="0:0:0.3">
+                                                <DoubleAnimation Storyboard.TargetName="KnobTranslateTransform" Storyboard.TargetProperty="X" To="0" Duration="0:0:0.3">
                                                     <DoubleAnimation.EasingFunction>
                                                         <ExponentialEase EasingMode="EaseOut" Exponent="6" />
                                                     </DoubleAnimation.EasingFunction>
@@ -135,7 +135,7 @@
                                         </VisualState>
                                         <VisualState x:Name="On">
                                             <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="KnobMove" Storyboard.TargetProperty="X" To="20" Duration="0:0:0.3">
+                                                <DoubleAnimation Storyboard.TargetName="KnobTranslateTransform" Storyboard.TargetProperty="X" To="20" Duration="0:0:0.3">
                                                     <DoubleAnimation.EasingFunction>
                                                         <ExponentialEase EasingMode="EaseOut" Exponent="6" />
                                                     </DoubleAnimation.EasingFunction>
@@ -147,26 +147,42 @@
                                 </VisualStateManager.VisualStateGroups>
                                 <Border CornerRadius="15" Background="#FFE6CDBB" />
                                 <Border x:Name="OnTrack" CornerRadius="15" Background="{StaticResource BrandPlumBrush}" Opacity="0" />
-                                <Ellipse x:Name="Knob" Width="24" Height="24" Margin="3,0,0,0" HorizontalAlignment="Left"
-                                         Fill="{StaticResource BrandBgBrush}" Stroke="#1F3A1A2E" StrokeThickness="0.5">
-                                    <Ellipse.RenderTransform>
-                                        <TranslateTransform x:Name="KnobMove" />
-                                    </Ellipse.RenderTransform>
-                                </Ellipse>
+                                <!-- the parts ToggleSwitch works with (named as in WinUI's own template): the knob
+                                     travels inside SwitchKnobBounds, and SwitchThumb, an invisible Thumb over the
+                                     whole switch, is what turns a click (or a drag) into a toggle; without it only
+                                     the keyboard could flip the switch -->
+                                <Border x:Name="SwitchKnobBounds" Margin="3,0,3,0" Background="Transparent" />
+                                <Grid x:Name="SwitchKnob" Width="24" Height="24" Margin="3,0,0,0" HorizontalAlignment="Left">
+                                    <Grid.RenderTransform>
+                                        <TranslateTransform x:Name="KnobTranslateTransform" />
+                                    </Grid.RenderTransform>
+                                    <Ellipse x:Name="Knob" Fill="{StaticResource BrandBgBrush}" Stroke="#1F3A1A2E" StrokeThickness="0.5" />
+                                </Grid>
+                                <Thumb x:Name="SwitchThumb" AutomationProperties.AccessibilityView="Raw">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Rectangle Fill="Transparent" />
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
                             </Grid>
                         </ControlTemplate>
                     </Setter.Value>
                 </Setter>
             </Style>
 
-            <!-- Settings' tabs: a cream track, the open one a white pill in plum -->
-            <Style x:Key="BrandSegmentStyle" TargetType="RadioButton">
+            <!-- what Settings' tabs and chips share: small bold labels, as wide as their column -->
+            <Style x:Key="BrandPillChoiceStyle" TargetType="RadioButton">
                 <Setter Property="Foreground" Value="{StaticResource BrandInk2Brush}" />
                 <Setter Property="FontSize" Value="13" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="MinWidth" Value="0" />
                 <Setter Property="HorizontalAlignment" Value="Stretch" />
                 <Setter Property="UseSystemFocusVisuals" Value="True" />
+            </Style>
+
+            <!-- Settings' tabs: a cream track, the open one a white pill in plum -->
+            <Style x:Key="BrandSegmentStyle" TargetType="RadioButton" BasedOn="{StaticResource BrandPillChoiceStyle}">
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="RadioButton">
@@ -213,13 +229,7 @@
             </Style>
 
             <!-- a choice among a few (the agent delay): cream pills, the chosen one plum -->
-            <Style x:Key="BrandChipStyle" TargetType="RadioButton">
-                <Setter Property="Foreground" Value="{StaticResource BrandInk2Brush}" />
-                <Setter Property="FontSize" Value="13" />
-                <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="MinWidth" Value="0" />
-                <Setter Property="HorizontalAlignment" Value="Stretch" />
-                <Setter Property="UseSystemFocusVisuals" Value="True" />
+            <Style x:Key="BrandChipStyle" TargetType="RadioButton" BasedOn="{StaticResource BrandPillChoiceStyle}">
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="RadioButton">

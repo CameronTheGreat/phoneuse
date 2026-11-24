@@ -31,7 +31,7 @@ public sealed partial class MainWindow
         BridgeSwitch.IsEnabled = answering;
         _settingUp = false;
         string daemon = (string?)j?["daemon"] ?? "";
-        BridgeText.Text = failed ? "phoneuse isn't answering."
+        BridgeRow.Subtitle = failed ? "phoneuse isn't answering."
             : saved == null ? "No bridge set up. A LilyGO T-Display can be the iPhone's keyboard and mouse instead of this PC."
             : !answering ? "The bridge isn't answering, so this PC's Bluetooth carries input."
             : !use ? "This PC's Bluetooth carries input."
@@ -47,12 +47,12 @@ public sealed partial class MainWindow
         // greyed out, only code changes it
         if (_settingUp || _conn == null || !BridgeSwitch.IsEnabled) return;
         BridgeSwitch.IsEnabled = false;
-        BridgeText.Text = BridgeSwitch.IsOn ? "Switching to this PC's Bluetooth…" : "Switching to the bridge…";
+        BridgeRow.Subtitle = BridgeSwitch.IsOn ? "Switching to this PC's Bluetooth…" : "Switching to the bridge…";
         var r = await _conn.PostAsync("api/bridge/use", new { on = !BridgeSwitch.IsOn });
         var daemon = (string?)r?["daemon"];
         await LoadBridgeSwitch();
         if (r?["error"] != null || (daemon != null && daemon.StartsWith("err")))
-            BridgeText.Text = "Couldn't switch: " + ((string?)r?["error"] ?? daemon![4..]);
+            BridgeRow.Subtitle = "Couldn't switch: " + ((string?)r?["error"] ?? daemon![4..]);
     }
 
     void BridgeSettings_Click(object sender, RoutedEventArgs e)

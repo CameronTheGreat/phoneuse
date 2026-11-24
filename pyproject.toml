@@ -41,5 +41,5 @@ namespaces = true  # phoneuse/web and phoneuse/sounds hold data files only
 
 [tool.setuptools.package-data]
 phoneuse = ["sdp_record.xml"]
-"phoneuse.web" = ["*.html"]
+"phoneuse.web" = ["*.html", "*.js", "*.json"]
 "phoneuse.sounds" = ["*.wav"]

@@ -1,0 +1,1398 @@
+{
+ "_about": [
+  "The phone frames the Windows mirror window (windows/PhoneUseMirror: PhoneModel.cs, FrameFinish.cs) and the browser mirror (index.html) draw. One table for both.",
+  "frame: the band's width and the side buttons' room, in units of the screen's short side.",
+  "models: by the model identifier AirPlay reports. glass: the black border between screen and band, in units of the screen's width (1.2 mm on the 16 Pro and 1.71 mm on the 15 Pro, reported before launch; the others estimated from photos). corner: the screen's corner radius in points, iOS's own (UIScreen._displayCornerRadius, github.com/kylebshr/ScreenCorners; the 18 Pro isn't listed there, so the 17 Pro's 62 is assumed). finish: its group in finishes. layout and length: its side buttons and its length in mm; camera: Camera Control's centre in mm (8.55 mm either side of it). Models without a layout use estimatedButtons.",
+  "layouts: each button's centre in mm from the phone's top and its half length, from Apple's dimensional drawings (developer.apple.com/accessories, Accessory Design Guidelines). Left: Action button or ring/silent switch, volume up, volume down; right: side button. Apple has no drawings online for the iPhone 11 and older.",
+  "estimatedButtons: (left side, top, bottom) as fractions of the band's height, estimated from photos.",
+  "finishes: each base colour is AppleDB's for that finish (appledb.dev, deviceFiles/iPhone/<identifier>.json in github.com/littlebyteorg/appledb). band: the band's tone measured from Apple's product photos; without one it is estimated from the base (40% of its light)."
+ ],
+ "frame": {
+  "band": 0.017,
+  "knob": 0.009
+ },
+ "defaultFinish": "graphite",
+ "default": {
+  "name": "iPhone",
+  "glass": 0.018,
+  "material": "Titanium",
+  "actionButton": true,
+  "finish": null,
+  "corner": 62,
+  "layout": "Pro17",
+  "length": 150.01,
+  "camera": 98.4
+ },
+ "models": [
+  {
+   "ids": [
+    "iPhone19,2"
+   ],
+   "name": "iPhone 18 Pro",
+   "glass": 0.018,
+   "material": "Aluminium",
+   "actionButton": true,
+   "finish": "iPhone 18 Pro",
+   "corner": 62,
+   "layout": "Pro17",
+   "length": 150.01,
+   "camera": 98.4
+  },
+  {
+   "ids": [
+    "iPhone19,3",
+    "iPhone19,7"
+   ],
+   "name": "iPhone 18 Pro Max",
+   "glass": 0.018,
+   "material": "Aluminium",
+   "actionButton": true,
+   "finish": "iPhone 18 Pro",
+   "corner": 62,
+   "layout": "Pro17",
+   "length": 163.43,
+   "camera": 111.82
+  },
+  {
+   "ids": [
+    "iPhone19,4"
+   ],
+   "name": "iPhone Duo",
+   "glass": 0.018,
+   "material": "PolishedTitanium",
+   "actionButton": true,
+   "finish": "iPhone Duo",
+   "corner": 62,
+   "layout": "Pro17",
+   "length": 150.01,
+   "camera": 98.4
+  },
+  {
+   "ids": [
+    "iPhone18,1"
+   ],
+   "name": "iPhone 17 Pro",
+   "glass": 0.018,
+   "material": "Aluminium",
+   "actionButton": true,
+   "finish": "iPhone 17 Pro",
+   "corner": 62,
+   "layout": "Pro17",
+   "length": 150.01,
+   "camera": 98.4
+  },
+  {
+   "ids": [
+    "iPhone18,2"
+   ],
+   "name": "iPhone 17 Pro Max",
+   "glass": 0.018,
+   "material": "Aluminium",
+   "actionButton": true,
+   "finish": "iPhone 17 Pro",
+   "corner": 62,
+   "layout": "Pro17",
+   "length": 163.43,
+   "camera": 111.82
+  },
+  {
+   "ids": [
+    "iPhone18,3"
+   ],
+   "name": "iPhone 17",
+   "glass": 0.02,
+   "material": "Aluminium",
+   "actionButton": true,
+   "finish": "iPhone 17",
+   "corner": 62,
+   "layout": "Iphone16",
+   "length": 149.61,
+   "camera": 98.2
+  },
+  {
+   "ids": [
+    "iPhone18,4"
+   ],
+   "name": "iPhone Air",
+   "glass": 0.02,
+   "material": "PolishedTitanium",
+   "actionButton": true,
+   "finish": "iPhone Air",
+   "corner": 62,
+   "layout": "Air",
+   "length": 156.18,
+   "camera": 104.77
+  },
+  {
+   "ids": [
+    "iPhone18,5"
+   ],
+   "name": "iPhone 17e",
+   "glass": 0.03,
+   "material": "Aluminium",
+   "actionButton": true,
+   "finish": "iPhone 17e",
+   "corner": 47.33,
+   "layout": "Iphone16e",
+   "length": 146.71
+  },
+  {
+   "ids": [
+    "iPhone17,1"
+   ],
+   "name": "iPhone 16 Pro",
+   "glass": 0.018,
+   "material": "Titanium",
+   "actionButton": true,
+   "finish": "iPhone 16 Pro",
+   "corner": 62,
+   "layout": "Iphone16",
+   "length": 149.61,
+   "camera": 98.19
+  },
+  {
+   "ids": [
+    "iPhone17,2"
+   ],
+   "name": "iPhone 16 Pro Max",
+   "glass": 0.018,
+   "material": "Titanium",
+   "actionButton": true,
+   "finish": "iPhone 16 Pro",
+   "corner": 62,
+   "layout": "Iphone16",
+   "length": 163.03,
+   "camera": 111.62
+  },
+  {
+   "ids": [
+    "iPhone17,3"
+   ],
+   "name": "iPhone 16",
+   "glass": 0.027,
+   "material": "Aluminium",
+   "actionButton": true,
+   "finish": "iPhone 16",
+   "corner": 55,
+   "layout": "Iphone16",
+   "length": 147.64,
+   "camera": 96.23
+  },
+  {
+   "ids": [
+    "iPhone17,4"
+   ],
+   "name": "iPhone 16 Plus",
+   "glass": 0.027,
+   "material": "Aluminium",
+   "actionButton": true,
+   "finish": "iPhone 16",
+   "corner": 55,
+   "layout": "Iphone16",
+   "length": 160.89,
+   "camera": 109.48
+  },
+  {
+   "ids": [
+    "iPhone17,5"
+   ],
+   "name": "iPhone 16e",
+   "glass": 0.03,
+   "material": "Aluminium",
+   "actionButton": true,
+   "finish": "iPhone 16e",
+   "corner": 47.33,
+   "layout": "Iphone16e",
+   "length": 146.71
+  },
+  {
+   "ids": [
+    "iPhone16,1"
+   ],
+   "name": "iPhone 15 Pro",
+   "glass": 0.026,
+   "material": "Titanium",
+   "actionButton": true,
+   "finish": "iPhone 15 Pro",
+   "corner": 55,
+   "layout": "Pro15",
+   "length": 146.61
+  },
+  {
+   "ids": [
+    "iPhone16,2"
+   ],
+   "name": "iPhone 15 Pro Max",
+   "glass": 0.026,
+   "material": "Titanium",
+   "actionButton": true,
+   "finish": "iPhone 15 Pro",
+   "corner": 55,
+   "layout": "Pro15",
+   "length": 159.86
+  },
+  {
+   "ids": [
+    "iPhone15,4"
+   ],
+   "name": "iPhone 15",
+   "glass": 0.028,
+   "material": "Aluminium",
+   "actionButton": false,
+   "finish": "iPhone 15",
+   "corner": 55,
+   "layout": "Iphone15",
+   "length": 147.64
+  },
+  {
+   "ids": [
+    "iPhone15,5"
+   ],
+   "name": "iPhone 15 Plus",
+   "glass": 0.028,
+   "material": "Aluminium",
+   "actionButton": false,
+   "finish": "iPhone 15",
+   "corner": 55,
+   "layout": "Plus15",
+   "length": 160.89
+  },
+  {
+   "ids": [
+    "iPhone15,2"
+   ],
+   "name": "iPhone 14 Pro",
+   "glass": 0.029,
+   "material": "Steel",
+   "actionButton": false,
+   "finish": "iPhone 14 Pro",
+   "corner": 55,
+   "layout": "Pro14",
+   "length": 147.46
+  },
+  {
+   "ids": [
+    "iPhone15,3"
+   ],
+   "name": "iPhone 14 Pro Max",
+   "glass": 0.029,
+   "material": "Steel",
+   "actionButton": false,
+   "finish": "iPhone 14 Pro",
+   "corner": 55,
+   "layout": "Pro14",
+   "length": 160.71
+  },
+  {
+   "ids": [
+    "iPhone14,7"
+   ],
+   "name": "iPhone 14",
+   "glass": 0.031,
+   "material": "Aluminium",
+   "actionButton": false,
+   "finish": "iPhone 14",
+   "corner": 47.33,
+   "layout": "Iphone14",
+   "length": 146.71
+  },
+  {
+   "ids": [
+    "iPhone14,8"
+   ],
+   "name": "iPhone 14 Plus",
+   "glass": 0.031,
+   "material": "Aluminium",
+   "actionButton": false,
+   "finish": "iPhone 14",
+   "corner": 53.33,
+   "layout": "Iphone14",
+   "length": 160.84
+  },
+  {
+   "ids": [
+    "iPhone14,2"
+   ],
+   "name": "iPhone 13 Pro",
+   "glass": 0.031,
+   "material": "Steel",
+   "actionButton": false,
+   "finish": "iPhone 13 Pro",
+   "corner": 47.33,
+   "layout": "Iphone13",
+   "length": 146.71
+  },
+  {
+   "ids": [
+    "iPhone14,3"
+   ],
+   "name": "iPhone 13 Pro Max",
+   "glass": 0.031,
+   "material": "Steel",
+   "actionButton": false,
+   "finish": "iPhone 13 Pro",
+   "corner": 53.33,
+   "layout": "Iphone13",
+   "length": 160.84
+  },
+  {
+   "ids": [
+    "iPhone14,5"
+   ],
+   "name": "iPhone 13",
+   "glass": 0.031,
+   "material": "Aluminium",
+   "actionButton": false,
+   "finish": "iPhone 13",
+   "corner": 47.33,
+   "layout": "Iphone13",
+   "length": 146.7
+  },
+  {
+   "ids": [
+    "iPhone14,4"
+   ],
+   "name": "iPhone 13 mini",
+   "glass": 0.031,
+   "material": "Aluminium",
+   "actionButton": false,
+   "finish": "iPhone 13",
+   "corner": 44,
+   "layout": "Mini13",
+   "length": 131.5
+  },
+  {
+   "ids": [
+    "iPhone13,3"
+   ],
+   "name": "iPhone 12 Pro",
+   "glass": 0.032,
+   "material": "Steel",
+   "actionButton": false,
+   "finish": "iPhone 12 Pro",
+   "corner": 47.33,
+   "layout": "Iphone12",
+   "length": 146.71
+  },
+  {
+   "ids": [
+    "iPhone13,4"
+   ],
+   "name": "iPhone 12 Pro Max",
+   "glass": 0.032,
+   "material": "Steel",
+   "actionButton": false,
+   "finish": "iPhone 12 Pro",
+   "corner": 53.33,
+   "layout": "ProMax12",
+   "length": 160.84
+  },
+  {
+   "ids": [
+    "iPhone13,2"
+   ],
+   "name": "iPhone 12",
+   "glass": 0.032,
+   "material": "Aluminium",
+   "actionButton": false,
+   "finish": "iPhone 12",
+   "corner": 47.33,
+   "layout": "Iphone12",
+   "length": 146.71
+  },
+  {
+   "ids": [
+    "iPhone13,1"
+   ],
+   "name": "iPhone 12 mini",
+   "glass": 0.032,
+   "material": "Aluminium",
+   "actionButton": false,
+   "finish": "iPhone 12",
+   "corner": 44,
+   "layout": "Mini12",
+   "length": 131.5
+  },
+  {
+   "ids": [
+    "iPhone12,3"
+   ],
+   "name": "iPhone 11 Pro",
+   "glass": 0.032,
+   "material": "Steel",
+   "actionButton": false,
+   "finish": "iPhone 11 Pro",
+   "corner": 39
+  },
+  {
+   "ids": [
+    "iPhone12,5"
+   ],
+   "name": "iPhone 11 Pro Max",
+   "glass": 0.032,
+   "material": "Steel",
+   "actionButton": false,
+   "finish": "iPhone 11 Pro",
+   "corner": 39
+  },
+  {
+   "ids": [
+    "iPhone12,1"
+   ],
+   "name": "iPhone 11",
+   "glass": 0.06,
+   "material": "Aluminium",
+   "actionButton": false,
+   "finish": "iPhone 11",
+   "corner": 41.5
+  },
+  {
+   "ids": [
+    "iPhone11,8"
+   ],
+   "name": "iPhone XR",
+   "glass": 0.06,
+   "material": "Aluminium",
+   "actionButton": false,
+   "finish": null,
+   "corner": 41.5
+  },
+  {
+   "ids": [
+    "iPhone11,2",
+    "iPhone11,4",
+    "iPhone11,6"
+   ],
+   "name": "iPhone XS",
+   "glass": 0.032,
+   "material": "Steel",
+   "actionButton": false,
+   "finish": null,
+   "corner": 39
+  },
+  {
+   "ids": [
+    "iPhone10,3",
+    "iPhone10,6"
+   ],
+   "name": "iPhone X",
+   "glass": 0.032,
+   "material": "Steel",
+   "actionButton": false,
+   "finish": null,
+   "corner": 39
+  }
+ ],
+ "layouts": {
+  "Pro17": [
+   {
+    "left": true,
+    "centre": 34.28,
+    "half": 3.45
+   },
+   {
+    "left": true,
+    "centre": 48.43,
+    "half": 5.6
+   },
+   {
+    "left": true,
+    "centre": 62.63,
+    "half": 5.6
+   },
+   {
+    "left": false,
+    "centre": 55.53,
+    "half": 8.85
+   }
+  ],
+  "Air": [
+   {
+    "left": true,
+    "centre": 34.08,
+    "half": 3.45
+   },
+   {
+    "left": true,
+    "centre": 48.23,
+    "half": 5.6
+   },
+   {
+    "left": true,
+    "centre": 62.43,
+    "half": 5.6
+   },
+   {
+    "left": false,
+    "centre": 55.33,
+    "half": 8.9
+   }
+  ],
+  "Iphone16": [
+   {
+    "left": true,
+    "centre": 34.08,
+    "half": 3.45
+   },
+   {
+    "left": true,
+    "centre": 48.23,
+    "half": 5.6
+   },
+   {
+    "left": true,
+    "centre": 62.43,
+    "half": 5.6
+   },
+   {
+    "left": false,
+    "centre": 55.33,
+    "half": 8.85
+   }
+  ],
+  "Iphone16e": [
+   {
+    "left": true,
+    "centre": 31.28,
+    "half": 3.77
+   },
+   {
+    "left": true,
+    "centre": 45.43,
+    "half": 5.92
+   },
+   {
+    "left": true,
+    "centre": 59.63,
+    "half": 5.92
+   },
+   {
+    "left": false,
+    "centre": 52.53,
+    "half": 9.17
+   }
+  ],
+  "Pro15": [
+   {
+    "left": true,
+    "centre": 31.67,
+    "half": 3.02
+   },
+   {
+    "left": true,
+    "centre": 45.22,
+    "half": 5.6
+   },
+   {
+    "left": true,
+    "centre": 59.42,
+    "half": 5.6
+   },
+   {
+    "left": false,
+    "centre": 56.17,
+    "half": 8.85
+   }
+  ],
+  "Iphone15": [
+   {
+    "left": true,
+    "centre": 32.83,
+    "half": 2.96
+   },
+   {
+    "left": true,
+    "centre": 46.27,
+    "half": 5.6
+   },
+   {
+    "left": true,
+    "centre": 60.47,
+    "half": 5.6
+   },
+   {
+    "left": false,
+    "centre": 53.37,
+    "half": 8.85
+   }
+  ],
+  "Plus15": [
+   {
+    "left": true,
+    "centre": 31.94,
+    "half": 2.96
+   },
+   {
+    "left": true,
+    "centre": 45.39,
+    "half": 5.6
+   },
+   {
+    "left": true,
+    "centre": 59.59,
+    "half": 5.6
+   },
+   {
+    "left": false,
+    "centre": 52.49,
+    "half": 8.85
+   }
+  ],
+  "Pro14": [
+   {
+    "left": true,
+    "centre": 31.14,
+    "half": 2.96
+   },
+   {
+    "left": true,
+    "centre": 44.59,
+    "half": 5.9
+   },
+   {
+    "left": true,
+    "centre": 58.79,
+    "half": 5.9
+   },
+   {
+    "left": false,
+    "centre": 55.54,
+    "half": 9.15
+   }
+  ],
+  "Iphone14": [
+   {
+    "left": true,
+    "centre": 31.98,
+    "half": 2.96
+   },
+   {
+    "left": true,
+    "centre": 45.43,
+    "half": 5.92
+   },
+   {
+    "left": true,
+    "centre": 59.63,
+    "half": 5.92
+   },
+   {
+    "left": false,
+    "centre": 52.53,
+    "half": 9.17
+   }
+  ],
+  "Iphone13": [
+   {
+    "left": true,
+    "centre": 32.22,
+    "half": 2.9
+   },
+   {
+    "left": true,
+    "centre": 45.53,
+    "half": 5.82
+   },
+   {
+    "left": true,
+    "centre": 59.53,
+    "half": 5.82
+   },
+   {
+    "left": false,
+    "centre": 52.53,
+    "half": 9.07
+   }
+  ],
+  "Mini13": [
+   {
+    "left": true,
+    "centre": 23.37,
+    "half": 2.9
+   },
+   {
+    "left": true,
+    "centre": 36.68,
+    "half": 5.82
+   },
+   {
+    "left": true,
+    "centre": 50.68,
+    "half": 5.82
+   },
+   {
+    "left": false,
+    "centre": 43.68,
+    "half": 9.07
+   }
+  ],
+  "Iphone12": [
+   {
+    "left": true,
+    "centre": 25.99,
+    "half": 2.85
+   },
+   {
+    "left": true,
+    "centre": 39.31,
+    "half": 5.65
+   },
+   {
+    "left": true,
+    "centre": 53.31,
+    "half": 5.65
+   },
+   {
+    "left": false,
+    "centre": 46.31,
+    "half": 8.9
+   }
+  ],
+  "ProMax12": [
+   {
+    "left": true,
+    "centre": 33.34,
+    "half": 2.85
+   },
+   {
+    "left": true,
+    "centre": 46.65,
+    "half": 5.65
+   },
+   {
+    "left": true,
+    "centre": 60.65,
+    "half": 5.65
+   },
+   {
+    "left": false,
+    "centre": 53.65,
+    "half": 8.9
+   }
+  ],
+  "Mini12": [
+   {
+    "left": true,
+    "centre": 23.37,
+    "half": 2.85
+   },
+   {
+    "left": true,
+    "centre": 36.68,
+    "half": 5.65
+   },
+   {
+    "left": true,
+    "centre": 50.68,
+    "half": 5.65
+   },
+   {
+    "left": false,
+    "centre": 43.68,
+    "half": 8.9
+   }
+  ]
+ },
+ "cameraControlHalf": 8.55,
+ "estimatedButtons": [
+  {
+   "left": true,
+   "top": 0.155,
+   "bottom": 0.18
+  },
+  {
+   "left": true,
+   "top": 0.245,
+   "bottom": 0.316
+  },
+  {
+   "left": true,
+   "top": 0.34,
+   "bottom": 0.411
+  },
+  {
+   "left": false,
+   "top": 0.265,
+   "bottom": 0.385
+  }
+ ],
+ "finishes": [
+  {
+   "group": "Phone Use",
+   "note": "The frame this window always had: its plain-band colours are given, not derived.",
+   "finishes": [
+    {
+     "id": "graphite",
+     "name": "Graphite",
+     "base": "#55555B",
+     "light": "#6C6C72",
+     "dark": "#2E2E33",
+     "mid": "#55555B",
+     "buttonEdge": "#3A3A3E",
+     "buttonMid": "#77777D"
+    }
+   ]
+  },
+  {
+   "group": "iPhone 18 Pro",
+   "note": "Bands measured in Apple's newsroom photos (apple.com/newsroom, \"Apple debuts iPhone 18 Pro and iPhone 18 Pro Max\"): Burgundy on the phone facing the camera; the others from the side bands of the colour lineup, scaled as Burgundy's side band is to its front one (0.8 of the light).",
+   "finishes": [
+    {
+     "id": "18pro-burgundy",
+     "name": "Burgundy",
+     "base": "#4D1822",
+     "band": "#3E252B"
+    },
+    {
+     "id": "18pro-glacier",
+     "name": "Glacier",
+     "base": "#E8F2FE",
+     "band": "#737F92"
+    },
+    {
+     "id": "18pro-silver",
+     "name": "Silver",
+     "base": "#F7F7F7",
+     "band": "#A9A9A7"
+    },
+    {
+     "id": "18pro-black",
+     "name": "Black",
+     "base": "#3C3C3C",
+     "band": "#1A1A1C"
+    }
+   ]
+  },
+  {
+   "group": "iPhone Duo",
+   "finishes": [
+    {
+     "id": "duo-night-sky",
+     "name": "Night Sky",
+     "base": "#394452"
+    },
+    {
+     "id": "duo-star-white",
+     "name": "Star White",
+     "base": "#F7F6F5"
+    }
+   ]
+  },
+  {
+   "group": "iPhone 17 Pro",
+   "finishes": [
+    {
+     "id": "17pro-cosmic-orange",
+     "name": "Cosmic Orange",
+     "base": "#F8833E",
+     "band": "#C67643"
+    },
+    {
+     "id": "17pro-deep-blue",
+     "name": "Deep Blue",
+     "base": "#4A5680",
+     "band": "#3A4053"
+    },
+    {
+     "id": "17pro-silver",
+     "name": "Silver",
+     "base": "#E7E7E7",
+     "band": "#ACACAA"
+    }
+   ]
+  },
+  {
+   "group": "iPhone Air",
+   "finishes": [
+    {
+     "id": "air-space-black",
+     "name": "Space Black",
+     "base": "#0E0E0E",
+     "band": "#17171A"
+    },
+    {
+     "id": "air-cloud-white",
+     "name": "Cloud White",
+     "base": "#FCFCFC",
+     "band": "#D0D0D0"
+    },
+    {
+     "id": "air-light-gold",
+     "name": "Light Gold",
+     "base": "#FAF2E5",
+     "band": "#D4CFC4"
+    },
+    {
+     "id": "air-sky-blue",
+     "name": "Sky Blue",
+     "base": "#E5F2FA",
+     "band": "#C7D2DC"
+    }
+   ]
+  },
+  {
+   "group": "iPhone 17",
+   "finishes": [
+    {
+     "id": "17-black",
+     "name": "Black",
+     "base": "#464747",
+     "band": "#505153"
+    },
+    {
+     "id": "17-lavender",
+     "name": "Lavender",
+     "base": "#E7D7F2",
+     "band": "#B9B3C0"
+    },
+    {
+     "id": "17-mist-blue",
+     "name": "Mist Blue",
+     "base": "#A6BDDD",
+     "band": "#96A8C2"
+    },
+    {
+     "id": "17-sage",
+     "name": "Sage",
+     "base": "#BAC79C",
+     "band": "#9AA887"
+    },
+    {
+     "id": "17-white",
+     "name": "White",
+     "base": "#F7F7F5",
+     "band": "#CACAC8"
+    }
+   ]
+  },
+  {
+   "group": "iPhone 17e",
+   "finishes": [
+    {
+     "id": "17e-black",
+     "name": "Black",
+     "base": "#404040"
+    },
+    {
+     "id": "17e-soft-pink",
+     "name": "Soft Pink",
+     "base": "#FCE7E6"
+    },
+    {
+     "id": "17e-white",
+     "name": "White",
+     "base": "#F6F6F4"
+    }
+   ]
+  },
+  {
+   "group": "iPhone 16 Pro",
+   "finishes": [
+    {
+     "id": "16pro-black",
+     "name": "Black Titanium",
+     "base": "#4F4F4F",
+     "band": "#232323"
+    },
+    {
+     "id": "16pro-white",
+     "name": "White Titanium",
+     "base": "#ECECEA",
+     "band": "#A6A29F"
+    },
+    {
+     "id": "16pro-natural",
+     "name": "Natural Titanium",
+     "base": "#CBC7C0",
+     "band": "#8A857C"
+    },
+    {
+     "id": "16pro-desert",
+     "name": "Desert Titanium",
+     "base": "#EBD8C8",
+     "band": "#685041"
+    }
+   ]
+  },
+  {
+   "group": "iPhone 16",
+   "finishes": [
+    {
+     "id": "16-black",
+     "name": "Black",
+     "base": "#464747",
+     "band": "#2E2F33"
+    },
+    {
+     "id": "16-pink",
+     "name": "Pink",
+     "base": "#F1A8D8",
+     "band": "#A9628D"
+    },
+    {
+     "id": "16-teal",
+     "name": "Teal",
+     "base": "#AFD4D2",
+     "band": "#5A7B80"
+    },
+    {
+     "id": "16-ultramarine",
+     "name": "Ultramarine",
+     "base": "#94A6F1",
+     "band": "#5D6EAD"
+    },
+    {
+     "id": "16-white",
+     "name": "White",
+     "base": "#F7F7F5",
+     "band": "#C1C1BF"
+    }
+   ]
+  },
+  {
+   "group": "iPhone 16e",
+   "finishes": [
+    {
+     "id": "16e-black",
+     "name": "Black",
+     "base": "#404040"
+    },
+    {
+     "id": "16e-white",
+     "name": "White",
+     "base": "#F6F6F4"
+    }
+   ]
+  },
+  {
+   "group": "iPhone 15 Pro",
+   "finishes": [
+    {
+     "id": "15pro-black",
+     "name": "Black Titanium",
+     "base": "#464646",
+     "band": "#242529"
+    },
+    {
+     "id": "15pro-blue",
+     "name": "Blue Titanium",
+     "base": "#545A66",
+     "band": "#20242E"
+    },
+    {
+     "id": "15pro-natural",
+     "name": "Natural Titanium",
+     "base": "#A6A29B",
+     "band": "#706C64"
+    },
+    {
+     "id": "15pro-white",
+     "name": "White Titanium",
+     "base": "#EEEAE6",
+     "band": "#93918C"
+    }
+   ]
+  },
+  {
+   "group": "iPhone 15",
+   "finishes": [
+    {
+     "id": "15-black",
+     "name": "Black",
+     "base": "#4E4F4E",
+     "band": "#393D3F"
+    },
+    {
+     "id": "15-blue",
+     "name": "Blue",
+     "base": "#F3F8F8",
+     "band": "#B7BEC1"
+    },
+    {
+     "id": "15-green",
+     "name": "Green",
+     "base": "#F3F8E8",
+     "band": "#BAC4B5"
+    },
+    {
+     "id": "15-pink",
+     "name": "Pink",
+     "base": "#FCE8E8",
+     "band": "#D2B8BB"
+    },
+    {
+     "id": "15-yellow",
+     "name": "Yellow",
+     "base": "#FCFBE4",
+     "band": "#D0CCAF"
+    }
+   ]
+  },
+  {
+   "group": "iPhone 14 Pro",
+   "note": "Middle of the flat sides in Apple's iPhone 14 Pro Newsroom colour carousel.",
+   "finishes": [
+    {
+     "id": "14pro-deep-purple",
+     "name": "Deep Purple",
+     "base": "#595261",
+     "band": "#8F819B"
+    },
+    {
+     "id": "14pro-gold",
+     "name": "Gold",
+     "base": "#F3E6CC",
+     "band": "#F4E6CB"
+    },
+    {
+     "id": "14pro-silver",
+     "name": "Silver",
+     "base": "#F0F2F2",
+     "band": "#EBECEE"
+    },
+    {
+     "id": "14pro-space-black",
+     "name": "Space Black",
+     "base": "#3B3937",
+     "band": "#2E2A27"
+    }
+   ]
+  },
+  {
+   "group": "iPhone 14",
+   "finishes": [
+    {
+     "id": "14-blue",
+     "name": "Blue",
+     "base": "#A8B8C8"
+    },
+    {
+     "id": "14-midnight",
+     "name": "Midnight",
+     "base": "#192928"
+    },
+    {
+     "id": "14-purple",
+     "name": "Purple",
+     "base": "#E8D8E8"
+    },
+    {
+     "id": "14-red",
+     "name": "(PRODUCT)RED",
+     "base": "#F80628"
+    },
+    {
+     "id": "14-starlight",
+     "name": "Starlight",
+     "base": "#F8F8E7"
+    },
+    {
+     "id": "14-yellow",
+     "name": "Yellow",
+     "base": "#F8D868"
+    }
+   ]
+  },
+  {
+   "group": "iPhone 13 Pro",
+   "note": "Band tones estimated from the Newsroom lineup images, accounting for reflections between phones.",
+   "finishes": [
+    {
+     "id": "13pro-alpine-green",
+     "name": "Alpine Green",
+     "base": "#546554",
+     "band": "#68786D"
+    },
+    {
+     "id": "13pro-gold",
+     "name": "Gold",
+     "base": "#F6E4C7",
+     "band": "#C1A67E"
+    },
+    {
+     "id": "13pro-graphite",
+     "name": "Graphite",
+     "base": "#4C4C4A",
+     "band": "#737470"
+    },
+    {
+     "id": "13pro-sierra-blue",
+     "name": "Sierra Blue",
+     "base": "#93A9C0",
+     "band": "#859BB4"
+    },
+    {
+     "id": "13pro-silver",
+     "name": "Silver",
+     "base": "#F1F1E7",
+     "band": "#DFE0DF"
+    }
+   ]
+  },
+  {
+   "group": "iPhone 13",
+   "finishes": [
+    {
+     "id": "13-blue",
+     "name": "Blue",
+     "base": "#235D7B"
+    },
+    {
+     "id": "13-green",
+     "name": "Green",
+     "base": "#334434"
+    },
+    {
+     "id": "13-midnight",
+     "name": "Midnight",
+     "base": "#151D23"
+    },
+    {
+     "id": "13-pink",
+     "name": "Pink",
+     "base": "#FCDDD8"
+    },
+    {
+     "id": "13-red",
+     "name": "(PRODUCT)RED",
+     "base": "#96060D"
+    },
+    {
+     "id": "13-starlight",
+     "name": "Starlight",
+     "base": "#F9F4EE"
+    }
+   ]
+  },
+  {
+   "group": "iPhone 12 Pro",
+   "note": "Estimates from the iPhone 12 Pro press images and finish swatches.",
+   "finishes": [
+    {
+     "id": "12pro-gold",
+     "name": "Gold",
+     "base": "#FCEFD9",
+     "band": "#BFA475"
+    },
+    {
+     "id": "12pro-graphite",
+     "name": "Graphite",
+     "base": "#494846",
+     "band": "#666563"
+    },
+    {
+     "id": "12pro-pacific-blue",
+     "name": "Pacific Blue",
+     "base": "#304B55",
+     "band": "#57788E"
+    },
+    {
+     "id": "12pro-silver",
+     "name": "Silver",
+     "base": "#F3F4F0",
+     "band": "#DBDDDE"
+    }
+   ]
+  },
+  {
+   "group": "iPhone 12",
+   "finishes": [
+    {
+     "id": "12-black",
+     "name": "Black",
+     "base": "#221C24"
+    },
+    {
+     "id": "12-blue",
+     "name": "Blue",
+     "base": "#033356"
+    },
+    {
+     "id": "12-green",
+     "name": "Green",
+     "base": "#DDF4D8"
+    },
+    {
+     "id": "12-purple",
+     "name": "Purple",
+     "base": "#AFA9DF"
+    },
+    {
+     "id": "12-red",
+     "name": "(PRODUCT)RED",
+     "base": "#DF3434"
+    },
+    {
+     "id": "12-white",
+     "name": "White",
+     "base": "#FDF4F4"
+    }
+   ]
+  },
+  {
+   "group": "iPhone 11 Pro",
+   "note": "The curved iPhone 11 Pro bands catch several reflections in the Newsroom lineup image.",
+   "finishes": [
+    {
+     "id": "11pro-gold",
+     "name": "Gold",
+     "base": "#F4D2B9",
+     "band": "#DAB394"
+    },
+    {
+     "id": "11pro-midnight-green",
+     "name": "Midnight Green",
+     "base": "#414A46",
+     "band": "#597069"
+    },
+    {
+     "id": "11pro-silver",
+     "name": "Silver",
+     "base": "#E0E0D8",
+     "band": "#DCDDDC"
+    },
+    {
+     "id": "11pro-space-gray",
+     "name": "Space Gray",
+     "base": "#3A3839",
+     "band": "#626062"
+    }
+   ]
+  },
+  {
+   "group": "iPhone 11",
+   "finishes": [
+    {
+     "id": "11-black",
+     "name": "Black",
+     "base": "#1E1E1E"
+    },
+    {
+     "id": "11-green",
+     "name": "Green",
+     "base": "#ABDDCA"
+    },
+    {
+     "id": "11-purple",
+     "name": "Purple",
+     "base": "#D7D1E0"
+    },
+    {
+     "id": "11-red",
+     "name": "(PRODUCT)RED",
+     "base": "#B6062A"
+    },
+    {
+     "id": "11-white",
+     "name": "White",
+     "base": "#FBF9F2"
+    },
+    {
+     "id": "11-yellow",
+     "name": "Yellow",
+     "base": "#FEE581"
+    }
+   ]
+  }
+ ]
+}

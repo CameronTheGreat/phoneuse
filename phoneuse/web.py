@@ -933,6 +933,10 @@ def app(mirror):
 
     for icon in ("favicon-32.png", "favicon-64.png", "apple-touch-icon.png"):  # scripts/make-icons.py
         a.router.add_get("/" + icon, lambda _r, f=icon: web.FileResponse(os.path.join(os.path.dirname(PAGE), f)))
+    # the phone's frame: the models and finishes (shared with the Windows app) and its drawing
+    for part in ("phones.json", "frame.js"):
+        a.router.add_get("/" + part, lambda _r, f=part: web.FileResponse(os.path.join(os.path.dirname(PAGE), f),
+                                                                         headers={"Cache-Control": "no-cache"}))
     a.router.add_post("/api/quit", quit_services)
     a.router.add_post("/api/agent/act", agent_act)
     a.router.add_post("/api/agent/phase", agent_phase)

@@ -33,7 +33,7 @@ public sealed class AboutView : UserControl
         var png = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.png");
         if (File.Exists(png)) head.Children.Add(new Image { Source = new BitmapImage(new Uri(png)), Width = 56, Height = 56 });
         var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        titles.Children.Add(new TextBlock { Text = "Phone Use", Style = ThemeStyle("TitleTextBlockStyle") });
+        titles.Children.Add(new TextBlock { Text = "Phone Use", Style = Brand.Title });
         titles.Children.Add(new TextBlock { Text = "Version " + version, Opacity = 0.6 });
         head.Children.Add(titles);
         _body.Children.Add(head);
@@ -99,12 +99,10 @@ public sealed class AboutView : UserControl
         Content = new ScrollViewer { Content = _body };
     }
 
-    static Style ThemeStyle(string key) => (Style)Application.Current.Resources[key];
-
     void Heading(string text) => _body.Children.Add(new TextBlock
     {
         Text = text,
-        Style = ThemeStyle("SubtitleTextBlockStyle"),
+        Style = Brand.Subtitle,
         Margin = new Thickness(0, 18, 0, 2),
     });
 
@@ -118,38 +116,32 @@ public sealed class AboutView : UserControl
 
     void Bullet(string text)
     {
-        var g = new Grid { ColumnSpacing = 10 };
-        g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var g = Ui.Columns(10, "auto", "*");
         g.Children.Add(new TextBlock { Text = "•", Opacity = 0.6 });
-        var t = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Opacity = 0.85, IsTextSelectionEnabled = true };
-        Grid.SetColumn(t, 1);
-        g.Children.Add(t);
+        new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Opacity = 0.85, IsTextSelectionEnabled = true }.AddTo(g, 1);
         _body.Children.Add(g);
     }
 
     void Step(int n, string title, string text)
     {
-        var g = new Grid { ColumnSpacing = 12, Margin = new Thickness(0, 4, 0, 4) };
-        g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var g = Ui.Columns(12, "auto", "*");
+        g.Margin = new Thickness(0, 4, 0, 4);
         var badge = new Border
         {
             Width = 24, Height = 24, CornerRadius = new CornerRadius(12), VerticalAlignment = VerticalAlignment.Top,
-            Background = (Brush)Application.Current.Resources["BrandPlumBrush"],
+            Background = Brand.Plum,
             Child = new TextBlock
             {
                 Text = n.ToString(), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                 HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-                Foreground = (Brush)Application.Current.Resources["BrandBgBrush"],
+                Foreground = Brand.Bg,
             },
         };
         g.Children.Add(badge);
         var col = new StackPanel { Spacing = 2 };
-        col.Children.Add(new TextBlock { Text = title, Style = ThemeStyle("BodyStrongTextBlockStyle") });
+        col.Children.Add(new TextBlock { Text = title, Style = Brand.BodyStrong });
         col.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Opacity = 0.85, IsTextSelectionEnabled = true });
-        Grid.SetColumn(col, 1);
-        g.Children.Add(col);
+        col.AddTo(g, 1);
         _body.Children.Add(g);
     }
 }
