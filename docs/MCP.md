@@ -89,11 +89,14 @@ The adapter handles plain text, structured JSON, and a PNG with JSON metadata.
 ## Running a sequence
 
 After `status` and `show_mirror`, prefer the MCP-only `run_steps` tool for up
-to four steps whose arguments you can supply up front. The screen can be
-unseen: `tap_on` finds a live label and `expect` verifies the transition.
-It accepts `open_app`, `tap_on`, `scroll_by`, `type_text`,
-`press_key`, `wait_for`, `look`, and `inspect_region` with their usual
-arguments. Put `look` or `inspect_region` last. Use separate calls when the
+to six steps whose arguments you can supply up front, within 90 seconds. The
+screen can be unseen: `tap_on` finds a live label and `expect` verifies the
+transition. It accepts `open_app`, `tap_on`, `scroll_by`, `type_text`,
+`press_key`, `navigate`, `back`, `find_in_scroll`, `wait_for`, `look`, and
+`inspect_region` with their usual arguments. Put `look` or `inspect_region`
+last. When a run stops early, its result includes `screen`, the current screen
+text as `look` returns it, so the agent can recover without another call. It is
+left out when the run ran out of time or fewer than 4 seconds remain. Use separate calls when the
 next action depends on inspecting a result or getting owner approval.
 
 ```json

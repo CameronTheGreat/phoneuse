@@ -70,7 +70,7 @@ moved since then, look again.
 | `toggle_keyboard` | `keyboard` | Show or hide the on-screen keyboard. |
 | `back` | `back` | Go back in the current app. |
 | `navigate` | `recipe` | Use a system gesture: home, switcher, control-center, notifications or dismiss. |
-| `run_steps` | (MCP only) | Batch up to four steps in 60 seconds. Stops on failure or uncertainty. |
+| `run_steps` | (MCP only) | Batch up to six steps in 90 seconds. Stops on failure or uncertainty and returns the current screen text. |
 
 If a result says input "was sent" or "may have been sent", look at the screen
 before you retry, so nothing happens twice. Avoid tapping the Dynamic Island,

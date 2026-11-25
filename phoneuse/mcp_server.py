@@ -17,8 +17,9 @@ from . import commands
 PROTOCOLS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 MCP_PORT = 8779
 COMMAND_TIMEOUT = 300
-STEPS_TIMEOUT = 60
-MAX_STEPS = 4
+STEPS_TIMEOUT = 90
+MAX_STEPS = 6
+SCREEN_MIN_SECONDS = 4  # the OCR read that a stopped run returns, with CLI startup
 STEP_STATUSES = {
     "open_app": {"ok"},
     "tap_on": {"tapped", "confirmed"},
@@ -28,9 +29,12 @@ STEP_STATUSES = {
     "wait_for": {"visible"},
     "look": {"ok"},
     "inspect_region": {"captured"},
+    "find_in_scroll": {"found"},
+    "navigate": {"ok"},
+    "back": {"ok"},
 }
 OBSERVATION_TOOLS = {"look", "inspect_region"}
-INPUT_TOOLS = {"open_app", "tap_on", "scroll_by", "type_text", "press_key"}
+INPUT_TOOLS = {"open_app", "tap_on", "scroll_by", "type_text", "press_key", "navigate", "back", "find_in_scroll"}
 RUN_STEPS = {
     "name": "run_steps",
     "description": (
@@ -38,7 +42,8 @@ RUN_STEPS = {
         "For example, open an app or scroll, then look. The screen need not be visible in advance: "
         "tap_on finds a live label, expect checks the transition, and wait_for waits for a label. "
         "Use look or inspect_region only as the last step. "
-        "Returns brief step statuses and the final result. Stops on failure or uncertainty. "
+        "Returns brief step statuses and the final result. Stops on failure or uncertainty, "
+        "and a stopped run includes the current screen text. "
         "Use individual calls when you need to inspect a result or get owner approval before continuing."
     ),
     "inputSchema": {
@@ -188,6 +193,15 @@ def validate_steps(args):
     return validated
 
 
+def current_screen(failed, deadline, job):
+    """Read the screen after a stop, which saves the agent a look call. It never sends input."""
+    remaining = deadline - time.monotonic()
+    if failed == "look" or remaining < SCREEN_MIN_SECONDS:
+        return None
+    reply = call_tool("look", {}, job, timeout=remaining)
+    return None if reply["isError"] else reply["content"][0]["text"]
+
+
 def run_steps(args, job=None):
     try:
         steps = validate_steps(args)
@@ -219,6 +233,9 @@ def run_steps(args, job=None):
 
         if reply["isError"] or status not in STEP_STATUSES[name]:
             summary.update(status="stopped", stopped_at=index, result=details)
+            screen = current_screen(name, deadline, job)
+            if screen is not None:
+                summary["screen"] = screen
             break
         if index == len(steps):
             summary["result"] = details

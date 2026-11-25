@@ -218,7 +218,7 @@ def test_mcp_discovers_manifest_over_stdio(tmp_path):
     assert "stop tool calls until it returns" in initialized["instructions"]
     schemas = {tool["name"]: tool["inputSchema"] for tool in listing["tools"]}
     steps_schema = schemas.pop("run_steps")["properties"]["steps"]
-    assert steps_schema["maxItems"] == 4
+    assert steps_schema["maxItems"] == 6
     assert {"scroll_by", "type_text", "press_key"} <= set(steps_schema["items"]["properties"]["name"]["enum"])
     assert schemas == {name: command.schema() for name, command in commands.TOOLS.items()}
     assert invalid["isError"]
@@ -312,7 +312,7 @@ def test_run_steps_executes_in_order_and_returns_only_final_observation(monkeypa
 
     def invoke(command, arguments, artifact, job, *, timeout):
         calls.append((command.cli, arguments))
-        assert 0 < timeout <= 60
+        assert 0 < timeout <= mcp_server.STEPS_TIMEOUT
         return SimpleNamespace(returncode=0, stdout=next(replies), stderr="")
 
     monkeypatch.setattr(mcp_server, "invoke", invoke)
@@ -367,7 +367,7 @@ def test_run_steps_stops_on_structured_failure_even_with_zero_exit(monkeypatch, 
     from phoneuse import mcp_server
 
     failure = {"status": "input_error", "stage": "tap", "input_sent": input_sent}
-    replies = iter([("open", "ok"), ("tap-on", json.dumps(failure))])
+    replies = iter([("open", "ok"), ("tap-on", json.dumps(failure)), ("text", "0.5 0.2  Allow Location?")])
 
     def invoke(command, *args, **kwargs):
         expected, stdout = next(replies)
@@ -385,7 +385,9 @@ def test_run_steps_stops_on_structured_failure_even_with_zero_exit(monkeypatch, 
         "steps": [{"name": "open_app", "status": "ok", "input_sent": True},
                   {"name": "tap_on", "status": "input_error", "input_sent": input_sent}],
         "result": failure,
+        "screen": "0.5 0.2  Allow Location?",
     }
+    assert next(replies, None) is None
 
 
 @pytest.mark.parametrize("later_steps", [
@@ -434,11 +436,11 @@ def test_run_steps_preserves_final_image(monkeypatch):
 def test_run_steps_stops_when_shared_deadline_expires(monkeypatch):
     from phoneuse import mcp_server
 
-    ticks = iter([0, 20, 60])
+    ticks = iter([0, 20, 90])
     monkeypatch.setattr(mcp_server, "time", SimpleNamespace(monotonic=lambda: next(ticks)))
 
     def invoke(command, arguments, artifact, job, *, timeout):
-        assert command.cli == "open" and timeout == 40
+        assert command.cli == "open" and timeout == 70
         return SimpleNamespace(returncode=0, stdout="ok", stderr="")
 
     monkeypatch.setattr(mcp_server, "invoke", invoke)
@@ -448,6 +450,75 @@ def test_run_steps_stops_when_shared_deadline_expires(monkeypatch):
     assert result["isError"]
     assert result["structuredContent"]["stopped_at"] == 2
     assert result["structuredContent"]["result"] == {"status": "deadline_exceeded", "input_sent": False}
+    assert "screen" not in result["structuredContent"]
+
+
+def test_run_steps_accepts_six_steps_with_navigation_tools(monkeypatch):
+    from phoneuse import mcp_server
+
+    calls = []
+
+    def invoke(command, arguments, artifact, job, *, timeout):
+        calls.append(command.cli)
+        stdout = '{"status":"found","matches":[],"scrolls":2,"input_sent":true}' if command.cli == "find-in-scroll" else ""
+        return SimpleNamespace(returncode=0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(mcp_server, "invoke", invoke)
+    result = mcp_server.call_tool("run_steps", {"steps": [
+        {"name": "back"}, {"name": "navigate", "arguments": {"name": "home"}},
+        {"name": "open_app", "arguments": {"app": "Settings"}},
+        {"name": "find_in_scroll", "arguments": {"label": "Privacy"}},
+        {"name": "tap_on", "arguments": {"label": "Privacy"}}, {"name": "press_key", "arguments": {"combo": "esc"}},
+    ]})
+    assert calls == ["back", "recipe", "open", "find-in-scroll", "tap-on", "text"]
+    # tap-on returned no JSON here, so the run stops at step 5 and reads the screen once.
+    assert result["structuredContent"]["stopped_at"] == 5
+    assert [s["input_sent"] for s in result["structuredContent"]["steps"][:4]] == [True, True, True, True]
+
+
+def test_run_steps_refuses_seven_steps(monkeypatch):
+    from phoneuse import mcp_server
+
+    monkeypatch.setattr(mcp_server, "invoke", lambda *a, **k: pytest.fail("must not invoke"))
+    result = mcp_server.call_tool("run_steps", {"steps": [{"name": "back"}] * 7})
+    assert result["isError"] and result["content"][0]["text"] == "Supply 1 to 6 steps"
+
+
+def test_run_steps_completed_run_reads_the_screen_only_when_asked(monkeypatch):
+    from phoneuse import mcp_server
+
+    calls = []
+
+    def invoke(command, arguments, artifact, job, *, timeout):
+        calls.append(command.cli)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(mcp_server, "invoke", invoke)
+    result = mcp_server.call_tool("run_steps", {"steps": [{"name": "back"}]})
+    assert calls == ["back"]
+    assert result["structuredContent"]["status"] == "completed"
+    assert "screen" not in result["structuredContent"]
+
+
+@pytest.mark.parametrize("ticks, look_fails", [([0, 0, 87], False), ([0, 0, 0], True)])
+def test_run_steps_omits_screen_when_short_of_time_or_look_fails(monkeypatch, ticks, look_fails):
+    from phoneuse import mcp_server
+
+    clock = iter(ticks)
+    monkeypatch.setattr(mcp_server, "time", SimpleNamespace(monotonic=lambda: next(clock)))
+    calls = []
+
+    def invoke(command, arguments, artifact, job, *, timeout):
+        calls.append(command.cli)
+        if command.cli == "wait-for":
+            return SimpleNamespace(returncode=1, stdout='{"status":"timeout"}', stderr="")
+        return SimpleNamespace(returncode=1, stdout="", stderr="mirror not running")
+
+    monkeypatch.setattr(mcp_server, "invoke", invoke)
+    result = mcp_server.call_tool("run_steps", {"steps": [{"name": "wait_for", "arguments": {"label": "Done"}}]})
+    assert calls == (["wait-for", "text"] if look_fails else ["wait-for"])
+    assert result["structuredContent"]["status"] == "stopped"
+    assert "screen" not in result["structuredContent"]
 
 
 def test_optional_positionals_append_only_when_given():
