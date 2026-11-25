@@ -79,6 +79,9 @@
                     <Grid x:Name="Screen" Background="Black" HorizontalAlignment="Left" VerticalAlignment="Top">
                         <!-- a pixel past the screen on every side, under the body: no sliver of background at any size -->
                         <SwapChainPanel x:Name="Video" Margin="-1" IsHitTestVisible="False" />
+                        <!-- dims the picture while it is old (UpdateNote); the panel's own Opacity would turn the window see-through -->
+                        <Border x:Name="StaleVeil" Margin="-1" Background="Black" Opacity="0.45" Visibility="Collapsed"
+                                IsHitTestVisible="False" />
                         <Canvas x:Name="DotLayer" IsHitTestVisible="False">
                             <Ellipse x:Name="AgentDot" Width="22" Height="22" Visibility="Collapsed"
                                      Fill="#66FFFFFF" Stroke="White" StrokeThickness="2" />

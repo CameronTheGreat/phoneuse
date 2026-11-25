@@ -186,7 +186,9 @@ public sealed partial class MainWindow : Window
             _video.Reset();
         }
         Video.Visibility = _live ? Visibility.Visible : Visibility.Collapsed;
-        Video.Opacity = _stale ? 0.55 : 1;
+        // The old picture is dimmed by a veil over the panel, not by the panel's Opacity: the swap chain is
+        // premultiplied (its corners are cut out), and a panel below full opacity let the desktop show through.
+        StaleVeil.Visibility = _live && _stale ? Visibility.Visible : Visibility.Collapsed;
 
         if (AwakeSwitch.IsOn != _awake)
         {
